@@ -6,10 +6,33 @@ import { MailerModule } from '../providers/mailer/mailer.module';
 import { DIGEST_QUEUE, SCHEDULER_QUEUE, SEND_QUEUE } from './queue.constants';
 import { SendProcessor } from './send.processor';
 
-const connection = {
-  host: process.env.REDIS_HOST ?? '127.0.0.1',
-  port: Number(process.env.REDIS_PORT ?? 6379),
-};
+/**
+ * Redis connection. Supports a single REDIS_URL (managed hosts like Upstash /
+ * Railway / Render give one, often rediss:// with a password), or discrete
+ * REDIS_HOST/PORT/PASSWORD for local Docker. TLS is enabled for rediss:// or
+ * when REDIS_TLS=true.
+ */
+function redisConnection() {
+  const url = process.env.REDIS_URL;
+  if (url) {
+    const u = new URL(url);
+    return {
+      host: u.hostname,
+      port: Number(u.port || 6379),
+      username: u.username || undefined,
+      password: u.password || undefined,
+      tls: u.protocol === 'rediss:' ? {} : undefined,
+    };
+  }
+  return {
+    host: process.env.REDIS_HOST ?? '127.0.0.1',
+    port: Number(process.env.REDIS_PORT ?? 6379),
+    password: process.env.REDIS_PASSWORD || undefined,
+    tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
+  };
+}
+
+const connection = redisConnection();
 
 @Module({
   imports: [
