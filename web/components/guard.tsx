@@ -17,6 +17,7 @@ const NAV: Record<Role, NavEntry[]> = {
     { kind: 'link', href: '/super-admin', label: 'Clients', icon: 'building' },
     { kind: 'link', href: '/super-admin/approvals', label: 'Approvals', icon: 'check' },
     { kind: 'link', href: '/super-admin/library', label: 'Shared library', icon: 'film' },
+    { kind: 'link', href: '/super-admin/quiz-library', label: 'Quiz library', icon: 'grad' },
     { kind: 'link', href: '/super-admin/audit', label: 'Audit log', icon: 'list' },
   ],
   client_admin: [

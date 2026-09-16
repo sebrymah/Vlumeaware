@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { parse } from 'csv-parse/sync';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { currentTenantId } from '../../common/prisma/tenant-context';
+import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
 
 export interface QuestionInput {
   prompt: string;
@@ -93,6 +93,27 @@ export class QuizzesService {
         },
       },
       include: { questions: { orderBy: { order: 'asc' } } },
+    });
+  }
+
+  /**
+   * Clones a quiz from the shared Vlumetech library into this tenant, attaching
+   * it to one of the tenant's own training modules or campaigns. The shared
+   * quiz is read under system scope; the created quiz is tenant-scoped by
+   * create().
+   */
+  async createFromShared(sharedQuizId: string, attach: { trainingModuleId?: string; campaignId?: string }) {
+    const shared = await runAsSystem('read shared quiz for clone', () =>
+      this.prisma.db.sharedQuiz.findUnique({ where: { id: sharedQuizId } }),
+    );
+    if (!shared) throw new NotFoundException('Shared quiz not found');
+    const questions = shared.questions as unknown as QuestionInput[];
+    return this.create({
+      title: shared.title,
+      passingScorePct: shared.passingScorePct,
+      trainingModuleId: attach.trainingModuleId,
+      campaignId: attach.campaignId,
+      questions,
     });
   }
 

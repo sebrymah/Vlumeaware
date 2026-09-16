@@ -61,6 +61,11 @@ class QuestionsDto {
   questions!: QuestionDto[];
 }
 
+class CloneSharedQuizDto {
+  @IsOptional() @IsUUID('4') trainingModuleId?: string;
+  @IsOptional() @IsUUID('4') campaignId?: string;
+}
+
 @Controller('tenants/:tenantId/quizzes')
 export class QuizzesController {
   constructor(private readonly quizzes: QuizzesService) {}
@@ -88,6 +93,17 @@ export class QuizzesController {
   @RequiresWritableTenant()
   create(@Body() dto: CreateQuizDto) {
     return this.quizzes.create(dto);
+  }
+
+  /** Clone a quiz from the shared Vlumetech library into this tenant. */
+  @Post('from-shared/:sharedQuizId')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @RequiresWritableTenant()
+  cloneShared(
+    @Param('sharedQuizId', ParseUUIDPipe) sharedQuizId: string,
+    @Body() dto: CloneSharedQuizDto,
+  ) {
+    return this.quizzes.createFromShared(sharedQuizId, dto);
   }
 
   @Patch(':quizId')

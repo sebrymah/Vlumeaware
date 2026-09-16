@@ -480,6 +480,24 @@ model SharedTrainingModule {
   @@map("shared_training_modules")
 }
 
+/**
+ * The shared, GLOBAL quiz library. Curated by Vlumetech staff and clonable by
+ * every client, mirroring SharedTrainingModule. Questions are stored as JSON
+ * ({ prompt, options[], correctIndex, explanation }) and expanded into tenant
+ * QuizQuestion rows on clone. No tenant_id — accessed under runAsSystem.
+ */
+model SharedQuiz {
+  id              String   @id @default(uuid()) @db.Uuid
+  title           String
+  category        String?
+  passingScorePct Int      @default(80) @map("passing_score_pct")
+  source          String?
+  questions       Json
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("shared_quizzes")
+}
+
 /// Append-only log of every deliberate cross-tenant (system-scope) query.
 model AuditLog {
   id        String   @id @default(uuid()) @db.Uuid

@@ -29,6 +29,13 @@ interface DraftQuestion {
   correctIndex: number;
   explanation: string;
 }
+interface SharedQuizItem {
+  id: string;
+  title: string;
+  category: string | null;
+  passingScorePct: number;
+  questions: { prompt: string }[];
+}
 
 const blankQuestion = (): DraftQuestion => ({ prompt: '', options: ['', ''], correctIndex: 0, explanation: '' });
 
@@ -51,6 +58,11 @@ function Quizzes() {
   const [results, setResults] = useState<{ quiz: QuizListItem; attempts: Attempt[] } | null>(null);
   const csvRef = useRef<HTMLInputElement>(null);
 
+  // clone-from-shared form
+  const [sharedQuizzes, setSharedQuizzes] = useState<SharedQuizItem[]>([]);
+  const [cloneSharedId, setCloneSharedId] = useState('');
+  const [cloneModuleId, setCloneModuleId] = useState('');
+
   // new-quiz form
   const [title, setTitle] = useState('');
   const [passMark, setPassMark] = useState('70');
@@ -60,14 +72,16 @@ function Quizzes() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const [q, m, c] = await Promise.all([
+      const [q, m, c, s] = await Promise.all([
         api.get<QuizListItem[]>(`/tenants/${tenantId}/quizzes`),
         api.get<TrainingModule[]>(`/tenants/${tenantId}/training-modules`),
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
+        api.get<SharedQuizItem[]>('/shared-quizzes').catch(() => [] as SharedQuizItem[]),
       ]);
       setQuizzes(q);
       setModules(m);
       setCampaigns(c);
+      setSharedQuizzes(s);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -113,6 +127,34 @@ function Quizzes() {
       setTitle('');
       setQuestions([blankQuestion()]);
       setAttach({ type: 'module', id: '' });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cloneShared(e: React.FormEvent) {
+    e.preventDefault();
+    if (!cloneSharedId) {
+      setError('Choose a quiz from the shared library.');
+      return;
+    }
+    if (!cloneModuleId) {
+      setError('Choose a training video to attach the cloned quiz to.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      await api.post(`/tenants/${tenantId}/quizzes/from-shared/${cloneSharedId}`, {
+        trainingModuleId: cloneModuleId,
+      });
+      setOk('Quiz added from the shared library and attached to your training video.');
+      setCloneSharedId('');
+      setCloneModuleId('');
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -245,6 +287,45 @@ function Quizzes() {
               </div>
             </Field>
           </div>
+        </Card>
+      )}
+
+      {sharedQuizzes.length > 0 && (
+        <Card title="Add from the shared library">
+          <p className="mb-3 text-xs text-slate-500">
+            Ready-made knowledge checks curated by Vlumetech. Pick one, attach it to one of your
+            training videos, and it becomes your own editable quiz.
+          </p>
+          <form onSubmit={cloneShared} className="grid items-end gap-3 sm:grid-cols-3">
+            <Field label="Shared quiz">
+              <select className={inputClass} value={cloneSharedId} onChange={(e) => setCloneSharedId(e.target.value)}>
+                <option value="">— choose —</option>
+                {sharedQuizzes.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title} ({s.questions?.length ?? 0} Q)
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Attach to training video">
+              <select className={inputClass} value={cloneModuleId} onChange={(e) => setCloneModuleId(e.target.value)}>
+                <option value="">— choose —</option>
+                {modules.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Button type="submit" disabled={busy}>
+              {busy ? 'Adding…' : 'Add to my quizzes'}
+            </Button>
+          </form>
+          {modules.length === 0 && (
+            <p className="mt-2 text-[11px] text-slate-400">
+              Add a training video first (Awareness content) — a quiz must attach to one.
+            </p>
+          )}
         </Card>
       )}
 
