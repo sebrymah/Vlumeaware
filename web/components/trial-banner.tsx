@@ -1,0 +1,49 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { api } from '@/lib/api';
+import { readSession } from '@/lib/session';
+
+interface TrialAccess {
+  level: 'full' | 'trial' | 'readonly' | 'suspended' | 'offboarded';
+  daysLeft: number | null;
+  approved: boolean;
+  licenseTier: string | null;
+}
+
+/**
+ * A slim status strip shown to client users while their account is on the free
+ * trial or awaiting approval. Silent for full (approved) accounts.
+ */
+export function TrialBanner() {
+  const [access, setAccess] = useState<TrialAccess | null>(null);
+
+  useEffect(() => {
+    const s = readSession();
+    if (!s?.tenantId || s.role === 'vlumetech_superadmin') return;
+    api
+      .get<TrialAccess>(`/tenants/${s.tenantId}/trial`)
+      .then(setAccess)
+      .catch(() => setAccess(null));
+  }, []);
+
+  if (!access || access.level === 'full') return null;
+
+  const styles: Record<string, string> = {
+    trial: 'border-emerald-800 bg-emerald-950/50 text-emerald-200',
+    readonly: 'border-amber-800 bg-amber-950/50 text-amber-200',
+    suspended: 'border-red-900 bg-red-950/50 text-red-200',
+    offboarded: 'border-red-900 bg-red-950/50 text-red-200',
+  };
+
+  const message =
+    access.level === 'trial'
+      ? `Free trial — ${access.daysLeft} day${access.daysLeft === 1 ? '' : 's'} left. You can set up your workspace and add up to 20 employees. Live campaigns unlock once Vlumetech approves your account.`
+      : access.level === 'readonly'
+        ? 'Your free trial has ended and is awaiting Vlumetech approval. The account is read-only until then.'
+        : `Account is ${access.level}. Contact Vlumetech.`;
+
+  return (
+    <div className={`border-b px-6 py-2 text-center text-xs ${styles[access.level]}`}>{message}</div>
+  );
+}

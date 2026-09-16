@@ -1,0 +1,80 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
+
+/**
+ * The shared phishing-template catalogue. Templates are global, read-only
+ * reference content — an admin browses them and clones one into their own
+ * tenant library, where it becomes an ordinary editable scenario (unapproved).
+ */
+@Injectable()
+export class TemplatesService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  list(filter: { category?: string; difficultyTier?: 'low' | 'medium' | 'high'; industryTag?: string }) {
+    // Global content: read outside tenant scope on purpose.
+    return runAsSystem('browse global phishing template catalogue', () =>
+      this.prisma.db.phishingTemplate.findMany({
+        where: {
+          category: filter.category,
+          difficultyTier: filter.difficultyTier,
+          industryTag: filter.industryTag,
+        },
+        orderBy: [{ category: 'asc' }, { title: 'asc' }],
+      }),
+    );
+  }
+
+  categories() {
+    return runAsSystem('list template categories', async () => {
+      const rows = await this.prisma.db.phishingTemplate.findMany({
+        distinct: ['category'],
+        select: { category: true },
+        orderBy: { category: 'asc' },
+      });
+      return rows.map((r) => r.category);
+    });
+  }
+
+  industries() {
+    return runAsSystem('list template industries', async () => {
+      const rows = await this.prisma.db.phishingTemplate.findMany({
+        distinct: ['industryTag'],
+        select: { industryTag: true },
+        where: { industryTag: { not: null } },
+        orderBy: { industryTag: 'asc' },
+      });
+      return rows.map((r) => r.industryTag).filter((x): x is string => x !== null);
+    });
+  }
+
+  async findOne(id: string) {
+    const template = await runAsSystem('read global template', () =>
+      this.prisma.db.phishingTemplate.findUnique({ where: { id } }),
+    );
+    if (!template) throw new NotFoundException('Template not found');
+    return template;
+  }
+
+  /**
+   * Clones a catalogue template into the acting tenant's scenario library as an
+   * unapproved draft. It carries no approval, so it still passes through the
+   * same review-and-approve gate as any scenario before it can be sent.
+   */
+  async cloneToTenant(templateId: string) {
+    const template = await this.findOne(templateId);
+    return this.prisma.db.scenario.create({
+      data: {
+        tenantId: currentTenantId(),
+        title: template.title,
+        difficultyTier: template.difficultyTier,
+        industryTag: template.industryTag,
+        subjectLine: template.subjectLine,
+        bodyHtml: template.bodyHtml,
+        senderSpoofName: template.senderSpoofName,
+        redFlags: template.redFlags,
+        createdByClaude: false,
+      },
+    });
+  }
+}

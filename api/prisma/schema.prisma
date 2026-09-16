@@ -1,0 +1,496 @@
+// Vlumeaware data model.
+//
+// Critical rule (VLUMEAWARE_CONTEXT.md §8): every query-facing table carries
+// tenant_id. The context doc omitted tenant_id from campaign_scenarios, sends
+// and training_assignments, expecting them to be scoped "via join". Join-based
+// scoping cannot be enforced by a Prisma client extension, so tenant_id is
+// denormalised onto those three tables. Every specified column is retained.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TenantStatus {
+  active
+  suspended
+  offboarded
+}
+
+enum StaffRole {
+  vlumetech_superadmin
+}
+
+enum TenantRole {
+  client_admin
+  client_viewer
+}
+
+enum CampaignStatus {
+  draft
+  active
+  paused
+  completed
+  killed
+}
+
+enum DifficultyTier {
+  low
+  medium
+  high
+}
+
+model Tenant {
+  id                    String       @id @default(uuid()) @db.Uuid
+  name                  String
+  brandLogoUrl          String?      @map("brand_logo_url")
+  brandPrimaryColor     String?      @map("brand_primary_color")
+  ndpaAgreementSignedAt DateTime?    @map("ndpa_agreement_signed_at")
+  ndpaAgreementDocUrl   String?      @map("ndpa_agreement_doc_url")
+  status                TenantStatus @default(active)
+  sendingDomain         String?      @map("sending_domain")
+  allowlistConfirmedAt  DateTime?    @map("allowlist_confirmed_at")
+  digestEmail           String?      @map("digest_email")
+  digestEnabled         Boolean      @default(false) @map("digest_enabled")
+  /// License tier label (e.g. "Starter", "Growth", "Enterprise"). Display only.
+  licenseTier           String?      @map("license_tier")
+  /// Max employees (seats) this client may have. null = unlimited.
+  seatLimit             Int?         @map("seat_limit")
+  /// True when the client self-signed-up rather than being onboarded by staff.
+  selfSignup            Boolean      @default(false) @map("self_signup")
+  /// End of the 7-day free trial. After this, an unapproved self-signup is read-only.
+  trialEndsAt           DateTime?    @map("trial_ends_at")
+  /// Set when a Vlumetech admin approves a self-signup into a standing account.
+  approvedAt            DateTime?    @map("approved_at")
+  approvedById          String?      @map("approved_by_id")
+  createdAt             DateTime     @default(now()) @map("created_at")
+
+  tenantUsers           TenantUser[]
+  employees             Employee[]
+  scenarios             Scenario[]
+  campaigns             Campaign[]
+  routingRules          TrainingRoutingRule[]
+  reports               Report[]
+  sends                 Send[]
+  campaignScenarios     CampaignScenario[]
+  trainingAssignments   TrainingAssignment[]
+  credentialSubmissions CredentialSubmission[]
+  trainingModules       TrainingModule[]
+  quizzes               Quiz[]
+  quizQuestions         QuizQuestion[]
+  quizAttempts          QuizAttempt[]
+  certificates          Certificate[]
+  phishReports          PhishReport[]
+
+  @@map("tenants")
+}
+
+/// Vlumetech internal staff. Deliberately NOT tenant-scoped.
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         StaffRole @default(vlumetech_superadmin)
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model TenantUser {
+  id           String     @id @default(uuid()) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  email        String
+  passwordHash String     @map("password_hash")
+  role         TenantRole
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("tenant_users")
+}
+
+model Employee {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  email      String
+  name       String
+  department String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sends               Send[]
+  trainingAssignments TrainingAssignment[]
+  quizAttempts        QuizAttempt[]
+  certificates        Certificate[]
+  phishReports        PhishReport[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("employees")
+}
+
+model Scenario {
+  id              String         @id @default(uuid()) @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  title           String
+  difficultyTier  DifficultyTier @map("difficulty_tier")
+  industryTag     String?        @map("industry_tag")
+  subjectLine     String         @map("subject_line")
+  bodyHtml        String         @map("body_html")
+  senderSpoofName String         @map("sender_spoof_name")
+  /// Red flags the teachable-moment page explains back to the employee.
+  redFlags        String[]       @map("red_flags")
+  createdByClaude Boolean        @default(false) @map("created_by_claude")
+  approvedAt      DateTime?      @map("approved_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  tenant            Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaignScenarios CampaignScenario[]
+  routingRules      TrainingRoutingRule[]
+
+  @@index([tenantId])
+  @@map("scenarios")
+}
+
+model Campaign {
+  id                String         @id @default(uuid()) @db.Uuid
+  tenantId          String         @map("tenant_id") @db.Uuid
+  name              String
+  status            CampaignStatus @default(draft)
+  scheduledSendAt   DateTime?      @map("scheduled_send_at")
+  sendWindowMinutes Int            @default(0) @map("send_window_minutes")
+  recurrenceDays    Int?           @map("recurrence_days")
+  parentCampaignId  String?        @map("parent_campaign_id") @db.Uuid
+  launchedAt        DateTime?      @map("launched_at")
+  killedAt          DateTime?      @map("killed_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaignScenarios CampaignScenario[]
+  sends             Send[]
+  reports           Report[]
+  quiz              Quiz?
+  parent            Campaign?          @relation("CampaignRecurrence", fields: [parentCampaignId], references: [id], onDelete: SetNull)
+  children          Campaign[]         @relation("CampaignRecurrence")
+
+  @@index([tenantId])
+  @@map("campaigns")
+}
+
+model CampaignScenario {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  campaignId String @map("campaign_id") @db.Uuid
+  scenarioId String @map("scenario_id") @db.Uuid
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  scenario Scenario @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+
+  @@unique([campaignId, scenarioId])
+  @@index([tenantId])
+  @@map("campaign_scenarios")
+}
+
+/// Heart of the system. Every tracked event writes back here.
+model Send {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  campaignId           String    @map("campaign_id") @db.Uuid
+  employeeId           String    @map("employee_id") @db.Uuid
+  scenarioId           String    @map("scenario_id") @db.Uuid
+  uniqueTrackingToken  String    @unique @map("unique_tracking_token")
+  sentAt               DateTime? @map("sent_at")
+  openedAt             DateTime? @map("opened_at")
+  clickedAt            DateTime? @map("clicked_at")
+  reportedAt           DateTime? @map("reported_at")
+  /// Boolean only. Never store what the employee typed — see context doc §13.
+  credentialsSubmitted Boolean   @default(false) @map("credentials_submitted")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign              Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  employee              Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  trainingAssignments   TrainingAssignment[]
+  credentialSubmissions CredentialSubmission[]
+  quizAttempts          QuizAttempt[]
+
+  @@unique([campaignId, employeeId, scenarioId])
+  @@index([tenantId])
+  @@index([campaignId])
+  @@map("sends")
+}
+
+model TrainingRoutingRule {
+  id               String @id @default(uuid()) @db.Uuid
+  tenantId         String @map("tenant_id") @db.Uuid
+  scenarioId       String @map("scenario_id") @db.Uuid
+  trainingModuleId String @map("training_module_id") @db.Uuid
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scenario Scenario       @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+  module   TrainingModule @relation(fields: [trainingModuleId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, scenarioId])
+  @@index([tenantId])
+  @@map("training_routing_rules")
+}
+
+model TrainingAssignment {
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  employeeId         String    @map("employee_id") @db.Uuid
+  trainingModuleId   String?   @map("training_module_id") @db.Uuid
+  /// Human label snapshot at assignment time; survives module rename/delete.
+  curriculumModuleId String    @map("curriculum_module_id")
+  assignedAt         DateTime  @default(now()) @map("assigned_at")
+  completedAt        DateTime? @map("completed_at")
+  sourceSendId       String?   @map("source_send_id") @db.Uuid
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee   Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  sourceSend Send?           @relation(fields: [sourceSendId], references: [id], onDelete: SetNull)
+  module     TrainingModule? @relation(fields: [trainingModuleId], references: [id], onDelete: SetNull)
+
+  @@unique([employeeId, trainingModuleId, sourceSendId])
+  @@index([tenantId])
+  @@map("training_assignments")
+}
+
+model Report {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  campaignId         String   @map("campaign_id") @db.Uuid
+  generatedNarrative String   @map("generated_narrative")
+  clickRate          Float    @map("click_rate")
+  reportRate         Float    @map("report_rate")
+  openRate           Float    @map("open_rate")
+  generatedAt        DateTime @default(now()) @map("generated_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("reports")
+}
+
+/// Metadata about a submission on the simulated login page.
+///
+/// Legal cleared credential capture (context doc §13). The design choice is
+/// metadata only: the browser computes these non-reversible metrics locally and
+/// posts integers plus one boolean. The API has no field capable of receiving
+/// the typed username or password, so a real secret cannot be stored here even
+/// by accident. `time_to_submit_ms` is computed server-side from the click.
+model CredentialSubmission {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @map("tenant_id") @db.Uuid
+  sendId                 String   @map("send_id") @db.Uuid
+  /// Character count of the username field. Never the value itself.
+  usernameLength         Int?     @map("username_length")
+  /// Character count of the password field. Never the value itself.
+  passwordLength         Int?     @map("password_length")
+  /// Whether the username the employee typed was email-shaped (client-derived).
+  usernameLooksLikeEmail Boolean? @map("username_looks_like_email")
+  /// Milliseconds from click to submission, computed from the send's click time.
+  timeToSubmitMs         Int?     @map("time_to_submit_ms")
+  submittedAt            DateTime @default(now()) @map("submitted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  send   Send   @relation(fields: [sendId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([sendId])
+  @@map("credential_submissions")
+}
+
+enum VideoSource {
+  upload
+  link
+}
+
+/// A client's own awareness content. Videos are uploaded to object storage or
+/// linked from a hosted URL; routing rules point clicks at one of these.
+model TrainingModule {
+  id              String      @id @default(uuid()) @db.Uuid
+  tenantId        String      @map("tenant_id") @db.Uuid
+  title           String
+  description     String?
+  /// Storage URI (s3:// or file://) for uploads, or the hosted URL for links.
+  videoUrl        String      @map("video_url")
+  videoSource     VideoSource @map("video_source")
+  durationSeconds Int?        @map("duration_seconds")
+  /// Set when this module was cloned from a shared-library item.
+  sharedModuleId  String?     @map("shared_module_id") @db.Uuid
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  routingRules TrainingRoutingRule[]
+  assignments  TrainingAssignment[]
+  quiz         Quiz?
+
+  @@index([tenantId])
+  @@map("training_modules")
+}
+
+/// Shared, read-only catalogue of ready-to-use phishing pretexts an admin can
+/// clone into their own library. GLOBAL by design — deliberately not
+/// tenant-scoped, like `tenants` and `users`.
+model PhishingTemplate {
+  id              String         @id @default(uuid()) @db.Uuid
+  title           String
+  category        String
+  difficultyTier  DifficultyTier @map("difficulty_tier")
+  industryTag     String?        @map("industry_tag")
+  subjectLine     String         @map("subject_line")
+  bodyHtml        String         @map("body_html")
+  senderSpoofName String         @map("sender_spoof_name")
+  redFlags        String[]       @map("red_flags")
+  source          String
+  createdAt       DateTime       @default(now()) @map("created_at")
+
+  @@map("phishing_templates")
+}
+
+/// A short assessment shown after a training video, or attached to a campaign.
+/// Exactly one of trainingModuleId / campaignId is set (enforced in the
+/// service). Tenant-scoped.
+model Quiz {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  title            String
+  passingScorePct  Int      @default(70) @map("passing_score_pct")
+  allowRetakes     Boolean  @default(true) @map("allow_retakes")
+  maxAttempts      Int?     @map("max_attempts")
+  trainingModuleId String?  @unique @map("training_module_id") @db.Uuid
+  campaignId       String?  @unique @map("campaign_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  module    TrainingModule? @relation(fields: [trainingModuleId], references: [id], onDelete: Cascade)
+  campaign  Campaign?       @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  @@index([tenantId])
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  quizId       String   @map("quiz_id") @db.Uuid
+  prompt       String
+  options      String[]
+  /// Zero-based index of the correct option.
+  correctIndex Int      @map("correct_index")
+  explanation  String?
+  order        Int      @default(0)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([quizId])
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  quizId       String   @map("quiz_id") @db.Uuid
+  employeeId   String   @map("employee_id") @db.Uuid
+  sourceSendId String?  @map("source_send_id") @db.Uuid
+  score        Int
+  total        Int
+  passed       Boolean
+  completedAt  DateTime @default(now()) @map("completed_at")
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  quiz       Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  sourceSend Send?    @relation(fields: [sourceSendId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([quizId])
+  @@map("quiz_attempts")
+}
+
+/// Certificate of completion, issued when an employee passes a module quiz.
+/// The PDF is rendered on demand from this record.
+model Certificate {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  employeeId   String   @map("employee_id") @db.Uuid
+  serial       String   @unique
+  moduleTitle  String   @map("module_title")
+  quizTitle    String?  @map("quiz_title")
+  scorePct     Int      @map("score_pct")
+  sourceSendId String?  @map("source_send_id") @db.Uuid
+  issuedAt     DateTime @default(now()) @map("issued_at")
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([employeeId])
+  @@map("certificates")
+}
+
+/// A REAL (non-simulated) phishing email an employee reported by forwarding it
+/// to the monitored intake address. Simulated reports stay on `sends`.
+model PhishReport {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  employeeId        String?  @map("employee_id") @db.Uuid
+  reporterEmail     String   @map("reporter_email")
+  subject           String?
+  sender            String?
+  /// True when the forwarded mail matched an active simulation token.
+  matchedSimulation Boolean  @default(false) @map("matched_simulation")
+  matchedSendId     String?  @map("matched_send_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("phish_reports")
+}
+
+/// Shared awareness-content library curated by Vlumetech staff. GLOBAL by
+/// design — no tenant_id — so every client can browse it and clone items into
+/// their own (private) training-module library. A clone references the same
+/// stored video, so the binary is never duplicated.
+model SharedTrainingModule {
+  id              String      @id @default(uuid()) @db.Uuid
+  title           String
+  description     String?
+  category        String?
+  videoUrl        String      @map("video_url")
+  videoSource     VideoSource @map("video_source")
+  durationSeconds Int?        @map("duration_seconds")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  @@map("shared_training_modules")
+}
+
+/// Append-only log of every deliberate cross-tenant (system-scope) query.
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String?  @map("tenant_id")
+  actorId   String?  @map("actor_id")
+  actorRole String?  @map("actor_role")
+  action    String
+  detail    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
