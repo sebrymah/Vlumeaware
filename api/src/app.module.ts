@@ -23,6 +23,8 @@ import { IntakeModule } from './modules/intake/intake.module';
 import { SharedModulesModule } from './modules/shared-modules/shared-modules.module';
 import { SignupModule } from './modules/signup/signup.module';
 
+import { HealthController } from './health.controller';
+
 @Module({
   imports: [
     PrismaModule,
@@ -44,6 +46,7 @@ import { SignupModule } from './modules/signup/signup.module';
     SignupModule,
     ReportsModule,
   ],
+  controllers: [HealthController],
   providers: [
     // Order matters: authenticate, then check role, then open the tenant
     // context from the verified token.
