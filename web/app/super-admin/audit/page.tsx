@@ -57,7 +57,7 @@ function Audit() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Audit log</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Audit log</h1>
         <p className="mt-1 text-xs text-slate-500">
           Append-only record of sensitive actions across all tenants — campaign creation, launch,
           kill, scheduling. Cross-tenant reads by staff are also captured here.
@@ -67,7 +67,7 @@ function Audit() {
       {error && <Notice kind="error">{error}</Notice>}
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-xs text-slate-400">
+        <label className="text-xs text-slate-500">
           Client
           <select className={`${inputClass} mt-1`} value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
             <option value="">All</option>
@@ -78,7 +78,7 @@ function Audit() {
             ))}
           </select>
         </label>
-        <label className="text-xs text-slate-400">
+        <label className="text-xs text-slate-500">
           Action contains
           <input className={`${inputClass} mt-1`} value={action} onChange={(e) => setAction(e.target.value)} placeholder="campaign.launch" />
         </label>
@@ -88,12 +88,12 @@ function Audit() {
       <Card title="Entries">
         <Table head={['When', 'Client', 'Actor', 'Action', 'Detail']}>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-slate-800/60">
-              <td className="px-2 py-2 text-slate-400">{new Date(r.createdAt).toLocaleString()}</td>
+            <tr key={r.id} className="border-b border-slate-100">
+              <td className="px-2 py-2 text-slate-500">{new Date(r.createdAt).toLocaleString()}</td>
               <td className="px-2 py-2">{tenantName(r.tenantId)}</td>
-              <td className="px-2 py-2 text-slate-400">{r.actorRole ?? '—'}</td>
+              <td className="px-2 py-2 text-slate-500">{r.actorRole ?? '—'}</td>
               <td className="px-2 py-2 font-mono text-[11px]">{r.action}</td>
-              <td className="px-2 py-2 text-slate-400">{r.detail ?? '—'}</td>
+              <td className="px-2 py-2 text-slate-500">{r.detail ?? '—'}</td>
             </tr>
           ))}
           {!rows.length && (

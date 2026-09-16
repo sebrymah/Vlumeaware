@@ -105,7 +105,7 @@ export function CampaignReport({
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">{m.campaignName}</h1>
+          <h1 className="text-lg font-semibold text-slate-900">{m.campaignName}</h1>
           <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
             <Badge>{m.status}</Badge>
             <span>
@@ -138,13 +138,13 @@ export function CampaignReport({
 
       <Card title="Board narrative" subtitle="Written in Vlumetech's governance tone.">
         {data.narrative ? (
-          <div className="space-y-3 text-sm leading-relaxed text-slate-300">
+          <div className="space-y-3 text-sm leading-relaxed text-slate-600">
             {data.narrative.split('\n').filter(Boolean).map((para, i) => {
               const heading = /^(Summary|What The Numbers Show|Risk Assessment|Recommended Actions)/i.test(
                 para.trim(),
               );
               return heading ? (
-                <h3 key={i} className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                <h3 key={i} className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   {para.replace(/[:#*]/g, '').trim()}
                 </h3>
               ) : (
@@ -173,15 +173,15 @@ export function CampaignReport({
       >
         <Table head={['Department', 'Delivered', 'Clicked', 'Click rate', '']}>
           {m.byDepartment.map((d) => (
-            <tr key={d.department} className="border-b border-slate-800/60">
+            <tr key={d.department} className="border-b border-slate-100">
               <td className="px-2 py-2">{d.department}</td>
               <td className="px-2 py-2">{d.sent}</td>
               <td className="px-2 py-2">{d.clicked}</td>
               <td className="px-2 py-2">{pct(d.clickRate)}</td>
               <td className="px-2 py-2">
-                <div className="h-1.5 w-full rounded bg-slate-800">
+                <div className="h-1.5 w-full rounded bg-slate-100">
                   <div
-                    className="h-1.5 rounded bg-emerald-600"
+                    className="h-1.5 rounded bg-brand-600"
                     style={{ width: `${Math.round(d.clickRate * 100)}%` }}
                   />
                 </div>

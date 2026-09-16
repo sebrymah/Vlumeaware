@@ -45,7 +45,7 @@ function Reported() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Reported emails</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Reported emails</h1>
         <p className="mt-1 text-xs text-slate-500">
           Real emails your staff forwarded to the monitored report-a-phish address. A report matched
           to one of our simulations is tagged, so genuine threats stand out from training traffic.
@@ -57,14 +57,14 @@ function Reported() {
       <Card title="Reports">
         <Table head={['Reported by', 'Subject', 'Sender', 'Type', 'When']}>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-slate-800/60">
+            <tr key={r.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{r.employee?.name ?? r.reporterEmail}</td>
               <td className="px-2 py-2">{r.subject ?? '—'}</td>
-              <td className="px-2 py-2 text-slate-400">{r.sender ?? '—'}</td>
+              <td className="px-2 py-2 text-slate-500">{r.sender ?? '—'}</td>
               <td className="px-2 py-2">
                 <Badge>{r.matchedSimulation ? 'simulation' : 'real'}</Badge>
               </td>
-              <td className="px-2 py-2 text-slate-400">{new Date(r.createdAt).toLocaleString()}</td>
+              <td className="px-2 py-2 text-slate-500">{new Date(r.createdAt).toLocaleString()}</td>
             </tr>
           ))}
           {!rows.length && (

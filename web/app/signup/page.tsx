@@ -51,8 +51,8 @@ export default function SignupPage() {
     <div className="flex min-h-screen items-center justify-center px-6 py-10">
       <form onSubmit={submit} className="w-full max-w-sm space-y-4">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">
-            Vlume<span className="text-emerald-500">aware</span>
+          <h1 className="text-xl font-semibold text-slate-900">
+            Vlume<span className="text-brand-600">aware</span>
           </h1>
           <p className="mt-1 text-xs text-slate-500">Start a free trial</p>
           <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
@@ -75,7 +75,7 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+          className="w-full rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
         >
           {busy ? 'Creating your workspace…' : 'Start free trial'}
         </button>

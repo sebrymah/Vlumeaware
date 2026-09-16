@@ -126,7 +126,7 @@ function Routing() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Training routing</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Training routing</h1>
         <p className="mt-1 text-xs text-slate-500">
           One rule per scenario. An employee who clicks is assigned the mapped module
           automatically — there is no per-employee routing to do.
@@ -141,7 +141,7 @@ function Routing() {
           {scenarios.map((s) => {
             const rule = ruleFor(s.id);
             return (
-              <tr key={s.id} className="border-b border-slate-800/60">
+              <tr key={s.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">{s.title}</td>
                 <td className="px-2 py-2">
                   <Badge>{s.difficultyTier}</Badge>
@@ -161,7 +161,7 @@ function Routing() {
                       ))}
                     </select>
                   ) : (
-                    <span className="text-[11px] text-amber-300">
+                    <span className="text-[11px] text-amber-700">
                       No modules yet — add one under Awareness content.
                     </span>
                   )}
@@ -190,7 +190,7 @@ function Routing() {
           )}
         </Table>
         {scenarios.some((s) => !ruleFor(s.id)) && (
-          <p className="mt-3 text-[11px] text-amber-300">
+          <p className="mt-3 text-[11px] text-amber-700">
             Scenarios without a rule still track clicks, but no training is assigned.
           </p>
         )}
@@ -203,9 +203,9 @@ function Routing() {
         <div className="max-h-[24rem] overflow-y-auto">
           <Table head={['Employee', 'Department', 'Module', 'Assigned', 'Status', '']}>
             {assignments.map((a) => (
-              <tr key={a.id} className="border-b border-slate-800/60">
+              <tr key={a.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">{a.employee.name}</td>
-                <td className="px-2 py-2 text-slate-400">{a.employee.department ?? '—'}</td>
+                <td className="px-2 py-2 text-slate-500">{a.employee.department ?? '—'}</td>
                 <td className="px-2 py-2">{a.curriculumModuleId}</td>
                 <td className="px-2 py-2">{new Date(a.assignedAt).toLocaleDateString()}</td>
                 <td className="px-2 py-2">

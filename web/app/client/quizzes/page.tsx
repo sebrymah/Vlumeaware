@@ -163,7 +163,7 @@ function Quizzes() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Quizzes</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Quizzes</h1>
         <p className="mt-1 text-xs text-slate-500">
           A short assessment after a training video, or attached to a campaign. Scored automatically;
           a pass marks the employee&rsquo;s training complete.
@@ -176,9 +176,9 @@ function Quizzes() {
       <Card title="Your quizzes">
         <Table head={['Title', 'Attached to', 'Questions', 'Attempts', 'Pass mark', '']}>
           {quizzes.map((q) => (
-            <tr key={q.id} className="border-b border-slate-800/60">
+            <tr key={q.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{q.title}</td>
-              <td className="px-2 py-2 text-slate-400">
+              <td className="px-2 py-2 text-slate-500">
                 {q.module ? `Video: ${q.module.title}` : q.campaign ? `Campaign: ${q.campaign.name}` : '—'}
               </td>
               <td className="px-2 py-2">{q._count.questions}</td>
@@ -211,20 +211,20 @@ function Quizzes() {
           title={`Results — ${results.quiz.title}`}
           actions={<Button variant="ghost" onClick={() => setResults(null)}>Close</Button>}
         >
-          <div className="mb-3 flex items-center gap-4 text-xs text-slate-400">
+          <div className="mb-3 flex items-center gap-4 text-xs text-slate-500">
             <span>{results.attempts.length} attempts</span>
             <span>{results.attempts.filter((a) => a.passed).length} passed</span>
           </div>
           <Table head={['Employee', 'Department', 'Score', 'Result', 'When']}>
             {results.attempts.map((a) => (
-              <tr key={a.id} className="border-b border-slate-800/60">
+              <tr key={a.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">{a.employee.name}</td>
-                <td className="px-2 py-2 text-slate-400">{a.employee.department ?? '—'}</td>
+                <td className="px-2 py-2 text-slate-500">{a.employee.department ?? '—'}</td>
                 <td className="px-2 py-2">{a.score}/{a.total}</td>
                 <td className="px-2 py-2">
                   <Badge>{a.passed ? 'yes' : 'no'}</Badge>
                 </td>
-                <td className="px-2 py-2 text-slate-400">{new Date(a.completedAt).toLocaleString()}</td>
+                <td className="px-2 py-2 text-slate-500">{new Date(a.completedAt).toLocaleString()}</td>
               </tr>
             ))}
             {!results.attempts.length && (
@@ -235,10 +235,10 @@ function Quizzes() {
               </tr>
             )}
           </Table>
-          <div className="mt-4 border-t border-slate-800 pt-3">
+          <div className="mt-4 border-t border-slate-200 pt-3">
             <Field label="Replace questions from CSV" hint="Columns: prompt, option1..optionN, correct (1-based), explanation">
               <div className="flex items-center gap-2">
-                <input ref={csvRef} type="file" accept=".csv,text/csv" className="text-xs text-slate-300" />
+                <input ref={csvRef} type="file" accept=".csv,text/csv" className="text-xs text-slate-600" />
                 <Button onClick={() => uploadCsv(results.quiz.id)} disabled={busy}>
                   Upload CSV
                 </Button>
@@ -281,13 +281,13 @@ function Quizzes() {
 
           <div className="space-y-3">
             {questions.map((q, qi) => (
-              <div key={qi} className="rounded border border-slate-800 bg-slate-900/40 p-3">
+              <div key={qi} className="rounded border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-400">Question {qi + 1}</span>
+                  <span className="text-xs font-medium text-slate-500">Question {qi + 1}</span>
                   {questions.length > 1 && (
                     <button
                       type="button"
-                      className="text-[11px] text-slate-500 hover:text-red-300"
+                      className="text-[11px] text-slate-500 hover:text-red-600"
                       onClick={() => setQuestions((qs) => qs.filter((_, i) => i !== qi))}
                     >
                       remove
@@ -320,7 +320,7 @@ function Quizzes() {
                       {q.options.length > 2 && (
                         <button
                           type="button"
-                          className="text-[11px] text-slate-500 hover:text-red-300"
+                          className="text-[11px] text-slate-500 hover:text-red-600"
                           onClick={() =>
                             setQ(qi, {
                               options: q.options.filter((_, j) => j !== oi),
@@ -337,7 +337,7 @@ function Quizzes() {
                 <div className="mt-2 flex items-center gap-3">
                   <button
                     type="button"
-                    className="text-[11px] text-emerald-400 hover:underline"
+                    className="text-[11px] text-brand-600 hover:underline"
                     onClick={() => setQ(qi, { options: [...q.options, ''] })}
                   >
                     + add option

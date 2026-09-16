@@ -116,7 +116,7 @@ function Scenarios() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Scenario library</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Scenario library</h1>
         <p className="mt-1 text-xs text-slate-500">
           Pretexts grounded in Nigerian business patterns. Drafts are reviewed and edited before
           they are saved, and approved before they can be sent.
@@ -135,7 +135,7 @@ function Scenarios() {
         </Button>
         <a
           href="/client/templates"
-          className="rounded border border-slate-700 px-3 py-1.5 text-xs font-medium text-slate-200 hover:border-slate-600"
+          className="rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:border-slate-400"
         >
           Browse template library
         </a>
@@ -230,9 +230,9 @@ function Scenarios() {
               />
             </Field>
             <div>
-              <p className="mb-1 text-xs font-medium text-slate-400">Preview</p>
+              <p className="mb-1 text-xs font-medium text-slate-500">Preview</p>
               <div
-                className="rounded border border-slate-700 bg-white p-3 text-black"
+                className="rounded border border-slate-300 bg-white p-3 text-black"
                 dangerouslySetInnerHTML={{
                   __html: draft.bodyHtml
                     .split('{{TRACKING_URL}}')
@@ -249,13 +249,13 @@ function Scenarios() {
       <Card title="Saved scenarios">
         <Table head={['Title', 'Tier', 'Subject', 'Source', 'Approved']}>
           {list.map((s) => (
-            <tr key={s.id} className="border-b border-slate-800/60">
+            <tr key={s.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{s.title}</td>
               <td className="px-2 py-2">
                 <Badge>{s.difficultyTier}</Badge>
               </td>
-              <td className="px-2 py-2 text-slate-400">{s.subjectLine}</td>
-              <td className="px-2 py-2 text-slate-400">{s.createdByClaude ? 'Claude draft' : 'manual'}</td>
+              <td className="px-2 py-2 text-slate-500">{s.subjectLine}</td>
+              <td className="px-2 py-2 text-slate-500">{s.createdByClaude ? 'Claude draft' : 'manual'}</td>
               <td className="px-2 py-2">
                 <Badge>{s.approvedAt ? 'yes' : 'no'}</Badge>
               </td>

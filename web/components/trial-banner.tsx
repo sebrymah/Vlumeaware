@@ -30,10 +30,10 @@ export function TrialBanner() {
   if (!access || access.level === 'full') return null;
 
   const styles: Record<string, string> = {
-    trial: 'border-emerald-800 bg-emerald-950/50 text-emerald-200',
-    readonly: 'border-amber-800 bg-amber-950/50 text-amber-200',
-    suspended: 'border-red-900 bg-red-950/50 text-red-200',
-    offboarded: 'border-red-900 bg-red-950/50 text-red-200',
+    trial: 'border-brand-200 bg-brand-50 text-brand-700',
+    readonly: 'border-amber-200 bg-amber-50 text-amber-700',
+    suspended: 'border-red-200 bg-red-50 text-red-700',
+    offboarded: 'border-red-200 bg-red-50 text-red-700',
   };
 
   const message =

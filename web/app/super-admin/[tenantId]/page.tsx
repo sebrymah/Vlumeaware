@@ -221,7 +221,7 @@ function TenantDetail() {
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">{tenant.name}</h1>
+          <h1 className="text-lg font-semibold text-slate-900">{tenant.name}</h1>
           <p className="mt-1 flex items-center gap-2 text-xs text-slate-500">
             <Badge>{tenant.status}</Badge>
             <span>NDPA agreement:</span>
@@ -265,7 +265,7 @@ function TenantDetail() {
               ref={fileRef}
               type="file"
               accept="application/pdf,image/png,image/jpeg"
-              className="text-xs text-slate-300"
+              className="text-xs text-slate-600"
               required
             />
           </Field>
@@ -311,13 +311,13 @@ function TenantDetail() {
               </Button>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-xs text-slate-300">
+          <div className="flex items-center gap-3 text-xs text-slate-600">
             <span>
               Client IT allow-list:{' '}
               {tenant.allowlistConfirmedAt ? (
-                <span className="text-emerald-300">confirmed</span>
+                <span className="text-brand-700">confirmed</span>
               ) : (
-                <span className="text-amber-300">not confirmed</span>
+                <span className="text-amber-700">not confirmed</span>
               )}
             </span>
             {tenant.allowlistConfirmedAt ? (
@@ -330,7 +330,7 @@ function TenantDetail() {
               </Button>
             )}
           </div>
-          <div className="grid gap-3 border-t border-slate-800 pt-4 sm:grid-cols-2">
+          <div className="grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
             <Field label="Digest email">
               <input
                 className={inputClass}
@@ -386,8 +386,8 @@ function TenantDetail() {
             </div>
           </div>
           {seatsUsed !== null && (
-            <p className="text-xs text-slate-400">
-              Currently using <span className="font-semibold text-slate-200">{seatsUsed}</span>{' '}
+            <p className="text-xs text-slate-500">
+              Currently using <span className="font-semibold text-slate-700">{seatsUsed}</span>{' '}
               {tenant.seatLimit != null ? `of ${tenant.seatLimit} seats` : 'seats (unlimited)'}.
             </p>
           )}
@@ -398,7 +398,7 @@ function TenantDetail() {
       <Card title="Client accounts">
         <Table head={['Email', 'Role', 'Created']}>
           {users.map((u) => (
-            <tr key={u.id} className="border-b border-slate-800/60">
+            <tr key={u.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{u.email}</td>
               <td className="px-2 py-2">
                 <Badge>{u.role}</Badge>
@@ -415,7 +415,7 @@ function TenantDetail() {
           )}
         </Table>
 
-        <form onSubmit={addUser} className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-800 pt-4">
+        <form onSubmit={addUser} className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-4">
           <div className="w-56">
             <Field label="Email">
               <input
@@ -460,7 +460,7 @@ function TenantDetail() {
       <Card title="Campaigns" subtitle="Vlumetech can halt any campaign in any tenant.">
         <Table head={['Campaign', 'Status', 'Created', '']}>
           {campaigns.map((c) => (
-            <tr key={c.id} className="border-b border-slate-800/60">
+            <tr key={c.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{c.name}</td>
               <td className="px-2 py-2">
                 <Badge>{c.status}</Badge>

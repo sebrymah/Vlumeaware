@@ -101,7 +101,7 @@ function Console() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Client portfolio</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Client portfolio</h1>
         <p className="mt-1 text-xs text-slate-500">
           Vlumetech internal console. Onboarding is white-glove; clients cannot self-register.
         </p>
@@ -129,10 +129,10 @@ function Console() {
         >
           <Table head={['Client', 'Signed up', 'Trial ends', 'Employees', 'Seats', '']}>
             {pending.map((p) => (
-              <tr key={p.id} className="border-b border-slate-800/60">
+              <tr key={p.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">{p.name}</td>
-                <td className="px-2 py-2 text-slate-400">{new Date(p.createdAt).toLocaleDateString()}</td>
-                <td className="px-2 py-2 text-slate-400">
+                <td className="px-2 py-2 text-slate-500">{new Date(p.createdAt).toLocaleDateString()}</td>
+                <td className="px-2 py-2 text-slate-500">
                   {p.trialEndsAt ? new Date(p.trialEndsAt).toLocaleDateString() : '—'}
                 </td>
                 <td className="px-2 py-2">{p._count.employees}</td>
@@ -141,7 +141,7 @@ function Console() {
                   <div className="flex justify-end gap-2">
                     <a
                       href={`/super-admin/${p.id}`}
-                      className="rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:border-slate-500"
+                      className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:border-slate-400"
                     >
                       Review
                     </a>
@@ -159,9 +159,9 @@ function Console() {
       <Card title="Clients" subtitle="Click a client to manage its agreement, users and campaigns.">
         <Table head={['Client', 'Status', 'NDPA agreement', 'Campaigns', 'Sent', 'Click rate', 'Report rate']}>
           {rows.map((r) => (
-            <tr key={r.tenantId} className="border-b border-slate-800/60">
+            <tr key={r.tenantId} className="border-b border-slate-100">
               <td className="px-2 py-2">
-                <Link href={`/super-admin/${r.tenantId}`} className="text-emerald-400 hover:underline">
+                <Link href={`/super-admin/${r.tenantId}`} className="text-brand-600 hover:underline">
                   {r.name}
                 </Link>
               </td>

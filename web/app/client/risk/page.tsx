@@ -23,10 +23,10 @@ interface EmployeeRisk {
 interface TrainingModule { id: string; title: string }
 
 const levelColor: Record<string, string> = {
-  low: 'text-emerald-300',
-  moderate: 'text-amber-300',
+  low: 'text-brand-700',
+  moderate: 'text-amber-700',
   high: 'text-orange-300',
-  critical: 'text-red-300',
+  critical: 'text-red-600',
 };
 
 export default function RiskPage() {
@@ -91,7 +91,7 @@ function Risk() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Employee risk</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Employee risk</h1>
         <p className="mt-1 text-xs text-slate-500">
           A running score per person across every campaign. Higher = more likely to fall for a real
           attack. Reporting and quiz passes lower it; clicks and credential entry raise it.
@@ -125,12 +125,12 @@ function Risk() {
       <Card title="All employees by risk">
         <Table head={['Employee', 'Dept', 'Score', 'Level', 'Sends', 'Clicks', 'Reports', 'Quiz passes']}>
           {rows.map((e) => (
-            <tr key={e.employeeId} className="border-b border-slate-800/60">
+            <tr key={e.employeeId} className="border-b border-slate-100">
               <td className="px-2 py-2">
                 {e.name}
-                {e.repeatClicker && <span className="ml-2 text-[10px] text-red-300">repeat clicker</span>}
+                {e.repeatClicker && <span className="ml-2 text-[10px] text-red-600">repeat clicker</span>}
               </td>
-              <td className="px-2 py-2 text-slate-400">{e.department ?? '—'}</td>
+              <td className="px-2 py-2 text-slate-500">{e.department ?? '—'}</td>
               <td className="px-2 py-2 font-semibold">{e.riskScore}</td>
               <td className={`px-2 py-2 font-medium ${levelColor[e.riskLevel]}`}>{e.riskLevel}</td>
               <td className="px-2 py-2">{e.sends}</td>

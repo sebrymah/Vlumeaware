@@ -97,7 +97,7 @@ function Employees() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Employees</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Employees</h1>
         <p className="mt-1 text-xs text-slate-500">
           {list.length} on the roster ·{' '}
           {Object.entries(byDept)
@@ -112,8 +112,8 @@ function Employees() {
         <div
           className={`rounded border px-4 py-2 text-xs ${
             seats.remaining === 0
-              ? 'border-amber-800 bg-amber-950/40 text-amber-200'
-              : 'border-slate-800 bg-slate-900/40 text-slate-300'
+              ? 'border-amber-200 bg-amber-50 text-amber-700'
+              : 'border-slate-200 bg-slate-50 text-slate-600'
           }`}
         >
           {seats.seatLimit == null ? (
@@ -131,7 +131,7 @@ function Employees() {
       <Card title="Bulk upload" subtitle="CSV with email, name and department columns.">
         <form onSubmit={upload} className="flex items-end gap-3">
           <Field label="CSV file" hint="Existing employees are updated, not duplicated. Up to 5 MB.">
-            <input ref={fileRef} type="file" accept=".csv,text/csv" className="text-xs text-slate-300" required />
+            <input ref={fileRef} type="file" accept=".csv,text/csv" className="text-xs text-slate-600" required />
           </Field>
           <Button type="submit" disabled={busy}>
             {busy ? 'Uploading…' : 'Upload'}
@@ -144,13 +144,13 @@ function Employees() {
               {result.created} created, {result.updated} updated, {result.skipped.length} skipped.
             </Notice>
             {result.skipped.length > 0 && (
-              <div className="max-h-40 overflow-y-auto rounded border border-slate-800 p-2">
+              <div className="max-h-40 overflow-y-auto rounded border border-slate-200 p-2">
                 <Table head={['Row', 'Value', 'Reason']}>
                   {result.skipped.map((s) => (
                     <tr key={`${s.row}-${s.email}`}>
                       <td className="px-2 py-1">{s.row}</td>
-                      <td className="px-2 py-1 text-slate-400">{s.email || '(blank)'}</td>
-                      <td className="px-2 py-1 text-amber-300">{s.reason}</td>
+                      <td className="px-2 py-1 text-slate-500">{s.email || '(blank)'}</td>
+                      <td className="px-2 py-1 text-amber-700">{s.reason}</td>
                     </tr>
                   ))}
                 </Table>
@@ -164,9 +164,9 @@ function Employees() {
         <div className="max-h-[28rem] overflow-y-auto">
           <Table head={['Name', 'Email', 'Department', '']}>
             {list.map((e) => (
-              <tr key={e.id} className="border-b border-slate-800/60">
+              <tr key={e.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">{e.name}</td>
-                <td className="px-2 py-2 text-slate-400">{e.email}</td>
+                <td className="px-2 py-2 text-slate-500">{e.email}</td>
                 <td className="px-2 py-2">{e.department ?? '—'}</td>
                 <td className="px-2 py-2 text-right">
                   <Button variant="ghost" onClick={() => remove(e.id)} disabled={busy}>

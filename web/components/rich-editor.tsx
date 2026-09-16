@@ -44,11 +44,11 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
   }
 
   const btn =
-    'rounded border border-slate-700 px-2 py-1 text-xs text-slate-200 hover:border-slate-500';
+    'rounded border border-slate-300 px-2 py-1 text-xs text-slate-700 hover:border-slate-400';
 
   return (
-    <div className="rounded border border-slate-700">
-      <div className="flex flex-wrap items-center gap-1 border-b border-slate-800 bg-slate-900/60 p-2">
+    <div className="rounded border border-slate-300">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 bg-white p-2">
         <button type="button" className={btn} onClick={() => exec('bold')}><b>B</b></button>
         <button type="button" className={btn} onClick={() => exec('italic')}><i>I</i></button>
         <button type="button" className={btn} onClick={() => exec('underline')}><u>U</u></button>
@@ -95,12 +95,12 @@ export function RichEditor({ value, onChange }: { value: string; onChange: (html
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="min-h-[220px] w-full bg-slate-950 p-3 font-mono text-xs text-slate-200 outline-none"
+          className="min-h-[220px] w-full bg-white p-3 font-mono text-xs text-slate-700 outline-none"
         />
       )}
 
       {!value.includes('{{TRACKING_URL}}') && (
-        <p className="border-t border-slate-800 bg-amber-950/40 px-3 py-1.5 text-[11px] text-amber-300">
+        <p className="border-t border-slate-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-700">
           Add a tracking link — the body must contain {'{{TRACKING_URL}}'} so clicks are measured.
         </p>
       )}

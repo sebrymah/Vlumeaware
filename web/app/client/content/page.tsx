@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
+import { VideoPreviewButton } from '@/components/video-preview';
+import { Icon } from '@/components/icons';
 
 interface TrainingModule {
   id: string;
@@ -21,6 +23,7 @@ interface SharedModule {
   title: string;
   description: string | null;
   category: string | null;
+  videoUrl: string;
   videoSource: 'upload' | 'link';
   durationSeconds: number | null;
 }
@@ -47,6 +50,7 @@ function Content() {
   const [videoUrl, setVideoUrl] = useState('');
   const [duration, setDuration] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -143,7 +147,7 @@ function Content() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Awareness content</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Awareness content</h1>
         <p className="mt-1 text-xs text-slate-500">
           Your own training videos. Upload a file, or link one already hosted on your LMS. Map a
           module to a scenario under Training routing so a click assigns it automatically.
@@ -178,11 +182,30 @@ function Content() {
 
           {mode === 'upload' ? (
             <Field label="Video file" hint="MP4, WebM, OGG, MOV or AVI — up to 200 MB.">
-              <input ref={fileRef} type="file" accept="video/*" className="text-xs text-slate-300" />
+              <input
+                ref={fileRef}
+                type="file"
+                accept="video/*"
+                className="text-xs text-slate-600"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  setFilePreview(f ? URL.createObjectURL(f) : null);
+                }}
+              />
+              {filePreview && (
+                <div className="mt-2">
+                  <VideoPreviewButton url={filePreview} label="Preview this file" title="Upload preview" />
+                </div>
+              )}
             </Field>
           ) : (
             <Field label="Hosted video URL" hint="An https link to the video on your LMS, Vimeo, etc.">
               <input className={inputClass} type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…" required />
+              {/^https?:\/\//i.test(videoUrl) && (
+                <div className="mt-2">
+                  <VideoPreviewButton url={videoUrl} label="Preview this link" title="Link preview" />
+                </div>
+              )}
             </Field>
           )}
 
@@ -200,21 +223,24 @@ function Content() {
           {libraryItems.map((m) => {
             const added = list.some((x) => x.sharedModuleId === m.id);
             return (
-              <tr key={m.id} className="border-b border-slate-800/60">
+              <tr key={m.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">
                   {m.title}
                   {m.description && <div className="text-[11px] text-slate-500">{m.description}</div>}
                 </td>
-                <td className="px-2 py-2 text-slate-400">{m.category ?? '—'}</td>
+                <td className="px-2 py-2 text-slate-500">{m.category ?? '—'}</td>
                 <td className="px-2 py-2">{m.durationSeconds ? `${m.durationSeconds}s` : '—'}</td>
-                <td className="px-2 py-2 text-right">
-                  {added ? (
-                    <span className="text-[11px] text-emerald-300">added</span>
-                  ) : (
-                    <Button onClick={() => addFromLibrary(m.id)} disabled={busy}>
-                      Add to my library
-                    </Button>
-                  )}
+                <td className="px-2 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <VideoPreviewButton url={m.videoUrl} title={m.title} />
+                    {added ? (
+                      <span className="text-[11px] font-medium text-brand-700">added</span>
+                    ) : (
+                      <Button onClick={() => addFromLibrary(m.id)} disabled={busy}>
+                        Add to my library
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             );
@@ -232,7 +258,7 @@ function Content() {
       <Card title="Your modules">
         <Table head={['Title', 'Source', 'Duration', 'Added', '']}>
           {list.map((m) => (
-            <tr key={m.id} className="border-b border-slate-800/60">
+            <tr key={m.id} className="border-b border-slate-100">
               <td className="px-2 py-2">
                 <div>{m.title}</div>
                 {m.description && <div className="text-[11px] text-slate-500">{m.description}</div>}
@@ -242,10 +268,13 @@ function Content() {
               </td>
               <td className="px-2 py-2">{m.durationSeconds ? `${m.durationSeconds}s` : '—'}</td>
               <td className="px-2 py-2">{new Date(m.createdAt).toLocaleDateString()}</td>
-              <td className="px-2 py-2 text-right">
-                <Button variant="ghost" onClick={() => remove(m.id)} disabled={busy}>
-                  Delete
-                </Button>
+              <td className="px-2 py-2">
+                <div className="flex items-center justify-end gap-2">
+                  <VideoPreviewButton url={m.videoUrl} title={m.title} />
+                  <Button variant="ghost" onClick={() => remove(m.id)} disabled={busy}>
+                    Delete
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}

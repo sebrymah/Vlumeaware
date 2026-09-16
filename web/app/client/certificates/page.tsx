@@ -58,7 +58,7 @@ function Certificates() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Certificates</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Certificates</h1>
         <p className="mt-1 text-xs text-slate-500">
           Issued automatically when an employee passes a module quiz. Useful as completion evidence
           for NDPA / ISO audits. Each carries a serial that verifies at /verify/&lt;serial&gt;.
@@ -70,12 +70,12 @@ function Certificates() {
       <Card title="Issued certificates">
         <Table head={['Employee', 'Module', 'Score', 'Serial', 'Issued', '']}>
           {rows.map((c) => (
-            <tr key={c.id} className="border-b border-slate-800/60">
+            <tr key={c.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{c.employee.name}</td>
               <td className="px-2 py-2">{c.moduleTitle}</td>
               <td className="px-2 py-2">{c.scorePct}%</td>
-              <td className="px-2 py-2 font-mono text-[11px] text-slate-400">{c.serial}</td>
-              <td className="px-2 py-2 text-slate-400">{new Date(c.issuedAt).toLocaleDateString()}</td>
+              <td className="px-2 py-2 font-mono text-[11px] text-slate-500">{c.serial}</td>
+              <td className="px-2 py-2 text-slate-500">{new Date(c.issuedAt).toLocaleDateString()}</td>
               <td className="px-2 py-2 text-right">
                 <Button variant="ghost" onClick={() => download(c)}>
                   PDF

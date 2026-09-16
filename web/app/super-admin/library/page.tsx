@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
+import { VideoPreviewButton } from '@/components/video-preview';
+import { Icon } from '@/components/icons';
 
 interface SharedModule {
   id: string;
@@ -37,6 +39,7 @@ function Library() {
   const [videoUrl, setVideoUrl] = useState('');
   const [duration, setDuration] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -110,7 +113,7 @@ function Library() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Shared awareness library</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Shared awareness library</h1>
         <p className="mt-1 text-xs text-slate-500">
           Content you publish here is available to every client. A client admin adds it to their own
           library from the Awareness content page — their own uploads stay private to them.
@@ -147,10 +150,29 @@ function Library() {
           {mode === 'link' ? (
             <Field label="Hosted video URL">
               <input className={inputClass} type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="https://…" required />
+              {/^https?:\/\//i.test(videoUrl) && (
+                <div className="mt-2">
+                  <VideoPreviewButton url={videoUrl} label="Preview this link" title="Link preview" />
+                </div>
+              )}
             </Field>
           ) : (
             <Field label="Video file" hint="MP4, WebM, OGG, MOV or AVI — up to 200 MB.">
-              <input ref={fileRef} type="file" accept="video/*" className="text-xs text-slate-300" />
+              <input
+                ref={fileRef}
+                type="file"
+                accept="video/*"
+                className="text-xs text-slate-600"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  setFilePreview(f ? URL.createObjectURL(f) : null);
+                }}
+              />
+              {filePreview && (
+                <div className="mt-2">
+                  <VideoPreviewButton url={filePreview} label="Preview this file" title="Upload preview" />
+                </div>
+              )}
             </Field>
           )}
           <Button type="submit" disabled={busy}>
@@ -162,25 +184,32 @@ function Library() {
       <Card title={`Shared modules (${list.length})`}>
         <Table head={['Title', 'Category', 'Source', 'Duration', '']}>
           {list.map((m) => (
-            <tr key={m.id} className="border-b border-slate-800/60">
+            <tr key={m.id} className="border-b border-slate-100">
               <td className="px-2 py-2">
                 {m.title}
                 {m.description && <div className="text-[11px] text-slate-500">{m.description}</div>}
               </td>
-              <td className="px-2 py-2 text-slate-400">{m.category ?? '—'}</td>
+              <td className="px-2 py-2 text-slate-500">{m.category ?? '—'}</td>
               <td className="px-2 py-2"><Badge>{m.videoSource}</Badge></td>
               <td className="px-2 py-2">{m.durationSeconds ? `${m.durationSeconds}s` : '—'}</td>
-              <td className="px-2 py-2 text-right">
-                <Button variant="ghost" onClick={() => remove(m.id)} disabled={busy}>
-                  Delete
-                </Button>
+              <td className="px-2 py-2">
+                <div className="flex items-center justify-end gap-2">
+                  <VideoPreviewButton url={m.videoUrl} title={m.title} />
+                  <Button variant="ghost" onClick={() => remove(m.id)} disabled={busy}>
+                    Delete
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}
           {!list.length && (
             <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
-                Nothing published yet.
+              <td colSpan={5} className="px-2 py-8">
+                <EmptyState
+                  icon={<Icon name="film" />}
+                  title="No shared modules yet"
+                  hint="Publish a hosted link or upload a video above. Every client will be able to add it to their own awareness library."
+                />
               </td>
             </tr>
           )}

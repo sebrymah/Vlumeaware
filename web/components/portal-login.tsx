@@ -65,11 +65,11 @@ export function PortalLogin({
     <div className="flex min-h-screen items-center justify-center px-6">
       <form onSubmit={submit} className="w-full max-w-sm space-y-4">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">
-            Vlume<span className="text-emerald-500">aware</span>
+          <h1 className="text-xl font-semibold text-slate-900">
+            Vlume<span className="text-brand-600">aware</span>
           </h1>
           <p className="mt-1 text-xs text-slate-500">{subtitle}</p>
-          <p className="mt-3 text-sm font-medium text-slate-300">{title}</p>
+          <p className="mt-3 text-sm font-medium text-slate-600">{title}</p>
         </div>
 
         {error && <Notice kind="error">{error}</Notice>}
@@ -97,7 +97,7 @@ export function PortalLogin({
         <button
           type="submit"
           disabled={busy}
-          className="w-full rounded bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-40"
+          className="w-full rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
         >
           {busy ? 'Signing in…' : 'Sign in'}
         </button>

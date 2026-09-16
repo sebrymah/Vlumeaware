@@ -119,7 +119,7 @@ function Campaigns() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Campaigns</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Campaigns</h1>
         <p className="mt-1 text-xs text-slate-500">
           Authorized simulations against your employee roster. Every campaign can be halted in one
           action.
@@ -132,13 +132,13 @@ function Campaigns() {
       <Card title="Your campaigns">
         <Table head={['Campaign', 'Scenarios', 'Status', 'Created', 'Actions']}>
           {campaigns.map((c) => (
-            <tr key={c.id} className="border-b border-slate-800/60">
+            <tr key={c.id} className="border-b border-slate-100">
               <td className="px-2 py-2">
-                <Link href={`/client/campaigns/${c.id}`} className="text-emerald-400 hover:underline">
+                <Link href={`/client/campaigns/${c.id}`} className="text-brand-600 hover:underline">
                   {c.name}
                 </Link>
               </td>
-              <td className="px-2 py-2 text-slate-400">
+              <td className="px-2 py-2 text-slate-500">
                 {c.campaignScenarios.map((cs) => cs.scenario.title).join(', ') || '—'}
               </td>
               <td className="px-2 py-2">
@@ -212,7 +212,7 @@ function Campaigns() {
             <Field label="Scenarios">
               <div className="space-y-1">
                 {approved.map((s) => (
-                  <label key={s.id} className="flex items-center gap-2 text-xs text-slate-300">
+                  <label key={s.id} className="flex items-center gap-2 text-xs text-slate-600">
                     <input
                       type="checkbox"
                       checked={selected.includes(s.id)}

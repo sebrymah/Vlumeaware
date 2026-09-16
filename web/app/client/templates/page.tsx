@@ -90,7 +90,7 @@ function Templates() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-100">Template library</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Template library</h1>
         <p className="mt-1 text-xs text-slate-500">
           Ready-to-use phishing simulations grounded in common attack patterns. Clone one into your
           library, then edit it to fit your business.
@@ -101,7 +101,7 @@ function Templates() {
       {ok && <Notice kind="ok">{ok}</Notice>}
 
       <div className="flex flex-wrap items-end gap-3">
-        <label className="text-xs text-slate-400">
+        <label className="text-xs text-slate-500">
           Category
           <select className={`${inputClass} mt-1`} value={category} onChange={(e) => setCategory(e.target.value)}>
             <option value="">All</option>
@@ -112,7 +112,7 @@ function Templates() {
             ))}
           </select>
         </label>
-        <label className="text-xs text-slate-400">
+        <label className="text-xs text-slate-500">
           Industry
           <select className={`${inputClass} mt-1`} value={industry} onChange={(e) => setIndustry(e.target.value)}>
             <option value="">All</option>
@@ -123,7 +123,7 @@ function Templates() {
             ))}
           </select>
         </label>
-        <label className="text-xs text-slate-400">
+        <label className="text-xs text-slate-500">
           Difficulty
           <select className={`${inputClass} mt-1`} value={tier} onChange={(e) => setTier(e.target.value)}>
             <option value="">Any</option>
@@ -139,10 +139,10 @@ function Templates() {
         <Card key={cat} title={cat}>
           <div className="grid gap-3 sm:grid-cols-2">
             {items.map((t) => (
-              <div key={t.id} className="rounded border border-slate-800 bg-slate-900/40 p-3">
+              <div key={t.id} className="rounded border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <div className="text-sm font-medium text-slate-100">{t.title}</div>
+                    <div className="text-sm font-medium text-slate-900">{t.title}</div>
                     <div className="mt-0.5 text-[11px] text-slate-500">
                       From: {t.senderSpoofName} · “{t.subjectLine}”
                     </div>
@@ -169,12 +169,12 @@ function Templates() {
           onClick={() => setPreview(null)}
         >
           <div
-            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 p-5"
+            className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg border border-slate-300 bg-white p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-slate-100">{preview.title}</h3>
+                <h3 className="text-sm font-semibold text-slate-900">{preview.title}</h3>
                 <p className="text-[11px] text-slate-500">
                   {preview.category} · {preview.difficultyTier}
                 </p>
@@ -183,19 +183,19 @@ function Templates() {
                 Close
               </Button>
             </div>
-            <p className="mt-3 text-[11px] text-slate-400">
+            <p className="mt-3 text-[11px] text-slate-500">
               From {preview.senderSpoofName} · Subject: {preview.subjectLine}
             </p>
             <div
-              className="mt-2 rounded border border-slate-700 bg-white p-3 text-black"
+              className="mt-2 rounded border border-slate-300 bg-white p-3 text-black"
               dangerouslySetInnerHTML={{
                 __html: preview.bodyHtml.split('{{TRACKING_URL}}').join('#').split('{{EMPLOYEE_NAME}}').join('Amina Bello'),
               }}
             />
-            <h4 className="mt-4 text-xs font-semibold text-slate-300">Red flags taught</h4>
+            <h4 className="mt-4 text-xs font-semibold text-slate-600">Red flags taught</h4>
             <ul className="mt-1 space-y-1">
               {preview.redFlags.map((f) => (
-                <li key={f} className="text-[11px] text-slate-400">
+                <li key={f} className="text-[11px] text-slate-500">
                   • {f}
                 </li>
               ))}

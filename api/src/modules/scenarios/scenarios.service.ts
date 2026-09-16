@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { DifficultyTier } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { currentTenantId } from '../../common/prisma/tenant-context';
+import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
 import { ClaudeService } from '../../providers/claude/claude.service';
 
 @Injectable()
@@ -65,5 +65,45 @@ export class ScenariosService {
     }
     await this.prisma.db.scenario.delete({ where: { id } });
     return { deleted: true };
+  }
+
+  // --- Vlumetech staff review queue (cross-tenant) -------------------------
+
+  /** Every scenario across all clients that is still waiting for approval. */
+  listPendingReview() {
+    return runAsSystem('superadmin: scenario review queue', () =>
+      this.prisma.db.scenario.findMany({
+        where: { approvedAt: null },
+        orderBy: { createdAt: 'asc' },
+        include: { tenant: { select: { id: true, name: true } } },
+      }),
+    );
+  }
+
+  /** Approve any client's scenario from the staff console. */
+  approveAcrossTenants(id: string) {
+    return runAsSystem('superadmin: approve scenario', async () => {
+      const scenario = await this.prisma.db.scenario.findUnique({ where: { id } });
+      if (!scenario) throw new NotFoundException('Scenario not found');
+      return this.prisma.db.scenario.update({ where: { id }, data: { approvedAt: new Date() } });
+    });
+  }
+
+  /**
+   * Reject a client's scenario. A scenario has no "rejected" state, so a
+   * rejection removes the draft — unless it is already attached to a campaign,
+   * in which case it cannot be pending anyway.
+   */
+  rejectAcrossTenants(id: string) {
+    return runAsSystem('superadmin: reject scenario', async () => {
+      const scenario = await this.prisma.db.scenario.findUnique({ where: { id } });
+      if (!scenario) throw new NotFoundException('Scenario not found');
+      const inUse = await this.prisma.db.campaignScenario.count({ where: { scenarioId: id } });
+      if (inUse > 0) {
+        throw new NotFoundException('Scenario is attached to a campaign and cannot be rejected');
+      }
+      await this.prisma.db.scenario.delete({ where: { id } });
+      return { rejected: true };
+    });
   }
 }
