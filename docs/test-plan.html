@@ -1,0 +1,416 @@
+<title>Vlumeaware Test Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --canvas:#eef2f0; --surface:#ffffff; --surface-2:#f6f9f7;
+    --ink:#0f1b16; --muted:#566B61; --faint:#87968e;
+    --line:#dbe5e0; --line-strong:#c5d2cc;
+    --brand:#0b7c57; --brand-strong:#0e9f6e; --brand-tint:#e6f4ee;
+    --pass:#0e9f6e; --pass-tint:#e6f4ee;
+    --fail:#d64550; --fail-tint:#fcebec;
+    --blocked:#c9821f; --blocked-tint:#fbf1df;
+    --skip:#7d8c84; --skip-tint:#eef2f0;
+    --shadow:0 1px 2px rgba(15,27,22,.04),0 4px 16px rgba(15,27,22,.05);
+    --shadow-pop:0 8px 40px rgba(15,27,22,.16);
+    --radius:14px;
+    font-family:'Manrope',system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --canvas:#0b120f; --surface:#121d18; --surface-2:#0f1913;
+      --ink:#e7efe9; --muted:#9fb0a7; --faint:#7c8d84;
+      --line:#20302a; --line-strong:#2c3f38;
+      --brand:#3fca97; --brand-strong:#57d7a8; --brand-tint:#132a20;
+      --pass:#3fca97; --pass-tint:#132a20;
+      --fail:#f2727c; --fail-tint:#2c1517;
+      --blocked:#e0a84a; --blocked-tint:#2a2210;
+      --skip:#8a9a92; --skip-tint:#18211d;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+      --shadow-pop:0 10px 44px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --canvas:#0b120f; --surface:#121d18; --surface-2:#0f1913;
+    --ink:#e7efe9; --muted:#9fb0a7; --faint:#7c8d84;
+    --line:#20302a; --line-strong:#2c3f38;
+    --brand:#3fca97; --brand-strong:#57d7a8; --brand-tint:#132a20;
+    --pass:#3fca97; --pass-tint:#132a20;
+    --fail:#f2727c; --fail-tint:#2c1517;
+    --blocked:#e0a84a; --blocked-tint:#2a2210;
+    --skip:#8a9a92; --skip-tint:#18211d;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 20px rgba(0,0,0,.35);
+    --shadow-pop:0 10px 44px rgba(0,0,0,.55);
+  }
+
+  *{box-sizing:border-box}
+  body{background:var(--canvas);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  code,.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+  a{color:var(--brand)}
+
+  /* ---- header ---- */
+  header.top{
+    position:sticky;top:0;z-index:20;
+    background:color-mix(in srgb,var(--canvas) 88%,transparent);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .top-inner{max-width:960px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:baseline;gap:2px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+  .brand .a{color:var(--brand-strong)}
+  .brand small{font-weight:600;font-size:11px;color:var(--muted);margin-left:8px;letter-spacing:.04em;text-transform:uppercase}
+  .prog{flex:1;min-width:200px;display:flex;align-items:center;gap:12px}
+  .bar{flex:1;height:8px;border-radius:99px;background:var(--line);overflow:hidden;min-width:120px}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--brand),var(--brand-strong));transition:width .35s ease}
+  .prog b{font-variant-numeric:tabular-nums;font-weight:700;font-size:13px}
+  .prog span{color:var(--muted);font-size:12px}
+  .filters{display:flex;gap:6px;flex-wrap:wrap}
+  .chip-btn{font:inherit;font-size:12px;font-weight:600;color:var(--muted);background:var(--surface);border:1px solid var(--line);
+    border-radius:99px;padding:5px 11px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+  .chip-btn[aria-pressed="true"]{color:var(--ink);border-color:var(--line-strong);background:var(--surface-2)}
+  .chip-btn .dot{width:8px;height:8px;border-radius:99px;background:var(--skip)}
+  .chip-btn.f-pass .dot{background:var(--pass)} .chip-btn.f-fail .dot{background:var(--fail)}
+  .chip-btn.f-blocked .dot{background:var(--blocked)} .chip-btn.f-todo .dot{background:var(--line-strong)}
+  .ghost{font:inherit;font-size:12px;font-weight:600;color:var(--muted);background:none;border:1px solid transparent;border-radius:8px;padding:5px 9px;cursor:pointer}
+  .ghost:hover{color:var(--ink);background:var(--surface-2)}
+
+  main{max-width:960px;margin:0 auto;padding:28px 24px 96px}
+
+  .lede{font-size:15px;color:var(--muted);max-width:66ch;margin:2px 0 26px}
+  .lede strong{color:var(--ink);font-weight:700}
+
+  /* ---- panels ---- */
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+  .panel-h{padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line)}
+  .panel-h .k{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--brand);
+    background:var(--brand-tint);border-radius:7px;padding:3px 8px}
+  .panel-h h2{font-size:16px;font-weight:750}
+  .panel-b{padding:18px 20px}
+
+  .callout{border-left:3px solid var(--brand);background:var(--surface-2);border-radius:0 10px 10px 0;padding:12px 16px;margin:0 0 4px}
+  .callout.warn{border-color:var(--blocked);background:var(--blocked-tint)}
+  .callout h3{font-size:13px;font-weight:700;margin-bottom:4px}
+  .callout p, .callout li{font-size:13px;color:var(--muted)}
+  .callout code{background:color-mix(in srgb,var(--ink) 8%,transparent);border-radius:5px;padding:1px 5px;font-size:12px;color:var(--ink)}
+
+  ul.tight{margin:6px 0 0;padding-left:18px}
+  ul.tight li{margin:3px 0}
+
+  /* deploy checklist */
+  .steps{display:grid;gap:10px}
+  .step{display:flex;gap:12px;align-items:flex-start}
+  .step .n{flex:none;width:22px;height:22px;border-radius:99px;background:var(--brand-tint);color:var(--brand);
+    font-size:12px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+  .step p{font-size:13.5px;margin:0}
+  .step .hint{color:var(--muted);font-size:12.5px}
+
+  /* accounts table */
+  .tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--faint);font-weight:700;padding:0 10px 8px}
+  .tbl td{padding:9px 10px;border-top:1px solid var(--line);vertical-align:top}
+  .tbl td:first-child{white-space:nowrap}
+  .role{font-size:11px;font-weight:700;border-radius:6px;padding:2px 7px;background:var(--surface-2);border:1px solid var(--line)}
+
+  /* ---- suites ---- */
+  .suite{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:16px;overflow:hidden}
+  .suite > summary{list-style:none;cursor:pointer;padding:16px 20px;display:flex;align-items:center;gap:14px}
+  .suite > summary::-webkit-details-marker{display:none}
+  .suite .caret{flex:none;color:var(--muted);transition:transform .2s ease}
+  .suite[open] .caret{transform:rotate(90deg)}
+  .suite .s-id{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;color:var(--brand);flex:none}
+  .suite h2{font-size:15.5px;font-weight:750;flex:1}
+  .suite .s-desc{color:var(--muted);font-weight:500;font-size:12.5px}
+  .mini{display:flex;align-items:center;gap:8px;flex:none}
+  .mini .count{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .mini .mbar{width:64px;height:6px;border-radius:99px;background:var(--line);overflow:hidden}
+  .mini .mbar > i{display:block;height:100%;width:0;background:var(--brand);transition:width .3s}
+
+  .tests{border-top:1px solid var(--line)}
+  .test{padding:16px 20px 16px 20px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:6px 16px}
+  .test:last-child{border-bottom:none}
+  .test.pass{background:linear-gradient(90deg,var(--pass-tint),transparent 60%)}
+  .test.fail{background:linear-gradient(90deg,var(--fail-tint),transparent 60%)}
+  .test.blocked{background:linear-gradient(90deg,var(--blocked-tint),transparent 60%)}
+  .t-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .t-id{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--muted)}
+  .t-title{font-size:14.5px;font-weight:700}
+  .t-body{grid-column:1/2}
+  .t-steps{margin:8px 0 0;padding-left:0;list-style:none;display:grid;gap:4px}
+  .t-steps li{font-size:13px;color:var(--muted);padding-left:20px;position:relative}
+  .t-steps li::before{content:"";position:absolute;left:4px;top:8px;width:5px;height:5px;border-radius:99px;background:var(--line-strong)}
+  .t-exp{margin-top:9px;font-size:12.5px;background:var(--surface-2);border:1px solid var(--line);border-radius:9px;padding:8px 11px}
+  .t-exp b{color:var(--brand);font-weight:700;font-size:11px;letter-spacing:.05em;text-transform:uppercase;display:block;margin-bottom:2px}
+  .t-exp code{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:color-mix(in srgb,var(--ink) 8%,transparent);border-radius:4px;padding:1px 4px}
+  .flag{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:5px;padding:2px 6px;vertical-align:middle}
+  .flag.new{color:var(--brand);background:var(--brand-tint)}
+  .flag.sec{color:var(--fail);background:var(--fail-tint)}
+
+  /* status control */
+  .status{grid-column:2/3;grid-row:1/3;align-self:start;display:flex;flex-direction:column;gap:4px;min-width:104px}
+  .seg{display:grid;grid-template-columns:repeat(2,1fr);gap:4px}
+  .seg button{font:inherit;font-size:11px;font-weight:700;border:1px solid var(--line);background:var(--surface);color:var(--muted);
+    border-radius:8px;padding:6px 4px;cursor:pointer;transition:.12s}
+  .seg button:hover{border-color:var(--line-strong);color:var(--ink)}
+  .seg button[data-s="pass"][aria-pressed="true"]{background:var(--pass);border-color:var(--pass);color:#fff}
+  .seg button[data-s="fail"][aria-pressed="true"]{background:var(--fail);border-color:var(--fail);color:#fff}
+  .seg button[data-s="blocked"][aria-pressed="true"]{background:var(--blocked);border-color:var(--blocked);color:#fff}
+  .seg button[data-s="skip"][aria-pressed="true"]{background:var(--skip);border-color:var(--skip);color:#fff}
+  :root[data-theme="dark"] .seg button[aria-pressed="true"],
+  :root:not([data-theme="light"]) .seg button[aria-pressed="true"]{color:#08110d}
+
+  footer{max-width:960px;margin:0 auto;padding:8px 24px 60px;color:var(--faint);font-size:12px}
+  :focus-visible{outline:2px solid var(--brand-strong);outline-offset:2px;border-radius:6px}
+  @media (max-width:640px){
+    .test{grid-template-columns:1fr}
+    .status{grid-column:1;grid-row:auto;flex-direction:row;min-width:0}
+    .seg{grid-template-columns:repeat(4,1fr);flex:1}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">Vlume<span class="a">aware</span><small>Test Plan</small></div>
+    <div class="prog">
+      <div class="bar"><i id="barFill"></i></div>
+      <b id="progPct">0%</b>
+      <span id="progCount">0 / 0 passed</span>
+    </div>
+    <div class="filters" id="filters">
+      <button class="chip-btn" data-filter="all" aria-pressed="true">All</button>
+      <button class="chip-btn f-todo" data-filter="todo" aria-pressed="false"><span class="dot"></span>To do</button>
+      <button class="chip-btn f-fail" data-filter="fail" aria-pressed="false"><span class="dot"></span>Failing</button>
+      <button class="chip-btn f-blocked" data-filter="blocked" aria-pressed="false"><span class="dot"></span>Blocked</button>
+    </div>
+    <button class="ghost" id="resetBtn" title="Clear all saved results">Reset</button>
+  </div>
+</header>
+
+<main>
+  <p class="lede">
+    An end-to-end acceptance plan for <strong>Vlumeaware</strong> — the phishing-simulation and
+    security-awareness platform. Work top to bottom: get the build deployed, then run each suite and
+    mark every case <strong>Pass</strong>, <strong>Fail</strong> or <strong>Blocked</strong>. Your
+    results are saved in this browser and the progress bar tracks the golden path from a scenario in
+    the catalogue all the way to an employee's certificate.
+  </p>
+
+  <!-- PREREQUISITES -->
+  <section class="panel">
+    <div class="panel-h"><span class="k">Step 0</span><h2>Make it work — deploy before you test</h2></div>
+    <div class="panel-b">
+      <p style="font-size:13.5px;color:var(--muted);margin:0 0 14px">
+        Most of the features below live in the code but are <strong style="color:var(--ink)">not on the live site yet</strong>.
+        Nothing in suites B–G will pass until this is done.
+      </p>
+      <div class="steps">
+        <div class="step"><div class="n">1</div><p><b>Push the code.</b> <span class="hint">From the repo, commit and push to <code>main</code>. Vercel redeploys the web app automatically; Render rebuilds the API. Wait for both to go green.</span></p></div>
+        <div class="step"><div class="n">2</div><p><b>Add the Supabase Storage env vars on Render</b> (API service → Environment), then let it redeploy: <span class="hint"><code>SUPABASE_URL=https://dsytyibazgoflkjgozsb.supabase.co</code>, <code>SUPABASE_STORAGE_BUCKET=training-videos</code>, <code>SUPABASE_SERVICE_ROLE_KEY=&lt;service_role secret from Supabase → Settings → API&gt;</code>. Without these, uploaded videos still won't play.</span></p></div>
+        <div class="step"><div class="n">3</div><p><b>Delete the old “Test awareness” video and re-upload it.</b> <span class="hint">The existing one points at a wiped <code>file://</code> path and will never play. Only uploads made <em>after</em> step 2 get a real playable URL.</span></p></div>
+        <div class="step"><div class="n">4</div><p><b>Decide how emails send.</b> <span class="hint">By default the API uses the <em>log mailer</em> — it records sends but delivers nothing. Real delivery needs <code>MAILER=ses</code> plus AWS SES (verified domain). To test the click/quiz flow without email, use the token method in the callout below.</span></p></div>
+        <div class="step"><div class="n">5</div><p><b>Rotate the exposed database password and change the seeded demo passwords</b> <span class="hint">before any real client data goes in.</span></p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACCOUNTS -->
+  <section class="panel">
+    <div class="panel-h"><span class="k">Accounts</span><h2>Who signs in where</h2></div>
+    <div class="panel-b">
+      <table class="tbl">
+        <thead><tr><th>Role</th><th>Sign-in</th><th>Portal</th><th>What they can do</th></tr></thead>
+        <tbody>
+          <tr><td><span class="role">Vlumetech superadmin</span></td><td class="mono">it@vlumetech.com.ng</td><td class="mono">/admin</td><td>Runs the platform: scenario catalogue, quiz library, shared videos, approvals, clients.</td></tr>
+          <tr><td><span class="role">Client admin</span></td><td class="mono">admin@kaduna.test</td><td class="mono">/login</td><td>Runs one client (Kaduna Foods): employees, campaigns, content, quizzes.</td></tr>
+          <tr><td><span class="role">Client viewer</span></td><td class="mono">viewer@kaduna.test</td><td class="mono">/login</td><td>Read-only reporting for that client.</td></tr>
+        </tbody>
+      </table>
+      <div class="callout warn" style="margin-top:14px">
+        <h3>Testing the simulation without a real inbox</h3>
+        <p>With the log mailer, no email is delivered — but every send still gets a unique tracking token. To walk the employee journey:
+        launch a campaign, then read the token from the <code>sends</code> table (or ask me to fetch it), and open
+        <code>https://vlumeaware.onrender.com/track/click/&lt;token&gt;</code> in a private window. That records the click and drops you on the
+        simulated landing page → teachable moment → training video → quiz, exactly as an employee would see it.</p>
+      </div>
+    </div>
+  </section>
+
+  <div id="suites"></div>
+
+  <footer>
+    Vlumeaware acceptance plan · results are stored only in this browser · check a box to mark progress.
+  </footer>
+</main>
+
+<script>
+const PLAN = [
+  { id:"A", title:"Authentication & access control", desc:"Right people, right portals, nothing leaking between roles.", tests:[
+    {id:"A1", title:"Superadmin sign-in", steps:["Go to /admin, sign in as it@vlumetech.com.ng."], exp:"Lands on the Clients console with the staff nav (Clients, Scenarios, Approvals, Shared library, Quiz library, Audit log)."},
+    {id:"A2", title:"Client admin sign-in", steps:["Go to /login, sign in as admin@kaduna.test."], exp:"Lands on the client console with grouped menus: Phishing, Training, People, Reporting."},
+    {id:"A3", title:"Client viewer is read-only", steps:["Sign in as viewer@kaduna.test.","Open Reporting, Risk, Certificates, Reported."], exp:"Can view dashboards but sees no create/delete controls; cannot reach admin-only pages."},
+    {id:"A4", title:"Portals don't cross", steps:["As a client admin, try the /admin URL.","Sign out; confirm a protected page bounces to login."], exp:"A client cannot enter the staff console; signing out clears the session."},
+  ]},
+  { id:"B", title:"Superadmin — content management", desc:"The Vlumetech-side authoring tools.", tests:[
+    {id:"B1", title:"Add a scenario to the catalogue", flag:"new", steps:["Staff → Scenarios → Add a scenario.","Fill title, category, difficulty, spoofed sender, subject, HTML body (use {{EMPLOYEE_NAME}} & {{TRACKING_URL}}), red flags.","Save, then Preview it."], exp:"Scenario appears grouped by category; Preview renders the email with the placeholders substituted."},
+    {id:"B2", title:"Edit & delete a scenario", flag:"new", steps:["Edit a scenario, change the subject, save.","Delete a test scenario."], exp:"Edit persists after reload; delete removes it from the catalogue."},
+    {id:"B3", title:"10 ISO 27001 scenarios are present", steps:["Open the catalogue."], exp:"The ten seeded ISO 27001:2022 scenarios show, grouped by category (Phishing, Credential Harvesting, Malware)."},
+    {id:"B4", title:"Publish a shared quiz", flag:"new", steps:["Staff → Quiz library → Publish a quiz.","Give it a title and paste a questions JSON array.","Preview it."], exp:"Quiz lists with its question count; Preview shows each question with the correct option highlighted."},
+    {id:"B5", title:"10 ISO quizzes are present", steps:["Open the Quiz library."], exp:"The ten seeded knowledge-check quizzes list, each with 5 questions."},
+    {id:"B6", title:"Upload a video — and it plays", flag:"new", steps:["Staff → Shared library → Upload a video, choose an MP4, publish.","Click Preview on the new row."], exp:"Row shows source “upload”; Preview PLAYS the video (served from Supabase Storage)."},
+    {id:"B7", title:"Link a hosted video — and it plays", steps:["Shared library → Link a hosted video, paste a direct MP4 URL, publish.","Preview it."], exp:"Preview plays the linked video."},
+    {id:"B9", title:"Approvals queue", flag:"new", steps:["Have a client submit a scenario (see C5).","Staff → Approvals.","Preview the pending email, then Approve (or Reject)."], exp:"Pending scenario appears with its client name; approving removes it from the queue and makes it usable in a campaign."},
+    {id:"B10", title:"Client administration", steps:["Staff → Clients.","Approve the pending signup (Lagos Freight).","Set a license tier and seat limit."], exp:"Lagos moves to active; license and seat limit save."},
+  ]},
+  { id:"C", title:"Client admin — setup", desc:"Everything a client does before running a campaign.", tests:[
+    {id:"C1", title:"Add a single employee", flag:"new", steps:["People → Employees → Add one employee.","Enter name + work email, submit."], exp:"Employee appears in the roster; the seat counter increases by one."},
+    {id:"C2", title:"Bulk CSV upload", steps:["Employees → Bulk upload a CSV (email, name, department)."], exp:"A created / updated / skipped summary shows; roster fills; duplicates update rather than duplicate."},
+    {id:"C3", title:"Remove an employee", steps:["Remove a roster row."], exp:"Employee disappears; seat count drops."},
+    {id:"C4", title:"Clone a template", steps:["Phishing → Templates.","Preview one of the ISO scenarios.","Clone it to your library."], exp:"Preview renders the email; clone appears under Scenarios as an unapproved draft."},
+    {id:"C5", title:"Edit a scenario & send for approval", steps:["Phishing → Scenarios, open the cloned draft.","Edit the body, save."], exp:"Scenario stays unapproved (needs Vlumetech approval — feeds test B9) and cannot yet be attached to a live send."},
+    {id:"C6", title:"Generate a scenario with Claude", steps:["Scenarios → Generate, give an industry + difficulty."], exp:"A drafted email returns for review. If the Claude API key isn't set, mark this Blocked."},
+    {id:"C7", title:"Add awareness content by link", steps:["Training → Awareness content → Link a hosted video.","Preview the entered link before saving."], exp:"The Preview button plays the linked video; the module saves."},
+    {id:"C8", title:"Upload awareness video — and it plays", flag:"new", steps:["Awareness content → Upload a video, publish.","Preview the new module row."], exp:"Video plays in the preview (Supabase Storage). Old file:// uploads will NOT — re-upload after deploy."},
+    {id:"C9", title:"Add a video from the shared library", flag:"new", steps:["Awareness content → shared library table → Add to my library."], exp:"The shared module is copied into the client's own module list."},
+    {id:"C10", title:"Create a quiz manually", steps:["Training → Quizzes → Create a quiz, attach to a training video, add questions, mark correct answers."], exp:"Quiz saves attached to that module and shows a question count."},
+    {id:"C11", title:"Add a quiz from the shared library", flag:"new", steps:["Quizzes → Add from the shared library.","Pick a shared quiz and a training video, add."], exp:"A cloned, editable quiz is created and attached to the chosen module."},
+    {id:"C12", title:"Import quiz questions from CSV", steps:["Open a quiz's Results, use Replace questions from CSV."], exp:"Questions replace from the file (columns: prompt, option1..N, correct, explanation)."},
+    {id:"C13", title:"Map training routing", steps:["Training → Training routing.","Map an approved scenario to a training module."], exp:"A routing rule saves so a click on that scenario auto-assigns the module."},
+  ]},
+  { id:"D", title:"Campaign & simulation — the golden path", desc:"Launch a real simulation and walk the employee journey end to end.", tests:[
+    {id:"D1", title:"Create & launch a campaign", steps:["Phishing → Campaigns → new campaign.","Attach an APPROVED scenario, select employees, launch or schedule."], exp:"Campaign is created as active; you cannot attach an unapproved scenario."},
+    {id:"D2", title:"Sends are generated", steps:["Open the campaign detail."], exp:"One send per employee × scenario, each with its own tracking token."},
+    {id:"D3", title:"Delivery", steps:["SES configured: confirm a simulated email arrives.","Log mailer: fetch a token (DB/logs) instead."], exp:"SES → email in the inbox. Log mailer → mark Blocked for inbox delivery and use the token method for D4–D10."},
+    {id:"D4", title:"Open tracking (pixel)", steps:["Hit /track/open/<token> (the email's tracking pixel)."], exp:"The send is marked opened in the campaign stats."},
+    {id:"D5", title:"Click tracking → landing", steps:["Open /track/click/<token> in a private window."], exp:"Click is recorded; you're redirected to the simulated login/landing page for that scenario."},
+    {id:"D6", title:"Teachable moment", steps:["Continue from the landing page."], exp:"The reveal page explains the scenario's red flags and shows the assigned training video (which plays) and the quiz."},
+    {id:"D7", title:"Credential submission is caught", steps:["On the simulated login page, submit dummy credentials."], exp:"A credential-submission event is recorded against the send (no real password stored in the clear)."},
+    {id:"D8", title:"Report-a-phish", steps:["Use the report action /track/report/<token> on a DIFFERENT, un-clicked send."], exp:"The send is marked reported; reporting only counts as a catch when it comes before a click."},
+    {id:"D9", title:"Take the quiz", steps:["From the teachable-moment page, take the assigned quiz and pass it."], exp:"Score is graded server-side; a pass marks that employee's training complete."},
+    {id:"D10", title:"Certificate issued", steps:["After passing, check Reporting → Certificates."], exp:"A completion certificate exists for that employee."},
+  ]},
+  { id:"E", title:"Reporting, risk & certificates", desc:"The numbers that come out of a run.", tests:[
+    {id:"E1", title:"Campaign reporting", steps:["Open the dashboard / campaign report after the run."], exp:"Open, click, report and submission rates reflect the actions from suite D."},
+    {id:"E2", title:"Per-employee risk", steps:["People → Risk."], exp:"Employees who clicked show a higher risk score; clean employees score lower."},
+    {id:"E3", title:"Repeat clickers & auto-enrol", steps:["Run a second campaign so someone clicks twice.","People → Risk → repeat clickers → auto-enrol into a module."], exp:"Repeat clickers are listed and get enrolled into the chosen remediation module."},
+    {id:"E4", title:"Certificates list", steps:["Reporting → Certificates, open one."], exp:"Earned certificates list and open/download correctly."},
+    {id:"E5", title:"Reported emails", steps:["Reporting → Reported."], exp:"Reported simulations appear in the list."},
+  ]},
+  { id:"F", title:"Multi-tenant isolation", desc:"The security backbone — one client can never see another's data.", tests:[
+    {id:"F1", title:"No cross-client data", flag:"sec", steps:["As Kaduna's admin, review employees, scenarios, campaigns, reports."], exp:"Only Kaduna's data is ever visible — nothing from Lagos or any other tenant."},
+    {id:"F2", title:"URL/API tenant tampering", flag:"sec", steps:["As a client admin, change the tenant UUID in an API path to another tenant's and retry."], exp:"Request is refused (403 tenant mismatch) — not silently answered."},
+    {id:"F3", title:"Staff cross-tenant is deliberate only", flag:"sec", steps:["As superadmin, confirm cross-tenant views (Approvals, Clients) work, but tenant-scoped routes stay scoped to the addressed client."], exp:"Staff see across tenants only on the console routes built for it."},
+  ]},
+  { id:"G", title:"Gating & limits", desc:"Trial, agreement and seat rules hold.", tests:[
+    {id:"G1", title:"Unapproved tenant is read-blocked from sending", steps:["As Lagos (agreement pending / not approved), try to create or launch a campaign."], exp:"Writable-tenant guard blocks the action with a clear message until the client is approved."},
+    {id:"G2", title:"Seat limit enforced", steps:["Set a low seat limit (test B10), then add employees past it."], exp:"Adding beyond the limit is refused with a clear “seat limit reached” message."},
+    {id:"G3", title:"Suspended / offboarded client", steps:["Set a client to suspended, attempt admin actions."], exp:"Suspended/offboarded clients cannot run new activity."},
+  ]},
+];
+
+const STATUSES = ["pass","fail","blocked","skip"];
+const LABEL = {pass:"Pass",fail:"Fail",blocked:"Block",skip:"Skip"};
+const KEY = "vlumeaware.testplan.v1";
+let state = {};
+try{ state = JSON.parse(localStorage.getItem(KEY) || "{}"); }catch(e){ state = {}; }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){} }
+
+const allTests = PLAN.flatMap(s => s.tests.map(t => t.id));
+const suitesEl = document.getElementById('suites');
+
+function render(){
+  suitesEl.innerHTML = '';
+  for(const suite of PLAN){
+    const passed = suite.tests.filter(t=>state[t.id]==='pass').length;
+    const det = document.createElement('details');
+    det.className='suite'; det.open = true; det.dataset.suite = suite.id;
+    const sum = document.createElement('summary');
+    sum.innerHTML = `
+      <svg class="caret" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="s-id">${suite.id}</span>
+      <h2>${suite.title} <span class="s-desc">— ${suite.desc}</span></h2>
+      <span class="mini"><span class="count">${passed}/${suite.tests.length}</span><span class="mbar"><i style="width:${Math.round(passed/suite.tests.length*100)}%"></i></span></span>`;
+    det.appendChild(sum);
+    const wrap = document.createElement('div'); wrap.className='tests';
+    for(const t of suite.tests){
+      const st = state[t.id] || '';
+      const row = document.createElement('div');
+      row.className = 'test' + (st ? ' '+st : '');
+      row.dataset.tid = t.id; row.dataset.status = st;
+      const flag = t.flag==='new' ? '<span class="flag new">New</span>' : t.flag==='sec' ? '<span class="flag sec">Security</span>' : '';
+      row.innerHTML = `
+        <div class="t-body">
+          <div class="t-head"><span class="t-id">${t.id}</span><span class="t-title">${t.title}</span>${flag}</div>
+          <ul class="t-steps">${t.steps.map(s=>`<li>${s}</li>`).join('')}</ul>
+          <div class="t-exp"><b>Expected</b>${t.exp}</div>
+        </div>
+        <div class="status">
+          <div class="seg">${STATUSES.map(s=>`<button data-s="${s}" aria-pressed="${st===s}">${LABEL[s]}</button>`).join('')}</div>
+        </div>`;
+      wrap.appendChild(row);
+    }
+    det.appendChild(wrap);
+    suitesEl.appendChild(det);
+  }
+  updateProgress();
+  applyFilter();
+}
+
+function updateProgress(){
+  const passed = allTests.filter(id=>state[id]==='pass').length;
+  const pct = Math.round(passed/allTests.length*100);
+  document.getElementById('barFill').style.width = pct+'%';
+  document.getElementById('progPct').textContent = pct+'%';
+  document.getElementById('progCount').textContent = `${passed} / ${allTests.length} passed`;
+}
+
+let filter = 'all';
+function matches(id){
+  const st = state[id] || 'todo';
+  if(filter==='all') return true;
+  if(filter==='todo') return !state[id];
+  return st===filter;
+}
+function applyFilter(){
+  document.querySelectorAll('.test').forEach(row=>{
+    row.style.display = matches(row.dataset.tid) ? '' : 'none';
+  });
+  document.querySelectorAll('.suite').forEach(det=>{
+    const anyVisible = [...det.querySelectorAll('.test')].some(r=>r.style.display!=='none');
+    det.style.display = anyVisible ? '' : 'none';
+  });
+}
+
+suitesEl.addEventListener('click', e=>{
+  const btn = e.target.closest('button[data-s]');
+  if(!btn) return;
+  const row = btn.closest('.test'); const id = row.dataset.tid; const s = btn.dataset.s;
+  state[id] = (state[id]===s) ? undefined : s;
+  if(!state[id]) delete state[id];
+  save();
+  // update just this row
+  row.className = 'test' + (state[id] ? ' '+state[id] : '');
+  row.querySelectorAll('button[data-s]').forEach(b=>b.setAttribute('aria-pressed', String(state[id]===b.dataset.s)));
+  // update suite mini + global
+  const det = row.closest('.suite'); const suite = PLAN.find(x=>x.id===det.dataset.suite);
+  const passed = suite.tests.filter(t=>state[t.id]==='pass').length;
+  det.querySelector('.count').textContent = `${passed}/${suite.tests.length}`;
+  det.querySelector('.mbar > i').style.width = Math.round(passed/suite.tests.length*100)+'%';
+  updateProgress();
+  if(filter!=='all') applyFilter();
+});
+
+document.getElementById('filters').addEventListener('click', e=>{
+  const btn = e.target.closest('[data-filter]'); if(!btn) return;
+  filter = btn.dataset.filter;
+  document.querySelectorAll('#filters .chip-btn').forEach(b=>b.setAttribute('aria-pressed', String(b===btn)));
+  applyFilter();
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(confirm('Clear all saved test results?')){ state = {}; save(); render(); }
+});
+
+render();
+</script>

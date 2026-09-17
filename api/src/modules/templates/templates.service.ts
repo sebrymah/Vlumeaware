@@ -56,6 +56,63 @@ export class TemplatesService {
     return template;
   }
 
+  // --- Vlumetech staff authoring (global catalogue) -----------------------
+
+  /** Add a scenario to the global catalogue. Vlumetech staff only. */
+  create(input: {
+    title: string;
+    category: string;
+    difficultyTier: 'low' | 'medium' | 'high';
+    industryTag?: string;
+    subjectLine: string;
+    bodyHtml: string;
+    senderSpoofName: string;
+    redFlags: string[];
+  }) {
+    return runAsSystem('create global template', () =>
+      this.prisma.db.phishingTemplate.create({
+        data: {
+          title: input.title,
+          category: input.category,
+          difficultyTier: input.difficultyTier,
+          industryTag: input.industryTag,
+          subjectLine: input.subjectLine,
+          bodyHtml: input.bodyHtml,
+          senderSpoofName: input.senderSpoofName,
+          redFlags: input.redFlags,
+          source: 'vlumetech',
+        },
+      }),
+    );
+  }
+
+  async update(
+    id: string,
+    data: Partial<{
+      title: string;
+      category: string;
+      difficultyTier: 'low' | 'medium' | 'high';
+      industryTag: string;
+      subjectLine: string;
+      bodyHtml: string;
+      senderSpoofName: string;
+      redFlags: string[];
+    }>,
+  ) {
+    await this.findOne(id);
+    return runAsSystem('update global template', () =>
+      this.prisma.db.phishingTemplate.update({ where: { id }, data }),
+    );
+  }
+
+  async remove(id: string) {
+    await this.findOne(id);
+    await runAsSystem('delete global template', () =>
+      this.prisma.db.phishingTemplate.delete({ where: { id } }),
+    );
+    return { deleted: true };
+  }
+
   /**
    * Clones a catalogue template into the acting tenant's scenario library as an
    * unapproved draft. It carries no approval, so it still passes through the

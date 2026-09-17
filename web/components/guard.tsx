@@ -15,6 +15,7 @@ type NavEntry =
 const NAV: Record<Role, NavEntry[]> = {
   vlumetech_superadmin: [
     { kind: 'link', href: '/super-admin', label: 'Clients', icon: 'building' },
+    { kind: 'link', href: '/super-admin/scenarios', label: 'Scenarios', icon: 'hook' },
     { kind: 'link', href: '/super-admin/approvals', label: 'Approvals', icon: 'check' },
     { kind: 'link', href: '/super-admin/library', label: 'Shared library', icon: 'film' },
     { kind: 'link', href: '/super-admin/quiz-library', label: 'Quiz library', icon: 'grad' },

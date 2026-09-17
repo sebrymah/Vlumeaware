@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, Field, Notice, Table } from '@/components/ui';
+import { Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
 
 interface Employee {
   id: string;
@@ -33,7 +33,13 @@ function Employees() {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [seats, setSeats] = useState<{ used: number; seatLimit: number | null; remaining: number | null; licenseTier: string | null } | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // single-employee add
+  const [oneName, setOneName] = useState('');
+  const [oneEmail, setOneEmail] = useState('');
+  const [oneDept, setOneDept] = useState('');
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -76,6 +82,32 @@ function Employees() {
     }
   }
 
+  async function addOne(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    setResult(null);
+    try {
+      const res = await api.post<UploadResult>(`/tenants/${tenantId}/employees`, {
+        employees: [{ name: oneName, email: oneEmail, department: oneDept || undefined }],
+      });
+      if (res.skipped.length > 0) {
+        setError(`Not added: ${res.skipped[0].reason}`);
+      } else {
+        setOk(res.created ? `${oneName} added to the roster.` : `${oneName} updated.`);
+        setOneName('');
+        setOneEmail('');
+        setOneDept('');
+      }
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(id: string) {
     setBusy(true);
     try {
@@ -107,6 +139,7 @@ function Employees() {
       </div>
 
       {error && <Notice kind="error">{error}</Notice>}
+      {ok && <Notice kind="ok">{ok}</Notice>}
 
       {seats && (
         <div
@@ -127,6 +160,23 @@ function Employees() {
           )}
         </div>
       )}
+
+      <Card title="Add one employee" subtitle="Add a single person to the roster.">
+        <form onSubmit={addOne} className="grid items-end gap-3 sm:grid-cols-4">
+          <Field label="Name">
+            <input className={inputClass} value={oneName} onChange={(ev) => setOneName(ev.target.value)} required minLength={2} />
+          </Field>
+          <Field label="Work email">
+            <input className={inputClass} type="email" value={oneEmail} onChange={(ev) => setOneEmail(ev.target.value)} required />
+          </Field>
+          <Field label="Department (optional)">
+            <input className={inputClass} value={oneDept} onChange={(ev) => setOneDept(ev.target.value)} placeholder="Finance" />
+          </Field>
+          <Button type="submit" disabled={busy}>
+            {busy ? 'Adding…' : 'Add employee'}
+          </Button>
+        </form>
+      </Card>
 
       <Card title="Bulk upload" subtitle="CSV with email, name and department columns.">
         <form onSubmit={upload} className="flex items-end gap-3">
