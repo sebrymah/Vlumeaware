@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Request a demo — Vlumeaware</title>
+<meta name="description" content="Book a Vlumeaware walkthrough. We’ll run a sample phishing simulation against a test group and show you the reporting a board would read.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%9B%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<div class="nav-mount"></div>
+
+<section style="padding:64px 0 40px">
+  <div class="wrap">
+    <div class="split" style="align-items:start">
+      <div>
+        <p class="eyebrow">Request a demo</p>
+        <h2 style="font-size:clamp(30px,4.4vw,44px)">See who’s clicking — in a 30-minute walkthrough.</h2>
+        <p style="font-size:18px;color:var(--muted);margin-top:16px">Tell us a little about your team. We’ll run a sample simulation against a small test group and show you the human-risk reporting, the training loop, and the compliance controls.</p>
+        <ul class="split" style="display:block;margin-top:22px">
+          <li>A live sample phishing simulation</li>
+          <li>Human Risk Score &amp; per-department reporting</li>
+          <li>The ISO 27001 content pack, end to end</li>
+          <li>Domain verification &amp; the NDPA consent gate</li>
+        </ul>
+        <div class="badge-row" style="margin-top:26px">
+          <span>Prefer email?</span>
+          <a class="mono" href="mailto:info@vlumetech.com.ng?subject=Vlumeaware%20demo%20request">info@vlumetech.com.ng</a>
+        </div>
+      </div>
+
+      <div class="panel">
+        <form class="form" id="demoForm" novalidate>
+          <div class="grid2">
+            <div class="field"><label for="name">Full name</label><input id="name" name="name" required autocomplete="name"></div>
+            <div class="field"><label for="company">Company</label><input id="company" name="company" required autocomplete="organization"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label for="email">Work email</label><input id="email" name="email" type="email" required autocomplete="email"></div>
+            <div class="field"><label for="phone">Phone (optional)</label><input id="phone" name="phone" autocomplete="tel"></div>
+          </div>
+          <div class="grid2">
+            <div class="field"><label for="role">Your role</label><input id="role" name="role" placeholder="e.g. IT Manager, CISO"></div>
+            <div class="field"><label for="size">Team size</label>
+              <select id="size" name="size">
+                <option value="Up to 25">Up to 25</option>
+                <option value="26–100">26–100</option>
+                <option value="101–250">101–250</option>
+                <option value="250+">250+</option>
+              </select>
+            </div>
+          </div>
+          <div class="field"><label for="message">Anything we should know? (optional)</label><textarea id="message" name="message" placeholder="Your goals, timeline, or a specific concern…"></textarea></div>
+          <button class="btn primary big" type="submit" style="justify-content:center">Send request</button>
+          <p id="hint" style="font-size:12.5px;color:var(--faint);margin:0">This opens your email app with the details ready to send to info@vlumetech.com.ng. We reply within one business day.</p>
+        </form>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="footer-mount"></div>
+<script src="site.js" defer></script>
+<script>
+document.getElementById('demoForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var f = e.target;
+  var v = function (id) { return (f.querySelector('#' + id).value || '').trim(); };
+  if (!v('name') || !v('company') || !v('email')) {
+    document.getElementById('hint').textContent = 'Please fill in your name, company and work email.';
+    document.getElementById('hint').style.color = '#C0393C';
+    return;
+  }
+  var body =
+    'Name: ' + v('name') + '\n' +
+    'Company: ' + v('company') + '\n' +
+    'Work email: ' + v('email') + '\n' +
+    'Phone: ' + (v('phone') || '—') + '\n' +
+    'Role: ' + (v('role') || '—') + '\n' +
+    'Team size: ' + v('size') + '\n\n' +
+    'Message:\n' + (v('message') || '—') + '\n';
+  var url = 'mailto:info@vlumetech.com.ng'
+    + '?subject=' + encodeURIComponent('Vlumeaware demo request — ' + v('company'))
+    + '&body=' + encodeURIComponent(body);
+  window.location.href = url;
+  var h = document.getElementById('hint');
+  h.textContent = 'Opening your email app… if nothing happens, email info@vlumetech.com.ng directly.';
+  h.style.color = 'var(--brand-strong)';
+});
+</script>
+</body>
+</html>

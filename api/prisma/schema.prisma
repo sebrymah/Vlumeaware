@@ -44,6 +44,11 @@ enum DifficultyTier {
   high
 }
 
+enum DomainStatus {
+  pending
+  verified
+}
+
 model Tenant {
   id                    String       @id @default(uuid()) @db.Uuid
   name                  String
@@ -85,6 +90,7 @@ model Tenant {
   quizAttempts          QuizAttempt[]
   certificates          Certificate[]
   phishReports          PhishReport[]
+  verifiedDomains       VerifiedDomain[]
 
   @@map("tenants")
 }
@@ -478,6 +484,27 @@ model SharedTrainingModule {
   createdAt       DateTime    @default(now()) @map("created_at")
 
   @@map("shared_training_modules")
+}
+
+/**
+ * A domain a client has proven they own, via a DNS TXT record. Employees can
+ * only be onboarded — and simulations only sent — to addresses on a verified
+ * domain, so a client cannot phish people outside their own organisation.
+ */
+model VerifiedDomain {
+  id         String       @id @default(uuid()) @db.Uuid
+  tenantId   String       @map("tenant_id") @db.Uuid
+  domain     String
+  token      String
+  status     DomainStatus @default(pending)
+  verifiedAt DateTime?    @map("verified_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, domain])
+  @@index([tenantId])
+  @@map("verified_domains")
 }
 
 /**

@@ -1,0 +1,564 @@
+<!doctype html>
+<html data-theme="light" lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size:A4; margin:15mm 14mm; }
+  html,body{ background:#ffffff; }
+  *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  /* single column for print */
+  .shell{ grid-template-columns:1fr !important; gap:0 !important; max-width:none !important; padding:0 !important; }
+  main{ max-width:none !important; }
+  .toc{ display:none !important; }
+  .theme-btn{ display:none !important; }
+  .topbar{ position:static !important; box-shadow:none !important; }
+  .cover{ padding-top:14px !important; }
+  /* keep blocks together across page breaks */
+  .feat, .diagram, .scrollx, .note, .factgrid, figure { break-inside:avoid; page-break-inside:avoid; }
+  h2, h3, h4 { break-after:avoid; page-break-after:avoid; }
+  section { border-bottom:1px solid var(--line); }
+</style>
+</head>
+<body>
+<title>Vlumeaware PRD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#FBFCFD; --surface:#FFFFFF; --surface-2:#F1F5F3;
+  --ink:#0E1A16; --ink-soft:#38473F; --muted:#6A7A72; --faint:#93A29B;
+  --line:#E3E9E5; --line-strong:#D3DCD7;
+  --accent:#0E7C56; --accent-strong:#0A5F42; --accent-soft:#E6F3EC;
+  --warn:#B45309; --warn-soft:#FBF0E2; --crit:#B42318; --crit-soft:#FBEBE9;
+  --info:#2563A8; --info-soft:#E9F0F8;
+  --shadow:0 1px 2px rgba(14,26,22,.05),0 12px 30px -18px rgba(14,26,22,.28);
+  --shadow-sm:0 1px 2px rgba(14,26,22,.06);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#080C0A; --surface:#0F1613; --surface-2:#0C120F;
+  --ink:#E8EEEA; --ink-soft:#B4C0BA; --muted:#84938C; --faint:#5E6C65;
+  --line:#20302A; --line-strong:#2B3D35;
+  --accent:#38B98A; --accent-strong:#57CB9E; --accent-soft:#11241C;
+  --warn:#E0A25C; --warn-soft:#241C10; --crit:#E88E80; --crit-soft:#251310;
+  --info:#82B2E3; --info-soft:#0F1B26;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 20px 40px -22px rgba(0,0,0,.7);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+}}
+:root[data-theme="dark"]{
+  --paper:#080C0A; --surface:#0F1613; --surface-2:#0C120F;
+  --ink:#E8EEEA; --ink-soft:#B4C0BA; --muted:#84938C; --faint:#5E6C65;
+  --line:#20302A; --line-strong:#2B3D35;
+  --accent:#38B98A; --accent-strong:#57CB9E; --accent-soft:#11241C;
+  --warn:#E0A25C; --warn-soft:#241C10; --crit:#E88E80; --crit-soft:#251310;
+  --info:#82B2E3; --info-soft:#0F1B26;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 20px 40px -22px rgba(0,0,0,.7);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:"Archivo","IBM Plex Sans",sans-serif;line-height:1.14;text-wrap:balance;margin:0;letter-spacing:-.01em}
+code,kbd,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:3px}
+
+.wrap{max-width:1180px;margin:0 auto;padding:0 28px}
+.shell{display:grid;grid-template-columns:1fr;gap:0}
+@media(min-width:1040px){.shell{grid-template-columns:236px minmax(0,1fr);gap:56px;align-items:start;max-width:1180px;margin:0 auto;padding:0 28px}.wrap.body{max-width:none;margin:0;padding:0}}
+main{min-width:0;max-width:820px}
+.prose p,.prose ul,.prose ol{max-width:72ch}
+
+.topbar{position:sticky;top:0;z-index:40;background:color-mix(in srgb,var(--paper) 86%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar .row{display:flex;align-items:center;gap:14px;height:56px}
+.brand{font-family:"Archivo";font-weight:800;letter-spacing:-.02em;font-size:18px;color:var(--ink)}
+.brand b{color:var(--accent)}
+.topbar .meta{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--line-strong);border-radius:999px;font-size:11.5px;font-weight:500;color:var(--ink-soft);background:var(--surface)}
+.pill.accent{color:var(--accent-strong);border-color:color-mix(in srgb,var(--accent) 40%,var(--line));background:var(--accent-soft)}
+.theme-btn{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-soft);border-radius:8px;height:32px;width:32px;cursor:pointer;font-size:14px;display:grid;place-items:center}
+
+.toc{position:sticky;top:76px;align-self:start;font-size:13px;padding-top:8px;max-height:calc(100vh - 96px);overflow:auto}
+.toc .lbl{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:600;margin:0 0 10px}
+.toc ol{list-style:none;margin:0;padding:0;counter-reset:t}
+.toc li{counter-increment:t}
+.toc a{display:flex;gap:8px;padding:5px 8px;border-radius:7px;color:var(--ink-soft);border-left:2px solid transparent}
+.toc a::before{content:counter(t,decimal-leading-zero);color:var(--faint);font-family:"IBM Plex Mono";font-size:11px;font-weight:500;flex:none;width:1.4em}
+.toc a:hover{background:var(--surface-2);text-decoration:none;color:var(--ink)}
+.toc a.on{color:var(--accent-strong);border-left-color:var(--accent);background:var(--accent-soft)}
+@media(max-width:1039px){.toc{display:none}}
+
+.cover{padding:66px 0 40px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:"IBM Plex Mono";font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:500;margin-bottom:18px}
+.cover h1{font-size:clamp(38px,7vw,72px);font-weight:800;letter-spacing:-.035em}
+.cover .lede{font-size:clamp(18px,2.4vw,22px);color:var(--ink-soft);max-width:40ch;margin-top:20px;line-height:1.4}
+.factgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:40px}
+@media(min-width:680px){.factgrid{grid-template-columns:repeat(4,1fr)}}
+.fact{background:var(--surface);padding:18px 18px 16px}
+.fact .k{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint)}
+.fact .v{font-family:"Archivo";font-weight:700;font-size:clamp(20px,2.4vw,26px);color:var(--ink);margin-top:6px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.fact .s{font-size:12px;color:var(--muted);margin-top:2px}
+
+section{padding:52px 0;border-bottom:1px solid var(--line)}
+section:last-of-type{border-bottom:0}
+.sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+.sec-num{font-family:"IBM Plex Mono";font-size:13px;color:var(--accent);font-weight:500;flex:none}
+h2{font-size:clamp(26px,4vw,34px);font-weight:750;letter-spacing:-.025em}
+.sec-sub{color:var(--muted);font-size:15px;margin:2px 0 26px}
+h3{font-size:20px;font-weight:700;margin:34px 0 10px;letter-spacing:-.02em}
+h4{font-size:15px;font-weight:600;margin:22px 0 6px;color:var(--ink)}
+.prose p{margin:0 0 15px}
+.prose ul,.prose ol{margin:0 0 15px;padding-left:20px}
+.prose li{margin:5px 0}
+.prose strong{font-weight:600;color:var(--ink)}
+.lead{font-size:18px;line-height:1.55;color:var(--ink-soft)}
+
+.note{border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--surface);border-radius:10px;padding:14px 18px;margin:18px 0;font-size:14.5px;color:var(--ink-soft)}
+.note.warn{border-left-color:var(--warn);background:color-mix(in srgb,var(--warn-soft) 60%,var(--surface))}
+.note.crit{border-left-color:var(--crit);background:color-mix(in srgb,var(--crit-soft) 60%,var(--surface))}
+.note .t{font-weight:600;color:var(--ink);display:block;margin-bottom:3px;font-size:13px}
+
+.feat{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:22px 22px 10px;margin:20px 0;box-shadow:var(--shadow-sm)}
+.feat>h3{margin-top:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.feat .tag{font-family:"IBM Plex Mono";font-size:10.5px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;color:var(--accent-strong);background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,var(--line));padding:2px 8px;border-radius:999px}
+.feat .tag.new{color:#fff;background:var(--accent);border-color:var(--accent)}
+.feat p{margin:6px 0 12px;font-size:14.5px;color:var(--ink-soft)}
+.ac{list-style:none;padding:0;margin:6px 0 6px}
+.ac li{position:relative;padding-left:26px;margin:8px 0;font-size:14.5px;color:var(--ink-soft)}
+.ac li::before{content:"";position:absolute;left:2px;top:6px;width:13px;height:13px;border-radius:4px;background:var(--accent-soft);border:1.5px solid var(--accent)}
+.ac li::after{content:"";position:absolute;left:6px;top:8px;width:4px;height:7px;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);transform:rotate(40deg)}
+
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px;margin:14px 0}
+.scrollx{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+.scrollx .tbl{margin:0}
+.tbl th,.tbl td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl thead th{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--faint);font-weight:600;background:var(--surface-2);white-space:nowrap}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl td.mono,.tbl th.mono{font-family:"IBM Plex Mono";font-size:12.5px;color:var(--ink)}
+.method{font-family:"IBM Plex Mono";font-weight:600;font-size:11px;padding:2px 6px;border-radius:5px;color:#fff;background:var(--accent);white-space:nowrap}
+.method.get{background:var(--info)}
+.method.post{background:var(--accent)}
+.method.patch{background:var(--warn)}
+.method.del{background:var(--crit)}
+
+.diagram{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:22px;margin:22px 0;box-shadow:var(--shadow-sm)}
+.diagram svg{width:100%;height:auto;display:block}
+.dg-box{fill:var(--surface-2);stroke:var(--line-strong)}
+.dg-accent{fill:var(--accent-soft);stroke:var(--accent)}
+.dg-t{fill:var(--ink);font-family:"IBM Plex Sans";font-weight:600}
+.dg-s{fill:var(--muted);font-family:"IBM Plex Mono"}
+.dg-flow{stroke:var(--accent);fill:none}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.chip{font-size:12.5px;padding:5px 11px;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface);color:var(--ink-soft)}
+.chip b{color:var(--ink);font-weight:600}
+.two{display:grid;grid-template-columns:1fr;gap:22px}
+@media(min-width:720px){.two{grid-template-columns:1fr 1fr}}
+.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.s-live{background:var(--accent)} .s-code{background:var(--warn)} .s-plan{background:var(--faint)}
+.legend{font-size:12px;color:var(--muted);margin-top:10px;display:flex;gap:16px;flex-wrap:wrap}
+.foot{padding:40px 0 70px;color:var(--muted);font-size:13px}
+.foot b{color:var(--ink-soft)}
+</style>
+
+<div class="topbar"><div class="wrap"><div class="row">
+  <span class="brand">Vlume<b>aware</b></span>
+  <span class="pill accent">PRD</span>
+  <span class="pill">v1.1 &#183; 17 Sep 2026</span>
+  <div class="meta">
+    <span class="pill">Status: Live on free-tier</span>
+    <button class="theme-btn" id="tt" aria-label="Toggle theme" title="Toggle light/dark">&#9680;</button>
+  </div>
+</div></div></div>
+
+<div class="wrap">
+<header class="cover">
+  <div class="eyebrow">Product Requirements Document &#183; Vlumetech LTD</div>
+  <h1>Vlumeaware</h1>
+  <p class="lede">A phishing-simulation and security-awareness platform for Nigerian SME and mid-market clients &#8212; measure who clicks, then route them straight into the training that fixes it.</p>
+  <div class="factgrid">
+    <div class="fact"><div class="k">Owner</div><div class="v">Vlumetech</div><div class="s">it@vlumetech.com.ng</div></div>
+    <div class="fact"><div class="k">Surfaces</div><div class="v">3 + 2</div><div class="s">consoles + portals</div></div>
+    <div class="fact"><div class="k">Data model</div><div class="v">23</div><div class="s">tables &#183; 11 migrations</div></div>
+    <div class="fact"><div class="k">Content pack</div><div class="v">10</div><div class="s">ISO 27001:2022 topics</div></div>
+  </div>
+</header>
+</div>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contents">
+    <p class="lbl">Contents</p>
+    <ol>
+      <li><a href="#summary">Executive summary</a></li>
+      <li><a href="#problem">Problem &amp; opportunity</a></li>
+      <li><a href="#goals">Goals &amp; non-goals</a></li>
+      <li><a href="#roles">Roles &amp; surfaces</a></li>
+      <li><a href="#loop">The core loop</a></li>
+      <li><a href="#features">Feature specification</a></li>
+      <li><a href="#content">ISO 27001 content pack</a></li>
+      <li><a href="#arch">Technical architecture</a></li>
+      <li><a href="#data">Data model</a></li>
+      <li><a href="#api">API surface</a></li>
+      <li><a href="#security">Security &amp; compliance</a></li>
+      <li><a href="#nfr">Non-functional</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+      <li><a href="#status">Build &amp; deploy status</a></li>
+    </ol>
+  </nav>
+
+  <main class="wrap body prose">
+
+  <section id="summary">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Executive summary</h2></div>
+    <p class="sec-sub">What Vlumeaware is, and why it exists.</p>
+    <p class="lead">Vlumeaware runs authorized phishing simulations against a client's own employees, measures who opens, clicks, reports, and submits credentials, and then <strong>auto-routes anyone who falls for a lure into the exact training module that addresses that attack</strong> &#8212; closing the loop from exposure to remediation without a human in the middle.</p>
+    <p>It is a paid add-on to Vlumetech's security-awareness curriculum and VAPT services, not a standalone tool. It differentiates from KnowBe4, Proofpoint, Cofense and SoSafe on three axes: <strong>NDPA/NDPR compliance</strong> baked into the workflow, <strong>Nigerian business context</strong> (invoice- and mandate-fraud lures, local payroll cycles, CBN/FIRS notice formats), and a <strong>closed training feedback loop</strong> grounded in an ISO&nbsp;27001:2022 content pack.</p>
+    <p>The platform is multi-tenant from the ground up: every client's data is isolated at the database-query layer, not merely in application logic. Two gates protect against misuse &#8212; a signed-authorization consent gate blocks any simulation for an unapproved client, and a <strong>domain-ownership gate</strong> ensures a client can only ever phish addresses on a domain it has proven it owns. Clients self-serve onto a 7-day trial; Vlumetech staff approve them into standing, licensed accounts.</p>
+
+    <div class="diagram" role="img" aria-label="Core simulation loop from send to certificate">
+    <svg viewBox="0 0 900 120" xmlns="http://www.w3.org/2000/svg" font-size="11.5">
+      <g text-anchor="middle">
+      <rect class="dg-accent" x="8"  y="40" width="118" height="46" rx="9"/><text class="dg-t" x="67"  y="67">Send</text>
+      <rect class="dg-box"    x="152" y="40" width="118" height="46" rx="9"/><text class="dg-t" x="211" y="67">Open</text>
+      <rect class="dg-box"    x="296" y="40" width="118" height="46" rx="9"/><text class="dg-t" x="355" y="67">Click</text>
+      <rect class="dg-box"    x="440" y="40" width="118" height="46" rx="9"/><text class="dg-t" x="499" y="61">Teachable</text><text class="dg-s" x="499" y="76" font-size="9">+ video</text>
+      <rect class="dg-box"    x="584" y="40" width="118" height="46" rx="9"/><text class="dg-t" x="643" y="67">Quiz</text>
+      <rect class="dg-accent" x="728" y="40" width="150" height="46" rx="9"/><text class="dg-t" x="803" y="61">Certificate</text><text class="dg-s" x="803" y="76" font-size="9">training complete</text>
+      </g>
+      <g>
+      <path class="dg-flow" d="M126 63 L150 63" stroke-width="1.5" marker-end="url(#l)"/>
+      <path class="dg-flow" d="M270 63 L294 63" stroke-width="1.5" marker-end="url(#l)"/>
+      <path class="dg-flow" d="M414 63 L438 63" stroke-width="1.5" marker-end="url(#l)"/>
+      <path class="dg-flow" d="M558 63 L582 63" stroke-width="1.5" marker-end="url(#l)"/>
+      <path class="dg-flow" d="M702 63 L726 63" stroke-width="1.5" marker-end="url(#l)"/>
+      </g>
+      <defs><marker id="l" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="var(--accent)"/></marker></defs>
+    </svg>
+    </div>
+    <p class="legend">The measurable unit is a <b>send</b> &#8212; one tracked email to one employee. Every event (open, click, report, credential submission, quiz pass) writes back to that row, which is what makes recipient-level reporting and per-person risk scoring possible.</p>
+  </section>
+
+  <section id="problem">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Problem &amp; opportunity</h2></div>
+    <p class="sec-sub">Why a locally-grounded simulator, and why now.</p>
+    <p>Phishing is the dominant initial-access vector for Nigerian SMEs, and the lures that land are local: vendor bank-mandate changes timed to the monthly invoice run, fake CBN/FIRS re-verification notices, payroll-account confirmations. Global awareness platforms train against US-centric templates and treat compliance as an afterthought &#8212; an awkward fit for an organisation answerable to the NDPA.</p>
+    <div class="chips">
+      <span class="chip"><b>Compliance-first</b> &#8212; consent gate blocks unauthorized sends</span>
+      <span class="chip"><b>Domain-bound</b> &#8212; can only phish addresses you own</span>
+      <span class="chip"><b>Local context</b> &#8212; invoice, payroll, CBN/FIRS lures</span>
+      <span class="chip"><b>Closed loop</b> &#8212; a click auto-assigns the fixing module</span>
+      <span class="chip"><b>ISO&#8209;aligned</b> &#8212; ten Annex&nbsp;A awareness topics ready to run</span>
+    </div>
+    <p>The opportunity is to be the awareness platform a Nigerian mid-market CISO can put in front of their board and their regulator with equal confidence.</p>
+  </section>
+
+  <section id="goals">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Goals &amp; non-goals</h2></div>
+    <p class="sec-sub">Deliberately narrow, defensively built.</p>
+    <div class="two">
+      <div>
+        <h4>Goals</h4>
+        <ul>
+          <li>Provably isolate every client's data at the query layer.</li>
+          <li>Make it impossible to simulate without signed authorization <em>or</em> to email anyone off a verified domain.</li>
+          <li>Auto-route failures into targeted training; measure completion with certificates.</li>
+          <li>Give Vlumetech staff a curated, reusable catalogue of scenarios, videos and quizzes.</li>
+          <li>Let clients self-serve onto a trial and staff approve them into licensed accounts.</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Non-goals (v1)</h4>
+        <ul>
+          <li>Not a SIEM or email gateway &#8212; it simulates and measures, it does not filter real mail.</li>
+          <li>No real-time SOC / incident-response integration.</li>
+          <li>No storage of what an employee types on a simulated login page (metadata only).</li>
+          <li>Not multi-language yet (English only in v1).</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note"><span class="t">Scope evolved during build</span>Several items were promoted to first-class features on request: self-serve signup, a content-authoring stack (template catalogue, manual composer, quizzes, shared libraries), and <strong>domain-ownership verification</strong>. All are documented below.</div>
+  </section>
+
+  <section id="roles">
+    <div class="sec-head"><span class="sec-num">04</span><h2>Roles &amp; surfaces</h2></div>
+    <p class="sec-sub">Three roles, three consoles, two sign-in portals.</p>
+    <div class="scrollx"><table class="tbl">
+      <thead><tr><th>Role</th><th>Scope</th><th>Console</th><th class="mono">Portal</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">vlumetech_superadmin</td><td>All tenants (cross-client)</td><td>Staff console &#8212; clients, scenario catalogue, approvals, shared video &amp; quiz libraries, audit</td><td class="mono">/admin</td></tr>
+        <tr><td class="mono">client_admin</td><td>Their own tenant</td><td>Full client console &#8212; campaigns, scenarios, content, domains, employees, reporting</td><td class="mono">/login</td></tr>
+        <tr><td class="mono">client_viewer</td><td>Their own tenant (read)</td><td>Read-only reporting, risk, certificates</td><td class="mono">/login</td></tr>
+      </tbody>
+    </table></div>
+    <p>Vlumetech staff and clients sign in at <strong>separate URLs</strong>; each portal accepts only its own roles and refuses a wrong-role sign-in without storing a session. The client console groups navigation into <strong>Phishing, Training, People and Reporting</strong>; the staff console is a flat set of platform tools. The UI is a light, KnowBe4-style theme with a shared emerald brand accent.</p>
+  </section>
+
+  <section id="loop">
+    <div class="sec-head"><span class="sec-num">05</span><h2>The core loop</h2></div>
+    <p class="sec-sub">From an approved scenario to a measured, remediated employee.</p>
+    <ol>
+      <li><strong>Author or clone a scenario.</strong> A client clones one from the global catalogue (or Claude drafts one), edits it, and submits it for review.</li>
+      <li><strong>Vlumetech approves.</strong> Only an approved scenario can be attached to a live campaign.</li>
+      <li><strong>Launch a campaign.</strong> One <em>send</em> is materialised per employee per scenario &#8212; but only for employees on a <strong>verified domain</strong>.</li>
+      <li><strong>Track.</strong> Opens (pixel), clicks (redirect to a simulated landing page), credential submissions and report-a-phish actions all write back to the send.</li>
+      <li><strong>Teach.</strong> A click lands the employee on a teachable-moment page that names the scenario's red flags and plays the assigned awareness video.</li>
+      <li><strong>Assess.</strong> A short quiz follows; a pass marks the employee's training complete and issues a certificate.</li>
+      <li><strong>Remediate.</strong> Repeat clickers are surfaced on the risk board and can be auto-enrolled into a remediation module.</li>
+    </ol>
+  </section>
+
+  <section id="features">
+    <div class="sec-head"><span class="sec-num">06</span><h2>Feature specification</h2></div>
+    <p class="sec-sub">Each block lists its acceptance criteria.</p>
+
+    <div class="feat">
+      <h3>Employee onboarding &amp; domain verification <span class="tag new">New</span></h3>
+      <p>A client proves it owns a domain via a DNS TXT record before it can onboard anyone on it &#8212; so no one outside the organisation is ever phished.</p>
+      <ul class="ac">
+        <li>Add multiple domains; each gets a unique token and a TXT record to publish at <code>_vlumeaware.&lt;domain&gt;</code>.</li>
+        <li><strong>Verify</strong> performs a live DNS lookup and flips the domain to <em>verified</em>.</li>
+        <li>Adding employees (single or CSV) rejects any address not on a verified domain, with a clear reason.</li>
+        <li>Campaign launch filters recipients to verified domains &#8212; a second guard, so a stale row can't leak out.</li>
+        <li>Single-employee add and bulk-CSV upload; existing rows update rather than duplicate; seat limits enforced.</li>
+      </ul>
+    </div>
+
+    <div class="feat">
+      <h3>Scenario catalogue &amp; approvals <span class="tag">Staff + client</span></h3>
+      <p>A global library of phishing scenarios that staff author and clients clone.</p>
+      <ul class="ac">
+        <li>Staff add / edit / delete catalogue scenarios (subject, spoofed sender, HTML body, red flags, difficulty).</li>
+        <li>Clients clone a catalogue scenario or generate one with Claude, then edit it.</li>
+        <li>Every client scenario is <em>unapproved</em> until Vlumetech reviews it; the approvals queue shows a cross-tenant list with an email preview and approve / reject.</li>
+        <li>Placeholders <code>{{EMPLOYEE_NAME}}</code> and <code>{{TRACKING_URL}}</code> are substituted at send time.</li>
+      </ul>
+    </div>
+
+    <div class="feat">
+      <h3>Campaigns &amp; simulation <span class="tag">Client</span></h3>
+      <p>The measurement engine.</p>
+      <ul class="ac">
+        <li>Create a campaign, attach one or more approved scenarios, select employees, launch now or schedule.</li>
+        <li>A preflight checklist gates launch (employees present, approved scenario attached, consent on file).</li>
+        <li>Sends are queued through Redis/BullMQ; a kill switch halts an active campaign.</li>
+        <li>Tracking endpoints record open, click, credential submission and report; report only credits a catch when it precedes a click.</li>
+        <li>Emails send via SES when configured; otherwise a log mailer records them for safe testing.</li>
+      </ul>
+    </div>
+
+    <div class="feat">
+      <h3>Awareness training &amp; shared video library <span class="tag">Staff + client</span></h3>
+      <p>Video modules a client uploads or links, plus a global library staff curate.</p>
+      <ul class="ac">
+        <li>Add a module by hosted link or by uploading a video file (stored in Supabase Storage, playable https URL).</li>
+        <li><strong>Preview</strong> plays any module &#8212; upload or link &#8212; before it goes out.</li>
+        <li>Clients clone modules from the shared Vlumetech library into their own.</li>
+        <li>The teachable-moment page serves the assigned module to the employee who clicked.</li>
+      </ul>
+    </div>
+
+    <div class="feat">
+      <h3>Quizzes &amp; shared quiz library <span class="tag new">New</span></h3>
+      <p>Knowledge checks that gate training completion, with a reusable global library.</p>
+      <ul class="ac">
+        <li>Staff publish shared quizzes; clients clone one onto a training module or author their own.</li>
+        <li>Questions via a form, bulk JSON, or CSV import; correct answers and explanations per question.</li>
+        <li>Scored server-side; a pass at the configured mark marks training complete and issues a certificate.</li>
+        <li>Per-quiz results show each employee's score and pass/fail.</li>
+      </ul>
+    </div>
+
+    <div class="feat">
+      <h3>Reporting, risk &amp; certificates <span class="tag">Client + staff</span></h3>
+      <ul class="ac">
+        <li>Campaign reporting: open, click, report and submission rates.</li>
+        <li>Per-employee risk scoring; a repeat-clicker list with one-click auto-enrol into a remediation module.</li>
+        <li>Certificates issued on quiz pass; a Reported view lists caught simulations.</li>
+        <li>Staff cross-client overview and an append-only audit log.</li>
+      </ul>
+    </div>
+
+    <div class="feat">
+      <h3>Multi-tenant, trial &amp; licensing <span class="tag">Platform</span></h3>
+      <ul class="ac">
+        <li>Self-serve signup creates a 7-day trial tenant capped at 20 seats; staff approve into a licensed tier with a seat limit.</li>
+        <li>A writable-tenant guard blocks creation and sending for unapproved / lapsed / suspended tenants.</li>
+        <li>Deliverability settings (sending domain, allowlist) recorded per tenant.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="content">
+    <div class="sec-head"><span class="sec-num">07</span><h2>ISO 27001:2022 content pack</h2></div>
+    <p class="sec-sub">Ten ready-to-run awareness topics, each a video + quiz + phishing simulation.</p>
+    <p>The pack maps to Annex&nbsp;A (2022) controls so it can be dropped into a statement of applicability. The ten phishing simulations are loaded into the global catalogue and the ten quizzes into the shared quiz library; video scripts are authored and awaiting production files.</p>
+    <div class="scrollx"><table class="tbl">
+      <thead><tr><th>#</th><th>Topic</th><th>Annex A</th><th>Deliverables</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td>Phishing &amp; social engineering</td><td class="mono">A.6.3, A.5.7</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">2</td><td>Passwords &amp; MFA</td><td class="mono">A.5.17, A.8.5</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">3</td><td>Clear desk / acceptable use</td><td class="mono">A.7.7, A.5.10</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">4</td><td>Information classification</td><td class="mono">A.5.12&#8211;5.14</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">5</td><td>Secure remote &amp; mobile working</td><td class="mono">A.6.7, A.8.1</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">6</td><td>Physical security &amp; tailgating</td><td class="mono">A.7.1&#8211;7.6</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">7</td><td>Security incident reporting</td><td class="mono">A.5.24&#8211;5.26</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">8</td><td>Malware &amp; ransomware</td><td class="mono">A.8.7, A.8.19</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">9</td><td>Removable media &amp; data transfer</td><td class="mono">A.7.10, A.8.12</td><td>Video &#183; quiz &#183; simulation</td></tr>
+        <tr><td class="mono">10</td><td>Personal data &amp; privacy (PII)</td><td class="mono">A.5.34, A.8.11</td><td>Video &#183; quiz &#183; simulation</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="arch">
+    <div class="sec-head"><span class="sec-num">08</span><h2>Technical architecture</h2></div>
+    <p class="sec-sub">A monorepo, deployed entirely on free tiers.</p>
+    <div class="chips">
+      <span class="chip"><b>API</b> NestJS (Node 22) &#183; Prisma 6</span>
+      <span class="chip"><b>Web</b> Next.js 16 &#183; React 19 &#183; Tailwind</span>
+      <span class="chip"><b>DB</b> PostgreSQL (Supabase)</span>
+      <span class="chip"><b>Queue</b> BullMQ &#183; Redis</span>
+      <span class="chip"><b>Storage</b> Supabase Storage</span>
+      <span class="chip"><b>AI</b> Claude (scenario drafting)</span>
+      <span class="chip"><b>Mail</b> AWS SES / log mailer</span>
+    </div>
+    <ul>
+      <li><strong>Web</strong> (Next.js) on Vercel &#8212; the two consoles and the public teachable-moment / simulated-login pages.</li>
+      <li><strong>API + worker</strong> (NestJS, one Docker image) on Render &#8212; the API serves requests; the worker drains the send and scheduler queues.</li>
+      <li><strong>Database</strong> on Supabase Postgres (session pooler), with a tenant-guard Prisma extension enforcing isolation and RLS enabled on every table.</li>
+      <li><strong>Redis</strong> (Render Key Value) backs BullMQ for send scheduling and send-window pacing.</li>
+      <li><strong>Object storage</strong> in a public Supabase bucket for awareness videos, returning playable https URLs.</li>
+    </ul>
+    <div class="note warn"><span class="t">Known free-tier constraints</span>Render's free web service cold-starts after idle (~50&nbsp;s first request) and has an ephemeral disk; video storage was moved to Supabase for durability. Removing cold-starts and adding persistent Redis + backups is on the roadmap.</div>
+  </section>
+
+  <section id="data">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Data model</h2></div>
+    <p class="sec-sub">23 tables across 11 migrations. Tenant-scoped tables carry <code>tenant_id</code> and are unreachable without a tenant in context.</p>
+    <div class="scrollx"><table class="tbl">
+      <thead><tr><th>Domain</th><th>Tables</th></tr></thead>
+      <tbody>
+        <tr><td>Tenancy &amp; identity</td><td class="mono">tenants, tenant_users, users</td></tr>
+        <tr><td>People &amp; domains</td><td class="mono">employees, verified_domains</td></tr>
+        <tr><td>Scenarios &amp; templates</td><td class="mono">scenarios, phishing_templates</td></tr>
+        <tr><td>Campaigns &amp; sends</td><td class="mono">campaigns, campaign_scenarios, sends</td></tr>
+        <tr><td>Tracking</td><td class="mono">reports, credential_submissions, phish_reports</td></tr>
+        <tr><td>Training</td><td class="mono">training_modules, shared_training_modules, training_routing_rules, training_assignments</td></tr>
+        <tr><td>Quizzes</td><td class="mono">quizzes, quiz_questions, quiz_attempts, shared_quizzes</td></tr>
+        <tr><td>Outcomes &amp; audit</td><td class="mono">certificates, audit_log</td></tr>
+      </tbody>
+    </table></div>
+    <p class="legend">Bold isolation rule: a build-time test fails if any model gains a <code>tenant_id</code> without being registered in the tenant guard &#8212; isolation cannot silently regress.</p>
+  </section>
+
+  <section id="api">
+    <div class="sec-head"><span class="sec-num">10</span><h2>API surface</h2></div>
+    <p class="sec-sub">Selected endpoints. Tenant-scoped routes carry <code>/tenants/:tenantId</code>; the interceptor binds scope from the verified JWT, not the URL.</p>
+    <div class="scrollx"><table class="tbl">
+      <thead><tr><th>Method</th><th class="mono">Route</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/tenants/:t/domains</td><td>Add a domain to verify</td></tr>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/tenants/:t/domains/:id/verify</td><td>Live DNS TXT check</td></tr>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/tenants/:t/employees</td><td>Add employees (domain-guarded)</td></tr>
+        <tr><td><span class="method get">GET</span></td><td class="mono">/phishing-templates</td><td>Global scenario catalogue</td></tr>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/phishing-templates</td><td>Staff: add a catalogue scenario</td></tr>
+        <tr><td><span class="method get">GET</span></td><td class="mono">/admin/scenarios/pending</td><td>Cross-tenant approvals queue</td></tr>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/admin/scenarios/:id/approve</td><td>Approve a client scenario</td></tr>
+        <tr><td><span class="method get">GET</span></td><td class="mono">/shared-quizzes</td><td>Global quiz library</td></tr>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/tenants/:t/quizzes/from-shared/:id</td><td>Clone a shared quiz onto a module</td></tr>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/tenants/:t/campaigns/:id/launch</td><td>Materialise &amp; queue sends</td></tr>
+        <tr><td><span class="method get">GET</span></td><td class="mono">/track/click/:token</td><td>Public: record click &#8594; teachable moment</td></tr>
+        <tr><td><span class="method post">POST</span></td><td class="mono">/track/quiz/:token</td><td>Public: submit quiz, score, certify</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section id="security">
+    <div class="sec-head"><span class="sec-num">11</span><h2>Security &amp; compliance</h2></div>
+    <p class="sec-sub">Isolation and consent are structural, not conventions.</p>
+    <ul>
+      <li><strong>Query-layer tenant isolation.</strong> A Prisma extension narrows every read and write to the tenant in async context; a superadmin-only <code>runAsSystem</code> escape hatch is the sole cross-tenant path, and it is audited.</li>
+      <li><strong>Consent gate.</strong> No simulation runs for a tenant without a signed authorization agreement and an approved status.</li>
+      <li><strong>Domain-ownership gate.</strong> Employees can only be onboarded and emailed on DNS-verified domains &#8212; enforced at both add and send.</li>
+      <li><strong>Row-level security</strong> is enabled on every table; the application connects as a role that bypasses RLS, giving defence in depth against a direct-DB mistake.</li>
+      <li><strong>Credential capture is metadata-only</strong> &#8212; the simulated login records that a submission happened, never the plaintext an employee typed.</li>
+      <li><strong>Auth</strong> is JWT with per-portal role checks and rate-limited sign-in; separate staff and client entry points.</li>
+    </ul>
+    <div class="note crit"><span class="t">Open security actions</span>Rotate the database password exposed during setup and replace the seeded demo passwords before onboarding real clients. Move uploaded-video storage to a private bucket with signed URLs when reputational/PII sensitivity increases.</div>
+  </section>
+
+  <section id="nfr">
+    <div class="sec-head"><span class="sec-num">12</span><h2>Non-functional requirements</h2></div>
+    <div class="two">
+      <div>
+        <h4>Reliability &amp; performance</h4>
+        <ul>
+          <li>Sends are pre-materialised before any job runs, so reporting has a complete denominator and the kill switch has something to halt.</li>
+          <li>Send-window pacing spreads a campaign over a configurable interval.</li>
+          <li>Cold-start and ephemeral-disk limits of the free tier are documented and slated for removal.</li>
+        </ul>
+      </div>
+      <div>
+        <h4>Deliverability &amp; testability</h4>
+        <ul>
+          <li>The log mailer lets the full click&#8594;training&#8594;quiz path be tested without sending real email.</li>
+          <li>SPF/DKIM/DMARC posture for the sending domain is a planned pre-flight check.</li>
+          <li>A dedicated sending identity keeps simulation traffic off the corporate domain's reputation.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <div class="sec-head"><span class="sec-num">13</span><h2>Roadmap</h2></div>
+    <p class="sec-sub">The agreed next four, in build order.</p>
+    <div class="scrollx"><table class="tbl">
+      <thead><tr><th>#</th><th>Initiative</th><th>Why it's next</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">1</td><td><strong>Deliverability + real email (SES)</strong></td><td>Nothing is fully testable until simulations actually land; pairs with an SPF/DKIM/DMARC checker.</td></tr>
+        <tr><td class="mono">2</td><td><strong>Reliability / off free-tier</strong></td><td>Persistent Redis, no cold-starts, DB backups, error monitoring, private video bucket &#8212; needed the moment real mail sends on a schedule.</td></tr>
+        <tr><td class="mono">3</td><td><strong>Campaign scheduling</strong></td><td>Send windows, randomized/drip times, timezones, recurring awareness programmes.</td></tr>
+        <tr><td class="mono">4</td><td><strong>Reporting &amp; exports</strong></td><td>Executive dashboard, CSV/PDF export, per-department trends, branded certificate PDFs.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Further candidates: admin MFA and session policy, employee consent/notification and manager nudges, a simulated-login landing-page builder, a suppression/never-send list, and localization (e.g. Hausa) for a Nigerian workforce.</p>
+  </section>
+
+  <section id="status">
+    <div class="sec-head"><span class="sec-num">14</span><h2>Build &amp; deploy status</h2></div>
+    <p class="sec-sub">Where each capability stands today.</p>
+    <div class="scrollx"><table class="tbl">
+      <thead><tr><th>Capability</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Core simulation loop, campaigns, tracking, training routing</td><td><span class="status-dot s-live"></span>Live</td></tr>
+        <tr><td>Multi-tenant isolation, trial &amp; licensing, approvals</td><td><span class="status-dot s-live"></span>Live</td></tr>
+        <tr><td>Light-theme UI, grouped nav, video preview</td><td><span class="status-dot s-live"></span>Live</td></tr>
+        <tr><td>ISO 27001 phishing scenarios &amp; quizzes (data)</td><td><span class="status-dot s-live"></span>Loaded in DB</td></tr>
+        <tr><td>Domain verification, shared quiz library, staff scenario authoring, single-employee add, Supabase Storage</td><td><span class="status-dot s-code"></span>Built &#8212; awaiting deploy</td></tr>
+        <tr><td>ISO 27001 awareness videos</td><td><span class="status-dot s-code"></span>Scripted &#8212; awaiting production files</td></tr>
+        <tr><td>SES real email, reliability hardening, scheduling, exports</td><td><span class="status-dot s-plan"></span>Roadmap</td></tr>
+      </tbody>
+    </table></div>
+    <p class="legend"><span class="status-dot s-live"></span>Live on the free-tier deployment &nbsp;&nbsp; <span class="status-dot s-code"></span>In the codebase, needs push + redeploy &nbsp;&nbsp; <span class="status-dot s-plan"></span>Planned</p>
+    <p class="foot">Vlumeaware &#183; Product Requirements Document v1.1 &#183; prepared for Vlumetech LTD &#183; 17 September 2026. Companion documents: interactive test plan and Word test plan.</p>
+  </section>
+
+  </main>
+</div>
+
+<script>
+(function(){
+  var root=document.documentElement, btn=document.getElementById('tt');
+  function cur(){var t=root.getAttribute('data-theme'); if(t) return t; return matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';}
+  btn&&btn.addEventListener('click',function(){root.setAttribute('data-theme', cur()==='dark'?'light':'dark');});
+  // TOC scroll-spy
+  var links=[].slice.call(document.querySelectorAll('.toc a'));
+  var map={}; links.forEach(function(a){var id=a.getAttribute('href').slice(1); map[id]=a;});
+  var obs=new IntersectionObserver(function(es){
+    es.forEach(function(e){ if(e.isIntersecting){ links.forEach(function(l){l.classList.remove('on');}); var a=map[e.target.id]; a&&a.classList.add('on'); } });
+  },{rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section[id]').forEach(function(s){obs.observe(s);});
+})();
+</script>
+
+</body></html>

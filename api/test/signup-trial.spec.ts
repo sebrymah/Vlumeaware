@@ -6,6 +6,7 @@ import { StorageService } from '../src/providers/storage/storage.service';
 import { AuditService } from '../src/common/audit/audit.service';
 import { TrialService } from '../src/common/trial/trial.service';
 import { SignupService } from '../src/modules/signup/signup.service';
+import { DomainsService } from '../src/modules/domains/domains.service';
 import { TenantsService } from '../src/modules/tenants/tenants.service';
 import { EmployeesService } from '../src/modules/employees/employees.service';
 
@@ -16,7 +17,7 @@ const audit = new AuditService(prisma);
 const trial = new TrialService(prisma);
 const signup = new SignupService(prisma, audit);
 const tenants = new TenantsService(prisma, new StorageService(), audit, trial);
-const employees = new EmployeesService(prisma);
+const employees = new EmployeesService(prisma, new DomainsService(prisma));
 
 const uniq = () => `co-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
 let created: string[] = [];
@@ -53,6 +54,11 @@ describe('self-signup & trial lifecycle', () => {
   it('a trial can add employees up to the 20-seat cap', async () => {
     const r = await signup.signup({ companyName: uniq(), email: `${uniq()}@x.test`, password: 'longenoughpw12' });
     created.push(r.tenantId);
+    await runAsSystem('seed domain', () =>
+      db.verifiedDomain.create({
+        data: { tenantId: r.tenantId, domain: 'x.test', token: 't', status: 'verified', verifiedAt: new Date() },
+      }),
+    );
     const rows = Array.from({ length: 25 }, (_, i) => ({ email: `e${i}-${r.tenantId.slice(0,4)}@x.test`, name: `E${i}` }));
     const up = await runInTenant(r.tenantId, () => employees.bulkUpload(rows));
     expect(up.created).toBe(20);

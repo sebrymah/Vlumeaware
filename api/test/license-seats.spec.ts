@@ -6,12 +6,13 @@ import { StorageService } from '../src/providers/storage/storage.service';
 import { AuditService } from '../src/common/audit/audit.service';
 import { TrialService } from '../src/common/trial/trial.service';
 import { EmployeesService } from '../src/modules/employees/employees.service';
+import { DomainsService } from '../src/modules/domains/domains.service';
 import { TenantsService } from '../src/modules/tenants/tenants.service';
 
 const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 const prisma = { db } as unknown as PrismaService;
-const employees = new EmployeesService(prisma);
+const employees = new EmployeesService(prisma, new DomainsService(prisma));
 const tenants = new TenantsService(prisma, new StorageService(), new AuditService(prisma), new TrialService(prisma));
 
 let tenantId: string;
@@ -20,6 +21,12 @@ beforeAll(async () => {
   await base.$connect();
   const t = await runAsSystem('s', () => db.tenant.create({ data: { name: `lic-${Date.now()}` } }));
   tenantId = t.id;
+  // Domain guard: employees can only be added on a verified domain.
+  await runAsSystem('seed domain', () =>
+    db.verifiedDomain.create({
+      data: { tenantId, domain: 'x.test', token: 't', status: 'verified', verifiedAt: new Date() },
+    }),
+  );
 });
 
 afterAll(async () => {

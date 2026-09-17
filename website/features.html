@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Features — Vlumeaware</title>
+<meta name="description" content="Realistic simulations, targeted training, Human Risk Scoring, adaptive difficulty, manager nudges, domain-bound safety, and query-layer tenant isolation.">
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%9B%A1%EF%B8%8F%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<div class="nav-mount"></div>
+
+<section class="dark" style="padding:64px 0 56px">
+  <div class="wrap"><div class="section-head" style="max-width:820px">
+    <p class="eyebrow">Features</p>
+    <h2>Everything to measure human risk — and actually reduce it.</h2>
+    <p>Not a send button bolted onto a template gallery. A full programme: simulate, teach, score, and remediate, with compliance built into the workflow.</p>
+  </div></div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="split">
+      <div class="reveal">
+        <p class="eyebrow">Simulations &amp; scenarios</p>
+        <h3>Lures your staff will really see.</h3>
+        <p>A curated catalogue of Nigerian phishing patterns — invoice and bank-mandate fraud, CBN/FIRS notices, payroll confirmations — plus a manual composer and Claude-assisted drafting. Every scenario is reviewed and approved before it can reach a real inbox.</p>
+        <ul class="split" style="display:block;margin-top:8px">
+          <li>Clone-and-edit from the catalogue</li>
+          <li>AI-assisted drafting for new lures</li>
+          <li>Mandatory approval before any send</li>
+        </ul>
+      </div>
+      <div class="reveal"><div class="panel"><div class="mockcard" style="transform:none;box-shadow:var(--shadow)">
+        <div class="bar"><i></i><i></i><i></i><span>scenario preview</span></div>
+        <div class="body"><div class="from">From: HR &amp; Payroll</div><div class="subj">Confirm your salary account before this month’s run</div><div class="lure">Your payroll account needs re-confirmation to avoid a delayed salary. Verify now →</div><div class="flag">Difficulty: medium · Category: payroll fraud</div></div>
+      </div></div></div>
+    </div>
+  </div>
+</section>
+
+<section style="background:var(--surface-2)">
+  <div class="wrap">
+    <div class="split">
+      <div class="reveal" style="order:2">
+        <p class="eyebrow">Human Risk Score</p>
+        <h3>Board-level language, from data you already generate.</h3>
+        <p>Opens, clicks, credential submissions, reports and quiz results roll up into a single score per employee, department and organisation — banded Low, Moderate, High and Critical, with recent behaviour weighted heaviest. Stop reporting “campaign stats” and start reporting risk.</p>
+        <div class="pills"><span class="pill"><b>Per employee</b></span><span class="pill"><b>Per department</b></span><span class="pill"><b>Per organisation</b></span><span class="pill"><b>Trend over time</b></span></div>
+      </div>
+      <div class="reveal panel" style="order:1">
+        <div style="font-family:var(--font-mono);font-size:12px;color:var(--muted);letter-spacing:.08em">HUMAN RISK · THIS QUARTER</div>
+        <div style="margin-top:14px;display:grid;gap:12px">
+          <div><div style="display:flex;justify-content:space-between;font-size:14px"><span>Finance</span><b>High · 71</b></div><div style="height:8px;border-radius:99px;background:var(--surface-2);margin-top:5px;overflow:hidden"><i style="display:block;height:100%;width:71%;background:linear-gradient(90deg,var(--gold),#d9772f)"></i></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:14px"><span>Sales</span><b>Moderate · 52</b></div><div style="height:8px;border-radius:99px;background:var(--surface-2);margin-top:5px;overflow:hidden"><i style="display:block;height:100%;width:52%;background:linear-gradient(90deg,var(--brand),var(--gold))"></i></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:14px"><span>Engineering</span><b>Low · 18</b></div><div style="height:8px;border-radius:99px;background:var(--surface-2);margin-top:5px;overflow:hidden"><i style="display:block;height:100%;width:18%;background:var(--brand)"></i></div></div>
+        </div>
+        <p style="font-size:12.5px;color:var(--faint);margin:16px 0 0">Illustrative figures.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cards">
+      <div class="card reveal"><div class="ic">🎯</div><h3>Adaptive difficulty</h3><p>Repeat non-clickers get harder, role-specific lures automatically — finance sees mandate fraud, HR sees payroll notices, IT sees credential and MFA traps — instead of one difficulty for everyone.</p></div>
+      <div class="card reveal"><div class="ic">📣</div><h3>Manager escalation nudges</h3><p>When a direct report is a repeat clicker or misses a training deadline, their manager gets an automatic nudge — turning awareness into a line-management habit.</p></div>
+      <div class="card reveal"><div class="ic">🎓</div><h3>Training &amp; certificates</h3><p>Awareness videos and quizzes attached to each module. A pass marks training complete and issues a certificate you can hand an auditor.</p></div>
+      <div class="card reveal"><div class="ic">♻️</div><h3>Auto-remediation</h3><p>A click auto-assigns the fixing module; repeat offenders can be bulk-enrolled into targeted remediation without manual chasing.</p></div>
+      <div class="card reveal"><div class="ic">📈</div><h3>Reporting &amp; export</h3><p>Open, click, report and submission rates by campaign and department, with CSV/PDF export for board packs and audits.</p></div>
+      <div class="card reveal"><div class="ic">🧩</div><h3>Roles &amp; access</h3><p>Separate staff and client consoles, an admin, and a read-only reporting role — everyone sees only what they should.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- SECURITY -->
+<section id="security" class="dark">
+  <div class="wrap">
+    <div class="split">
+      <div class="reveal">
+        <p class="eyebrow">Security &amp; compliance</p>
+        <h3>Isolation and consent are structural, not promises.</h3>
+        <p>Vlumeaware is the kind of tool that phishes people and holds sensitive rosters — so it’s built defensively from the data layer up.</p>
+        <ul class="split" style="display:block;margin-top:8px">
+          <li><b>Query-layer tenant isolation.</b> Every read and write is scoped to one client; there is no shared view by accident.</li>
+          <li><b>Consent gate.</b> No simulation runs without signed authorization on file.</li>
+          <li><b>Domain-ownership gate.</b> Recipients are confined to DNS-verified domains — enforced when adding people and again at send.</li>
+          <li><b>Metadata-only capture.</b> A simulated login records that a submission happened, never the password typed.</li>
+        </ul>
+      </div>
+      <div class="reveal panel">
+        <div class="pills"><span class="pill"><b>NDPA-aware</b></span><span class="pill"><b>Consent-gated</b></span><span class="pill"><b>Domain-bound</b></span><span class="pill"><b>Tenant-isolated</b></span><span class="pill"><b>Audit log</b></span><span class="pill"><b>Dedicated sending identity</b></span></div>
+        <p style="margin-top:16px;color:#9FB6AB;font-size:14px">Security hardening — mandatory MFA, private media storage and scheduled domain re-checks — is tracked on an active roadmap under Vlumetech’s security programme.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="ctaband">
+  <div class="wrap"><h2>Put it in front of your board and your regulator.</h2><p>See the reporting and the controls in one walkthrough.</p><a class="btn light big" href="request-demo.html">Request a demo</a></div>
+</section>
+
+<div class="footer-mount"></div>
+<script src="site.js" defer></script>
+</body>
+</html>

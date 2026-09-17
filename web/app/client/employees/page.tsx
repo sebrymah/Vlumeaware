@@ -161,7 +161,7 @@ function Employees() {
         </div>
       )}
 
-      <Card title="Add one employee" subtitle="Add a single person to the roster.">
+      <Card title="Add one employee" subtitle="You can only add people on a verified domain (People → Domains).">
         <form onSubmit={addOne} className="grid items-end gap-3 sm:grid-cols-4">
           <Field label="Name">
             <input className={inputClass} value={oneName} onChange={(ev) => setOneName(ev.target.value)} required minLength={2} />

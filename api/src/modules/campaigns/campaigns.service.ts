@@ -5,6 +5,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
 import { AuditService } from '../../common/audit/audit.service';
+import { DomainsService } from '../domains/domains.service';
 import { SEND_QUEUE } from '../../queue/queue.constants';
 import type { SendJob } from '../../queue/queue.constants';
 
@@ -13,6 +14,7 @@ export class CampaignsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly domains: DomainsService,
     @InjectQueue(SEND_QUEUE) private readonly sendQueue: Queue<SendJob>,
   ) {}
 
@@ -164,9 +166,19 @@ export class CampaignsService {
       throw new ConflictException('Campaign already completed');
     }
 
-    const employees = await this.prisma.db.employee.findMany({ select: { id: true } });
-    if (!employees.length) {
+    const allEmployees = await this.prisma.db.employee.findMany({ select: { id: true, email: true } });
+    if (!allEmployees.length) {
       throw new BadRequestException('No employees uploaded for this tenant');
+    }
+
+    // Domain guard (defence in depth): only send to addresses on a verified
+    // domain, even if an employee row predates verification.
+    const verifiedDomains = await this.domains.verifiedSet();
+    const employees = allEmployees.filter((e) => verifiedDomains.has(DomainsService.domainOf(e.email)));
+    if (!employees.length) {
+      throw new BadRequestException(
+        'No recipients on a verified domain. Verify the domain you own under People → Domains before launching.',
+      );
     }
 
     const tenantId = currentTenantId();

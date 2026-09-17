@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { parse } from 'csv-parse/sync';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId } from '../../common/prisma/tenant-context';
+import { DomainsService } from '../domains/domains.service';
 
 export interface EmployeeRow {
   email: string;
@@ -19,7 +20,10 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 @Injectable()
 export class EmployeesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly domains: DomainsService,
+  ) {}
 
   list() {
     return this.prisma.db.employee.findMany({ orderBy: [{ department: 'asc' }, { name: 'asc' }] });
@@ -57,6 +61,10 @@ export class EmployeesService {
     let seatsUsed = await this.prisma.db.employee.count();
     const seatLimit = tenant?.seatLimit ?? null;
 
+    // Domain guard: employees can only be onboarded on a domain the client has
+    // proven it owns, so a client cannot phish people outside its organisation.
+    const verifiedDomains = await this.domains.verifiedSet();
+
     for (const [index, row] of rows.entries()) {
       const email = row.email?.trim().toLowerCase();
       const name = row.name?.trim();
@@ -68,6 +76,17 @@ export class EmployeesService {
       }
       if (!name) {
         result.skipped.push({ row: rowNumber, email, reason: 'missing name' });
+        continue;
+      }
+      const domain = DomainsService.domainOf(email);
+      if (!verifiedDomains.has(domain)) {
+        result.skipped.push({
+          row: rowNumber,
+          email,
+          reason: verifiedDomains.size
+            ? `${domain} is not a verified domain`
+            : 'no verified domains yet — verify your domain first',
+        });
         continue;
       }
       if (seen.has(email)) {
