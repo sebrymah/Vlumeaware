@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
@@ -20,6 +20,24 @@ interface Setup {
   otpauthUrl: string;
 }
 
+const QR_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+
+/** Load the QR library once. It renders locally, so the secret never leaves the browser. */
+function loadQrLib(): Promise<unknown> {
+  const w = window as unknown as { QRCode?: unknown; __qrPromise?: Promise<unknown> };
+  if (w.QRCode) return Promise.resolve(w.QRCode);
+  if (w.__qrPromise) return w.__qrPromise;
+  w.__qrPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = QR_SRC;
+    s.async = true;
+    s.onload = () => resolve((window as unknown as { QRCode?: unknown }).QRCode);
+    s.onerror = () => reject(new Error('Could not load the QR generator'));
+    document.head.appendChild(s);
+  });
+  return w.__qrPromise;
+}
+
 function Security() {
   const router = useRouter();
   const [enrollMode, setEnrollMode] = useState(false);
@@ -29,12 +47,40 @@ function Security() {
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [qrFailed, setQrFailed] = useState(false);
+  const qrRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('enroll') === '1') {
       setEnrollMode(true);
     }
   }, []);
+
+  // Render the QR once we have an otpauth URI and the container is mounted.
+  useEffect(() => {
+    if (!setup || !qrRef.current) return;
+    let cancelled = false;
+    loadQrLib()
+      .then((QRCode) => {
+        if (cancelled || !qrRef.current) return;
+        qrRef.current.innerHTML = '';
+        const Ctor = QRCode as unknown as new (el: HTMLElement, opts: Record<string, unknown>) => unknown;
+        // eslint-disable-next-line no-new
+        new Ctor(qrRef.current, {
+          text: setup.otpauthUrl,
+          width: 176,
+          height: 176,
+          colorDark: '#0F1B16',
+          colorLight: '#ffffff',
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setQrFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [setup]);
 
   const start = useCallback(async () => {
     setBusy(true);
@@ -102,12 +148,22 @@ function Security() {
         <Card title="Add the key, then confirm a code">
           <ol className="mb-4 space-y-3 text-sm text-slate-600">
             <li>
-              <span className="font-medium text-slate-800">1. Add this account to your authenticator.</span>
-              <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Manual key</div>
-                <div className="mt-1 select-all break-all font-mono text-[13px] text-slate-900">{setup.secret}</div>
-                <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Or use the setup link</div>
-                <a className="mt-1 block break-all font-mono text-[12px] text-brand-700 underline" href={setup.otpauthUrl}>{setup.otpauthUrl}</a>
+              <span className="font-medium text-slate-800">1. Scan this with your authenticator app.</span>
+              <div className="mt-2 flex flex-wrap items-start gap-4">
+                <div className="rounded-xl border border-slate-200 bg-white p-3" style={{ lineHeight: 0 }}>
+                  <div ref={qrRef} aria-label="Two-factor QR code" style={{ width: 176, height: 176 }} />
+                  {qrFailed && (
+                    <div style={{ width: 176 }} className="text-center text-[11px] leading-normal text-slate-500">
+                      QR couldn’t load — use the manual key instead.
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Can’t scan? Enter this key</div>
+                  <div className="mt-1 select-all break-all font-mono text-[13px] text-slate-900">{setup.secret}</div>
+                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Or open the setup link</div>
+                  <a className="mt-1 block break-all font-mono text-[12px] text-brand-700 underline" href={setup.otpauthUrl}>{setup.otpauthUrl}</a>
+                </div>
               </div>
             </li>
             <li><span className="font-medium text-slate-800">2. Enter the 6-digit code it shows.</span></li>

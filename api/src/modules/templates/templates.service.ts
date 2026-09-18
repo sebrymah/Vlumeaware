@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
+import { sanitizeHtml } from '../../common/security/sanitize-html';
 
 /**
  * The shared phishing-template catalogue. Templates are global, read-only
@@ -77,7 +78,7 @@ export class TemplatesService {
           difficultyTier: input.difficultyTier,
           industryTag: input.industryTag,
           subjectLine: input.subjectLine,
-          bodyHtml: input.bodyHtml,
+          bodyHtml: sanitizeHtml(input.bodyHtml),
           senderSpoofName: input.senderSpoofName,
           redFlags: input.redFlags,
           source: 'vlumetech',
@@ -100,8 +101,10 @@ export class TemplatesService {
     }>,
   ) {
     await this.findOne(id);
+    const clean = { ...data };
+    if (typeof clean.bodyHtml === 'string') clean.bodyHtml = sanitizeHtml(clean.bodyHtml);
     return runAsSystem('update global template', () =>
-      this.prisma.db.phishingTemplate.update({ where: { id }, data }),
+      this.prisma.db.phishingTemplate.update({ where: { id }, data: clean }),
     );
   }
 

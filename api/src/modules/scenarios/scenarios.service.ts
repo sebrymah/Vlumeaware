@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { DifficultyTier } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
+import { sanitizeHtml } from '../../common/security/sanitize-html';
 import { ClaudeService } from '../../providers/claude/claude.service';
 
 @Injectable()
@@ -33,7 +34,9 @@ export class ScenariosService {
     redFlags: string[];
     createdByClaude: boolean;
   }) {
-    return this.prisma.db.scenario.create({ data: { ...input, tenantId: currentTenantId() } });
+    return this.prisma.db.scenario.create({
+      data: { ...input, bodyHtml: sanitizeHtml(input.bodyHtml), tenantId: currentTenantId() },
+    });
   }
 
   list() {
@@ -46,9 +49,19 @@ export class ScenariosService {
     return scenario;
   }
 
+  /**
+   * Editing a scenario clears any prior approval and re-queues it (review R2):
+   * approved content is locked, so a change can never reach recipients without
+   * a fresh Vlumetech review. The body is re-sanitized on the way in.
+   */
   async update(id: string, data: Partial<Parameters<ScenariosService['save']>[0]>) {
     await this.findOne(id);
-    return this.prisma.db.scenario.update({ where: { id }, data });
+    const clean = { ...data };
+    if (typeof clean.bodyHtml === 'string') clean.bodyHtml = sanitizeHtml(clean.bodyHtml);
+    return this.prisma.db.scenario.update({
+      where: { id },
+      data: { ...clean, approvedAt: null },
+    });
   }
 
   /** Approval is what makes a scenario attachable to a campaign. */
