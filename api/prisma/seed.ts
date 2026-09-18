@@ -12,6 +12,13 @@ import { runAsSystem, runInTenant } from '../src/common/prisma/tenant-context';
 const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 
+// Security review R6: the demo password must never ship to production. In a
+// production environment SEED_PASSWORD must be set explicitly, or seeding aborts.
+if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD) {
+  throw new Error(
+    'Refusing to seed with the built-in demo password in production. Set SEED_PASSWORD explicitly.',
+  );
+}
 const DEV_PASSWORD = process.env.SEED_PASSWORD ?? 'vlumeaware-dev-password';
 
 /**

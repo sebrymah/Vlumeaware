@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
-import { login } from '@/lib/api';
+import { login, verifyMfa, type LoginResponse } from '@/lib/api';
 import { homeFor, loginPathFor, writeSession, type Role } from '@/lib/session';
 import { Field, Notice, inputClass } from '@/components/ui';
 
@@ -31,6 +31,32 @@ export function PortalLogin({
   const [password, setPassword] = useState('');
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [busy, setBusy] = useState(false);
+  const [challenge, setChallenge] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+
+  function completeSession(res: LoginResponse) {
+    const role = res.role as Role;
+    if (!allow.includes(role)) {
+      const other = loginPathFor(role);
+      setError(
+        <>
+          This account belongs to the {otherPortalLabel}.{' '}
+          <Link href={other} className="underline">
+            Go to {other}
+          </Link>
+          .
+        </>,
+      );
+      return;
+    }
+    writeSession({ accessToken: res.accessToken as string, role, tenantId: res.tenantId, email });
+    // Staff without MFA must enrol before using the console (mandatory).
+    if (res.mfaEnrollmentRequired) {
+      router.replace('/super-admin/security?enroll=1');
+      return;
+    }
+    router.replace(homeFor(role));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -38,27 +64,73 @@ export function PortalLogin({
     setError(null);
     try {
       const res = await login(email, password);
-      const role = res.role as Role;
-      if (!allow.includes(role)) {
-        const other = loginPathFor(role);
-        setError(
-          <>
-            This account belongs to the {otherPortalLabel}.{' '}
-            <Link href={other} className="underline">
-              Go to {other}
-            </Link>
-            .
-          </>,
-        );
+      if (res.mfaRequired && res.mfaChallenge) {
+        setChallenge(res.mfaChallenge);
         return;
       }
-      writeSession({ accessToken: res.accessToken, role, tenantId: res.tenantId, email });
-      router.replace(homeFor(role));
+      completeSession(res);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitCode(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challenge) return;
+    setBusy(true);
+    setError(null);
+    try {
+      completeSession(await verifyMfa(challenge, code.trim()));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (challenge) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-6">
+        <form onSubmit={submitCode} className="w-full max-w-sm space-y-4">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">
+              Vlume<span className="text-brand-600">aware</span>
+            </h1>
+            <p className="mt-3 text-sm font-medium text-slate-600">Two-factor authentication</p>
+            <p className="mt-1 text-xs text-slate-500">Enter the 6-digit code from your authenticator app.</p>
+          </div>
+          {error && <Notice kind="error">{error}</Notice>}
+          <Field label="Authentication code">
+            <input
+              className={inputClass}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              autoFocus
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+              required
+            />
+          </Field>
+          <button
+            type="submit"
+            disabled={busy || code.length !== 6}
+            className="w-full rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
+          >
+            {busy ? 'Verifying…' : 'Verify'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setChallenge(null); setCode(''); setError(null); }}
+            className="w-full text-[11px] text-slate-500 hover:text-slate-700"
+          >
+            ← Back to sign in
+          </button>
+        </form>
+      </div>
+    );
   }
 
   return (

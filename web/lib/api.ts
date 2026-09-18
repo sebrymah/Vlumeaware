@@ -57,20 +57,44 @@ export const api = {
   upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
 };
 
-export async function login(email: string, password: string) {
-  const res = await fetch(`${BASE}/auth/login`, {
+export interface LoginResponse {
+  accessToken?: string;
+  role?: string;
+  tenantId?: string;
+  /** MFA is active: exchange `mfaChallenge` + a code at verifyMfa(). */
+  mfaRequired?: boolean;
+  mfaChallenge?: string;
+  /** Signed-in staff must still enrol in MFA. */
+  mfaEnrollmentRequired?: boolean;
+}
+
+async function authPost(path: string, body: unknown): Promise<LoginResponse> {
+  const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
-    const status = res.status;
-    throw new ApiError(
-      status,
-      status === 429 ? 'Too many attempts. Wait a minute and try again.' : 'Invalid credentials.',
-    );
+    if (res.status === 429) throw new ApiError(429, 'Too many attempts. Wait a minute and try again.');
+    let message = 'Invalid credentials.';
+    try {
+      const b = await res.json();
+      message = Array.isArray(b.message) ? b.message.join(', ') : (b.message ?? message);
+    } catch {
+      /* keep default */
+    }
+    throw new ApiError(res.status, message);
   }
-  return (await res.json()) as { accessToken: string; role: string; tenantId?: string };
+  return (await res.json()) as LoginResponse;
+}
+
+export function login(email: string, password: string) {
+  return authPost('/auth/login', { email, password });
+}
+
+/** Second factor: exchange the login challenge + a 6-digit code for an access token. */
+export function verifyMfa(challenge: string, code: string) {
+  return authPost('/auth/mfa/verify', { challenge, code });
 }
 
 /** Public endpoint — no session, used by the teachable-moment page. */

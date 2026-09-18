@@ -19,8 +19,12 @@ export class TrainingModulesService {
     private readonly storage: StorageService,
   ) {}
 
-  list() {
-    return this.prisma.db.trainingModule.findMany({ orderBy: { createdAt: 'desc' } });
+  async list() {
+    const rows = await this.prisma.db.trainingModule.findMany({ orderBy: { createdAt: 'desc' } });
+    // Return time-limited playable URLs (signed for uploads; hosted links pass through).
+    return Promise.all(
+      rows.map(async (r) => ({ ...r, videoUrl: await this.storage.signedUrl(r.videoUrl) })),
+    );
   }
 
   async findOne(id: string) {

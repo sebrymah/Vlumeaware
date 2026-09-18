@@ -36,8 +36,9 @@ export default function SignupPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.message ?? 'Signup failed');
       }
-      // Sign straight in.
+      // Sign straight in. A brand-new client_admin has no MFA, so a token is returned.
       const auth = await login(email, password);
+      if (!auth.accessToken) throw new Error('Could not sign in automatically. Please sign in.');
       writeSession({ accessToken: auth.accessToken, role: auth.role as Role, tenantId: auth.tenantId, email });
       router.replace(homeFor(auth.role as Role));
     } catch (err) {

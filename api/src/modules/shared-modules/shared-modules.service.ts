@@ -23,9 +23,12 @@ export class SharedModulesService {
     private readonly storage: StorageService,
   ) {}
 
-  list() {
-    return runAsSystem('browse shared awareness library', () =>
+  async list() {
+    const rows = await runAsSystem('browse shared awareness library', () =>
       this.prisma.db.sharedTrainingModule.findMany({ orderBy: { createdAt: 'desc' } }),
+    );
+    return Promise.all(
+      rows.map(async (r) => ({ ...r, videoUrl: await this.storage.signedUrl(r.videoUrl) })),
     );
   }
 
@@ -34,7 +37,7 @@ export class SharedModulesService {
       this.prisma.db.sharedTrainingModule.findUnique({ where: { id } }),
     );
     if (!module) throw new NotFoundException('Shared module not found');
-    return module;
+    return { ...module, videoUrl: await this.storage.signedUrl(module.videoUrl) };
   }
 
   createFromLink(input: { title: string; description?: string; category?: string; videoUrl: string; durationSeconds?: number }) {

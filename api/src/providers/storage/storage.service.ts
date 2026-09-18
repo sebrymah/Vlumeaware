@@ -9,9 +9,14 @@ import { join } from 'node:path';
  * Object storage for uploaded videos and documents. Three backends, chosen by
  * which env vars are present, in priority order:
  *   1. Supabase Storage  — SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (the free
- *      deployment default; returns real public https URLs that survive redeploys)
- *   2. AWS S3            — S3_BUCKET
+ *      deployment default; a PRIVATE bucket, read only through short-lived
+ *      signed URLs so uploaded content is never publicly addressable)
+ *   2. AWS S3            — S3_BUCKET (private; presigned GET URLs)
  *   3. Local disk        — neither set (dev only; ephemeral)
+ *
+ * `put` returns a durable, non-public reference (supabase://…, s3://…, file://…).
+ * Call `signedUrl` to turn a reference into a time-limited playable URL; hosted
+ * https links pass through unchanged.
  */
 @Injectable()
 export class StorageService {
@@ -61,9 +66,9 @@ export class StorageService {
   }
 
   /**
-   * Uploads to a public Supabase Storage bucket and returns the public https
-   * URL. The object path uses a random UUID, so the URL is unguessable even
-   * though the bucket is public — fine for generic awareness videos.
+   * Uploads to a PRIVATE Supabase Storage bucket and returns a durable
+   * reference (supabase://bucket/path). Nothing public is exposed; callers must
+   * mint a signed URL through `signedUrl` to read the object.
    */
   private async putSupabase(objectPath: string, body: Buffer, contentType: string): Promise<string> {
     const endpoint = `${this.supabaseUrl}/storage/v1/object/${this.supabaseBucket}/${objectPath}`;
@@ -80,19 +85,54 @@ export class StorageService {
       const detail = await res.text().catch(() => '');
       throw new Error(`Supabase Storage upload failed (${res.status}): ${detail}`);
     }
-    return `${this.supabaseUrl}/storage/v1/object/public/${this.supabaseBucket}/${objectPath}`;
+    return `supabase://${this.supabaseBucket}/${objectPath}`;
   }
 
   /**
-   * A readable URL for a stored object. Supabase public URLs and hosted links
-   * are already https and are returned as-is; only S3 objects are signed.
+   * Turns a durable reference into a time-limited, playable URL. Hosted https
+   * links (videoSource "link") and unresolved dev file:// paths pass through
+   * unchanged; supabase:// and s3:// references are signed with a short TTL.
    */
-  async signedUrl(uri: string, ttlSeconds = 900): Promise<string> {
-    if (!uri.startsWith('s3://') || !this.client || !this.bucket) return uri;
-    const key = uri.replace(`s3://${this.bucket}/`, '');
-    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
-    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
-      expiresIn: ttlSeconds,
-    });
+  async signedUrl(uri: string, ttlSeconds = 3600): Promise<string> {
+    if (!uri) return uri;
+
+    if (uri.startsWith('supabase://')) {
+      if (!this.supabaseUrl || !this.supabaseKey) return uri;
+      const path = uri.slice('supabase://'.length); // bucket/object...
+      const slash = path.indexOf('/');
+      const bucket = path.slice(0, slash);
+      const objectPath = path.slice(slash + 1);
+      try {
+        const res = await fetch(
+          `${this.supabaseUrl}/storage/v1/object/sign/${bucket}/${objectPath}`,
+          {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${this.supabaseKey}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ expiresIn: ttlSeconds }),
+          },
+        );
+        if (!res.ok) {
+          this.logger.warn(`Supabase sign failed (${res.status}) for ${objectPath}`);
+          return uri;
+        }
+        const data = (await res.json()) as { signedURL?: string };
+        if (!data.signedURL) return uri;
+        // signedURL is relative, e.g. "/object/sign/bucket/path?token=…"
+        return `${this.supabaseUrl}/storage/v1${data.signedURL.replace(/^\/storage\/v1/, '')}`;
+      } catch (err) {
+        this.logger.warn(`Supabase sign error: ${(err as Error).message}`);
+        return uri;
+      }
+    }
+
+    if (uri.startsWith('s3://') && this.client && this.bucket) {
+      const key = uri.replace(`s3://${this.bucket}/`, '');
+      const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+      return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: key }), {
+        expiresIn: ttlSeconds,
+      });
+    }
+
+    return uri;
   }
 }

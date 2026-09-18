@@ -14,7 +14,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  validate(payload: JwtPayload): JwtPayload {
+  validate(payload: JwtPayload & { typ?: string }): JwtPayload {
+    // A half-authenticated MFA challenge is not an access token.
+    if (payload.typ === 'mfa') {
+      throw new UnauthorizedException('MFA challenge cannot be used as an access token');
+    }
     // A client-side role without a tenant binding would sidestep the tenant
     // guard, so reject the token outright rather than defaulting a tenant.
     if (payload.role !== ROLES.superadmin && !payload.tenantId) {

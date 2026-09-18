@@ -1,4 +1,17 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { Logger } from '@nestjs/common';
+
+/**
+ * Every cross-tenant (system-scope) entry is logged with its reason and actor.
+ * This is the audit trail for the one deliberate way to escape tenant scoping
+ * (Security review R1). Shipped to the platform's log stream; noisy by design.
+ */
+const systemAuditLogger = new Logger('SystemScope');
+function auditSystemEntry(reason: string, actor: Actor): void {
+  systemAuditLogger.log(
+    `runAsSystem reason=${JSON.stringify(reason)} actor=${actor.actorId ?? 'anon'} role=${actor.actorRole ?? 'none'}`,
+  );
+}
 
 export interface TenantScope {
   /** Tenant every query in this async context is confined to. */
@@ -43,6 +56,7 @@ export function runAsSystem<T>(
   fn: () => T | Promise<T>,
   actor: Actor = {},
 ): Promise<T> {
+  auditSystemEntry(reason, actor);
   return storage.run({ system: true, systemReason: reason, ...actor }, async () => fn());
 }
 
@@ -57,6 +71,7 @@ export function runInTenantSync<T>(tenantId: string, fn: () => T, actor: Actor =
 }
 
 export function runAsSystemSync<T>(reason: string, fn: () => T, actor: Actor = {}): T {
+  auditSystemEntry(reason, actor);
   return storage.run({ system: true, systemReason: reason, ...actor }, fn);
 }
 

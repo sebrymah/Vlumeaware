@@ -103,6 +103,14 @@ model User {
   role         StaffRole @default(vlumetech_superadmin)
   createdAt    DateTime  @default(now()) @map("created_at")
 
+  /// TOTP shared secret (base32). Present once enrollment starts; MFA is only
+  /// active once mfaEnabledAt is set. Mandatory for Vlumetech staff (review R8).
+  mfaSecret        String?   @map("mfa_secret")
+  mfaEnabledAt     DateTime? @map("mfa_enabled_at")
+  /// Sign-in lockout after repeated failures (review R8).
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
+
   @@map("users")
 }
 
