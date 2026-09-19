@@ -1,8 +1,9 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
-import { IsUUID } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsOptional, IsString, IsUUID } from 'class-validator';
 import { ROLES } from '../../common/auth/roles';
 import { Roles } from '../../common/auth/roles.decorator';
 import { TrainingService } from './training.service';
+import { LearnService } from './learn.service';
 import { RequiresWritableTenant } from '../../common/trial/writable-tenant.guard';
 
 class RuleDto {
@@ -14,9 +15,32 @@ class AssignDto {
   @IsUUID('4') trainingModuleId!: string;
 }
 
+class AssignTrainingDto {
+  @IsUUID('4') trainingModuleId!: string;
+  @IsOptional() @IsArray() @ArrayNotEmpty() @IsUUID('4', { each: true }) employeeIds?: string[];
+  @IsOptional() @IsString() department?: string;
+  @IsOptional() @IsBoolean() all?: boolean;
+  @IsOptional() @IsBoolean() notify?: boolean;
+}
+
 @Controller('tenants/:tenantId')
 export class TrainingController {
-  constructor(private readonly training: TrainingService) {}
+  constructor(
+    private readonly training: TrainingService,
+    private readonly learn: LearnService,
+  ) {}
+
+  /** Assign a module to people directly (per-person, a department, or all) and email a link. */
+  @Post('training/assign')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @RequiresWritableTenant()
+  assignTraining(@Body() dto: AssignTrainingDto) {
+    return this.learn.assign(
+      dto.trainingModuleId,
+      { employeeIds: dto.employeeIds, department: dto.department, all: dto.all },
+      dto.notify ?? true,
+    );
+  }
 
   @Get('routing-rules')
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)

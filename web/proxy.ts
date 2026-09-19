@@ -26,7 +26,8 @@ function apiOrigin(): string {
 export function proxy(request: NextRequest) {
   const dev = process.env.NODE_ENV !== 'production';
   const api = apiOrigin();
-  const isPublic = request.nextUrl.pathname.startsWith('/t/');
+  const p = request.nextUrl.pathname;
+  const isPublic = p.startsWith('/t/') || p.startsWith('/learn/');
   const nonce = btoa(crypto.randomUUID());
 
   const common = [
