@@ -9,6 +9,11 @@ class RuleDto {
   @IsUUID('4') trainingModuleId!: string;
 }
 
+class AssignDto {
+  @IsUUID('4') employeeId!: string;
+  @IsUUID('4') trainingModuleId!: string;
+}
+
 @Controller('tenants/:tenantId')
 export class TrainingController {
   constructor(private readonly training: TrainingService) {}
@@ -36,6 +41,14 @@ export class TrainingController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   listAssignments() {
     return this.training.listAssignments();
+  }
+
+  /** Manually assign a training module to an employee. */
+  @Post('training-assignments')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @RequiresWritableTenant()
+  assign(@Body() dto: AssignDto) {
+    return this.training.assignManual(dto.employeeId, dto.trainingModuleId);
   }
 
   @Post('training-assignments/:assignmentId/complete')

@@ -95,6 +95,41 @@ export class TrainingService {
     };
   }
 
+  /**
+   * Admin manually assigns a training module to an employee (e.g. someone who
+   * clicked or submitted credentials). Distinct from the automatic click-routed
+   * path — no source send. Skips re-assigning a module the person already has
+   * outstanding.
+   */
+  async assignManual(employeeId: string, trainingModuleId: string) {
+    const tenantId = currentTenantId();
+    const [employee, module] = await Promise.all([
+      this.prisma.db.employee.findUnique({ where: { id: employeeId }, select: { id: true } }),
+      this.prisma.db.trainingModule.findUnique({
+        where: { id: trainingModuleId },
+        select: { id: true, title: true },
+      }),
+    ]);
+    if (!employee) throw new NotFoundException('Employee not found');
+    if (!module) throw new NotFoundException('Training module not found');
+
+    const existing = await this.prisma.db.trainingAssignment.findFirst({
+      where: { employeeId, trainingModuleId, completedAt: null },
+    });
+    if (existing) return { ...existing, alreadyAssigned: true };
+
+    const created = await this.prisma.db.trainingAssignment.create({
+      data: {
+        tenantId,
+        employeeId,
+        trainingModuleId,
+        curriculumModuleId: module.title,
+        sourceSendId: null,
+      },
+    });
+    return { ...created, alreadyAssigned: false };
+  }
+
   listAssignments() {
     return this.prisma.db.trainingAssignment.findMany({
       orderBy: { assignedAt: 'desc' },

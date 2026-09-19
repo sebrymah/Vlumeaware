@@ -41,6 +41,7 @@ interface Dashboard {
 }
 
 interface Recipient {
+  employeeId: string;
   name: string;
   email: string;
   department: string | null;
@@ -49,6 +50,11 @@ interface Recipient {
   clickedAt: string | null;
   credentialsSubmitted: boolean;
   reportedAt: string | null;
+}
+
+interface TrainingModule {
+  id: string;
+  title: string;
 }
 
 function StatusPills({ r }: { r: Recipient }) {
@@ -86,22 +92,50 @@ export function CampaignReport({
 }) {
   const [data, setData] = useState<Dashboard | null>(null);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
+  const [modules, setModules] = useState<TrainingModule[]>([]);
+  const [assignNote, setAssignNote] = useState<Record<string, string>>({});
+  const [assigningId, setAssigningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [dash, recips] = await Promise.all([
+      const [dash, recips, mods] = await Promise.all([
         api.get<Dashboard>(`/tenants/${tenantId}/reports/${campaignId}`),
         api.get<Recipient[]>(`/tenants/${tenantId}/campaigns/${campaignId}/recipients`).catch(() => [] as Recipient[]),
+        canGenerate
+          ? api.get<TrainingModule[]>(`/tenants/${tenantId}/training-modules`).catch(() => [] as TrainingModule[])
+          : Promise.resolve([] as TrainingModule[]),
       ]);
       setData(dash);
       setRecipients(recips);
+      setModules(mods);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
     }
-  }, [tenantId, campaignId]);
+  }, [tenantId, campaignId, canGenerate]);
+
+  async function assignTraining(employeeId: string, trainingModuleId: string) {
+    if (!trainingModuleId) return;
+    setAssigningId(employeeId);
+    try {
+      const res = await api.post<{ alreadyAssigned?: boolean }>(
+        `/tenants/${tenantId}/training-assignments`,
+        { employeeId, trainingModuleId },
+      );
+      const title = modules.find((m) => m.id === trainingModuleId)?.title ?? 'module';
+      setAssignNote((n) => ({
+        ...n,
+        [employeeId]: res.alreadyAssigned ? `Already had “${title}”` : `Assigned “${title}”`,
+      }));
+      await load();
+    } catch (err) {
+      setAssignNote((n) => ({ ...n, [employeeId]: (err as Error).message }));
+    } finally {
+      setAssigningId(null);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -243,7 +277,7 @@ export function CampaignReport({
         subtitle={`Who this went to and where each person is — ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}.`}
       >
         <div className="max-h-[28rem] overflow-y-auto">
-          <Table head={['Recipient', 'Department', 'Status']}>
+          <Table head={canGenerate ? ['Recipient', 'Department', 'Status', 'Assign training'] : ['Recipient', 'Department', 'Status']}>
             {recipients.map((r) => (
               <tr key={r.email} className="border-b border-slate-100">
                 <td className="px-2 py-2">
@@ -252,11 +286,43 @@ export function CampaignReport({
                 </td>
                 <td className="px-2 py-2 text-slate-500">{r.department ?? '—'}</td>
                 <td className="px-2 py-2"><StatusPills r={r} /></td>
+                {canGenerate && (
+                  <td className="px-2 py-2">
+                    {modules.length ? (
+                      <div className="flex items-center gap-2">
+                        <select
+                          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-[12px] text-slate-700 disabled:opacity-50"
+                          defaultValue=""
+                          disabled={assigningId === r.employeeId}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            e.target.value = '';
+                            void assignTraining(r.employeeId, v);
+                          }}
+                        >
+                          <option value="" disabled>
+                            {assigningId === r.employeeId ? 'Assigning…' : 'Assign a module…'}
+                          </option>
+                          {modules.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.title}
+                            </option>
+                          ))}
+                        </select>
+                        {assignNote[r.employeeId] && (
+                          <span className="text-[11px] text-brand-700">{assignNote[r.employeeId]}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-slate-400">Add a module first</span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
             {!recipients.length && (
               <tr>
-                <td colSpan={3} className="px-2 py-6 text-center text-slate-500">
+                <td colSpan={canGenerate ? 4 : 3} className="px-2 py-6 text-center text-slate-500">
                   No recipients yet — launch the campaign to generate sends.
                 </td>
               </tr>

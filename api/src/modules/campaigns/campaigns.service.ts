@@ -168,9 +168,10 @@ export class CampaignsService {
     const rows = await this.prisma.db.send.findMany({
       where: { campaignId },
       orderBy: { createdAt: 'asc' },
-      include: { employee: { select: { name: true, email: true, department: true } } },
+      include: { employee: { select: { id: true, name: true, email: true, department: true } } },
     });
     return rows.map((s) => ({
+      employeeId: s.employee.id,
       name: s.employee.name,
       email: s.employee.email,
       department: s.employee.department,
