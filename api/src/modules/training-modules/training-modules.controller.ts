@@ -7,11 +7,12 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { IsInt, IsOptional, IsString, IsUrl, MinLength, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUrl, IsUUID, MinLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ROLES } from '../../common/auth/roles';
 import { Roles } from '../../common/auth/roles.decorator';
@@ -36,6 +37,11 @@ class UpdateModuleDto {
   @IsOptional() @IsString() @MinLength(2) title?: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsInt() @Min(1) durationSeconds?: number;
+}
+
+class SetQuizDto {
+  // The quiz to attach, or null to detach the module's quiz.
+  @IsOptional() @IsUUID('4') quizId?: string | null;
 }
 
 @Controller('tenants/:tenantId/training-modules')
@@ -74,6 +80,14 @@ export class TrainingModulesController {
     @UploadedFile() video: { buffer: Buffer; mimetype: string; originalname: string },
   ) {
     return this.modules.createFromUpload(video, dto);
+  }
+
+  /** Attach (or detach) the quiz for this module, from the module side. */
+  @Put(':moduleId/quiz')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @RequiresWritableTenant()
+  setQuiz(@Param('moduleId', ParseUUIDPipe) moduleId: string, @Body() dto: SetQuizDto) {
+    return this.modules.setQuiz(moduleId, dto.quizId ?? null);
   }
 
   @Patch(':moduleId')

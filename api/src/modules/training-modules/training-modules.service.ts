@@ -122,6 +122,36 @@ export class TrainingModulesService {
     });
   }
 
+  /**
+   * Attach a quiz to this module (or detach with quizId=null), from the module
+   * side. A module holds at most one quiz, so any quiz currently on it is
+   * detached first; the chosen quiz is moved off any campaign it was on.
+   */
+  async setQuiz(moduleId: string, quizId: string | null) {
+    const module = await this.prisma.db.trainingModule.findUnique({
+      where: { id: moduleId },
+      select: { id: true },
+    });
+    if (!module) throw new NotFoundException('Training module not found');
+
+    if (quizId) {
+      const quiz = await this.prisma.db.quiz.findUnique({ where: { id: quizId }, select: { id: true } });
+      if (!quiz) throw new NotFoundException('Quiz not found');
+    }
+
+    await this.prisma.db.$transaction(async (tx) => {
+      // Free the module of whatever quiz it currently holds.
+      await tx.quiz.updateMany({ where: { trainingModuleId: moduleId }, data: { trainingModuleId: null } });
+      if (quizId) {
+        await tx.quiz.update({
+          where: { id: quizId },
+          data: { trainingModuleId: moduleId, campaignId: null },
+        });
+      }
+    });
+    return { moduleId, quizId };
+  }
+
   /** A playable URL for the teachable-moment page: signed for uploads, as-is for links. */
   async playableUrl(module: { videoUrl: string; videoSource: 'upload' | 'link' }) {
     if (module.videoSource === 'link') return module.videoUrl;

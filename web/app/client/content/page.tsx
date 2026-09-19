@@ -28,6 +28,12 @@ interface SharedModule {
   durationSeconds: number | null;
 }
 
+interface QuizItem {
+  id: string;
+  title: string;
+  module: { id: string; title: string } | null;
+}
+
 export default function ContentPage() {
   return (
     <Guard allow={['client_admin']}>
@@ -40,6 +46,7 @@ function Content() {
   const tenantId = useActingTenant();
   const [list, setList] = useState<TrainingModule[]>([]);
   const [libraryItems, setLibraryItems] = useState<SharedModule[]>([]);
+  const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,12 +62,14 @@ function Content() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const [mine, library] = await Promise.all([
+      const [mine, library, qz] = await Promise.all([
         api.get<TrainingModule[]>(`/tenants/${tenantId}/training-modules`),
         api.get<SharedModule[]>(`/shared-training-modules`),
+        api.get<QuizItem[]>(`/tenants/${tenantId}/quizzes`).catch(() => [] as QuizItem[]),
       ]);
       setList(mine);
       setLibraryItems(library);
+      setQuizzes(qz);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -136,6 +145,21 @@ function Content() {
     setError(null);
     try {
       await api.del(`/tenants/${tenantId}/training-modules/${id}`);
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setModuleQuiz(moduleId: string, quizId: string) {
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      await api.put(`/tenants/${tenantId}/training-modules/${moduleId}/quiz`, { quizId: quizId || null });
+      setOk(quizId ? 'Quiz attached to this video.' : 'Quiz removed from this video.');
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -255,29 +279,51 @@ function Content() {
         </Table>
       </Card>
 
-      <Card title="Your modules">
-        <Table head={['Title', 'Source', 'Duration', 'Added', '']}>
-          {list.map((m) => (
-            <tr key={m.id} className="border-b border-slate-100">
-              <td className="px-2 py-2">
-                <div>{m.title}</div>
-                {m.description && <div className="text-[11px] text-slate-500">{m.description}</div>}
-              </td>
-              <td className="px-2 py-2">
-                <Badge>{m.videoSource}</Badge>
-              </td>
-              <td className="px-2 py-2">{m.durationSeconds ? `${m.durationSeconds}s` : '—'}</td>
-              <td className="px-2 py-2">{new Date(m.createdAt).toLocaleDateString()}</td>
-              <td className="px-2 py-2">
-                <div className="flex items-center justify-end gap-2">
-                  <VideoPreviewButton url={m.videoUrl} title={m.title} />
-                  <Button variant="ghost" onClick={() => remove(m.id)} disabled={busy}>
-                    Delete
-                  </Button>
-                </div>
-              </td>
-            </tr>
-          ))}
+      <Card title="Your modules" subtitle="Attach a quiz to each video — employees take it after watching.">
+        <Table head={['Title', 'Source', 'Quiz', 'Added', '']}>
+          {list.map((m) => {
+            const current = quizzes.find((q) => q.module?.id === m.id);
+            return (
+              <tr key={m.id} className="border-b border-slate-100">
+                <td className="px-2 py-2">
+                  <div>{m.title}</div>
+                  {m.description && <div className="text-[11px] text-slate-500">{m.description}</div>}
+                </td>
+                <td className="px-2 py-2">
+                  <Badge>{m.videoSource}</Badge>
+                </td>
+                <td className="px-2 py-2">
+                  {quizzes.length ? (
+                    <select
+                      className={`${inputClass} !py-1 text-[12px]`}
+                      value={current?.id ?? ''}
+                      disabled={busy}
+                      onChange={(e) => setModuleQuiz(m.id, e.target.value)}
+                    >
+                      <option value="">— No quiz —</option>
+                      {quizzes.map((q) => (
+                        <option key={q.id} value={q.id}>
+                          {q.title}
+                          {q.module && q.module.id !== m.id ? ` (on: ${q.module.title})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <span className="text-[11px] text-slate-400">No quizzes yet</span>
+                  )}
+                </td>
+                <td className="px-2 py-2">{new Date(m.createdAt).toLocaleDateString()}</td>
+                <td className="px-2 py-2">
+                  <div className="flex items-center justify-end gap-2">
+                    <VideoPreviewButton url={m.videoUrl} title={m.title} />
+                    <Button variant="ghost" onClick={() => remove(m.id)} disabled={busy}>
+                      Delete
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
           {!list.length && (
             <tr>
               <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
