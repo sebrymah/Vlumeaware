@@ -57,6 +57,49 @@ export const api = {
   upload: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
 };
 
+/**
+ * Multipart upload with progress. fetch() can't report upload progress, so this
+ * uses XMLHttpRequest and calls onProgress(0..100) as bytes go out.
+ */
+export function uploadWithProgress<T>(
+  path: string,
+  form: FormData,
+  onProgress: (pct: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const session = readSession();
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BASE}${path}`);
+    if (session) xhr.setRequestHeader('Authorization', `Bearer ${session.accessToken}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(xhr.responseText ? (JSON.parse(xhr.responseText) as T) : (undefined as T));
+        } catch {
+          resolve(undefined as T);
+        }
+      } else if (xhr.status === 401) {
+        clearSession();
+        reject(new ApiError(401, 'Session expired. Please sign in again.'));
+      } else {
+        let message = 'Upload failed';
+        try {
+          const b = JSON.parse(xhr.responseText);
+          message = Array.isArray(b.message) ? b.message.join(', ') : (b.message ?? message);
+        } catch {
+          /* non-JSON error body */
+        }
+        reject(new ApiError(xhr.status, message));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError(0, 'Network error during upload'));
+    xhr.send(form);
+  });
+}
+
 export interface LoginResponse {
   accessToken?: string;
   role?: string;

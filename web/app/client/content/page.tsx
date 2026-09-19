@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, uploadWithProgress } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
@@ -50,6 +50,7 @@ function Content() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [mode, setMode] = useState<'upload' | 'link'>('upload');
 
   const [title, setTitle] = useState('');
@@ -113,7 +114,8 @@ function Content() {
         form.append('title', title);
         if (description) form.append('description', description);
         if (duration) form.append('durationSeconds', duration);
-        await api.upload(`/tenants/${tenantId}/training-modules/upload`, form);
+        setUploadPct(0);
+        await uploadWithProgress(`/tenants/${tenantId}/training-modules/upload`, form, setUploadPct);
       }
       setOk('Awareness module saved. Map it to a scenario under Training routing.');
       reset();
@@ -122,6 +124,7 @@ function Content() {
       setError((err as Error).message);
     } finally {
       setBusy(false);
+      setUploadPct(null);
     }
   }
 
@@ -233,6 +236,17 @@ function Content() {
             </Field>
           )}
 
+          {uploadPct !== null && (
+            <div>
+              <div className="mb-1 flex justify-between text-[11px] text-slate-500">
+                <span>{uploadPct < 100 ? 'Uploading video…' : 'Processing…'}</span>
+                <span>{uploadPct}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${uploadPct}%` }} />
+              </div>
+            </div>
+          )}
           <Button type="submit" disabled={busy}>
             {busy ? 'Saving…' : mode === 'upload' ? 'Upload module' : 'Add linked module'}
           </Button>

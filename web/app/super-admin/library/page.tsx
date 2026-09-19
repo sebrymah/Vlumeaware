@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '@/lib/api';
+import { api, uploadWithProgress } from '@/lib/api';
 import { Guard } from '@/components/guard';
 import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
@@ -31,6 +31,7 @@ function Library() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploadPct, setUploadPct] = useState<number | null>(null);
   const [mode, setMode] = useState<'upload' | 'link'>('link');
 
   const [title, setTitle] = useState('');
@@ -81,7 +82,8 @@ function Library() {
         if (category) form.append('category', category);
         if (description) form.append('description', description);
         if (duration) form.append('durationSeconds', duration);
-        await api.upload('/shared-training-modules/upload', form);
+        setUploadPct(0);
+        await uploadWithProgress('/shared-training-modules/upload', form, setUploadPct);
       }
       setOk('Published to the shared library. Every client can now add it.');
       setTitle('');
@@ -95,6 +97,7 @@ function Library() {
       setError((err as Error).message);
     } finally {
       setBusy(false);
+      setUploadPct(null);
     }
   }
 
@@ -174,6 +177,17 @@ function Library() {
                 </div>
               )}
             </Field>
+          )}
+          {uploadPct !== null && (
+            <div>
+              <div className="mb-1 flex justify-between text-[11px] text-slate-500">
+                <span>{uploadPct < 100 ? 'Uploading video…' : 'Processing…'}</span>
+                <span>{uploadPct}%</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${uploadPct}%` }} />
+              </div>
+            </div>
           )}
           <Button type="submit" disabled={busy}>
             {busy ? 'Publishing…' : 'Publish to shared library'}
