@@ -9,6 +9,8 @@ import { CampaignsService } from './campaigns.service';
 class CreateCampaignDto {
   @IsString() @MinLength(2) name!: string;
   @IsArray() @ArrayNotEmpty() @IsUUID('4', { each: true }) scenarioIds!: string[];
+  /** Recipients. Omit or empty = send to all staff. */
+  @IsOptional() @IsArray() @IsUUID('4', { each: true }) employeeIds?: string[];
   @IsOptional() @IsDateString() scheduledSendAt?: string;
   /** Spread sends randomly across this many minutes. 0 = send at once. */
   @IsOptional() @IsInt() @Min(0) @Max(10080) sendWindowMinutes?: number;
@@ -33,6 +35,7 @@ export class CampaignsController {
     return this.campaigns.create({
       name: dto.name,
       scenarioIds: dto.scenarioIds,
+      employeeIds: dto.employeeIds,
       scheduledSendAt: dto.scheduledSendAt ? new Date(dto.scheduledSendAt) : undefined,
       sendWindowMinutes: dto.sendWindowMinutes,
       recurrenceDays: dto.recurrenceDays,
@@ -63,6 +66,13 @@ export class CampaignsController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   preflight(@Param('campaignId', ParseUUIDPipe) campaignId: string) {
     return this.campaigns.preflight(campaignId);
+  }
+
+  /** Per-recipient delivery + engagement status. */
+  @Get('tenants/:tenantId/campaigns/:campaignId/recipients')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  recipients(@Param('campaignId', ParseUUIDPipe) campaignId: string) {
+    return this.campaigns.recipients(campaignId);
   }
 
   @Post('tenants/:tenantId/campaigns/:campaignId/launch')

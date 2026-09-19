@@ -25,12 +25,24 @@ export class CampaignsService {
   async create(input: {
     name: string;
     scenarioIds: string[];
+    employeeIds?: string[];
     scheduledSendAt?: Date;
     sendWindowMinutes?: number;
     recurrenceDays?: number;
   }) {
     if (!input.scenarioIds.length) {
       throw new BadRequestException('A campaign needs at least one scenario');
+    }
+
+    // Recipient targeting: empty = all staff. Any explicit IDs must be this
+    // tenant's own employees (read under tenant scope, so cross-tenant IDs
+    // simply won't be found).
+    const targetEmployeeIds = input.employeeIds ?? [];
+    if (targetEmployeeIds.length) {
+      const found = await this.prisma.db.employee.count({ where: { id: { in: targetEmployeeIds } } });
+      if (found !== targetEmployeeIds.length) {
+        throw new BadRequestException('One or more selected recipients do not exist in this tenant');
+      }
     }
 
     const scenarios = await this.prisma.db.scenario.findMany({
@@ -56,6 +68,7 @@ export class CampaignsService {
         scheduledSendAt: input.scheduledSendAt,
         sendWindowMinutes: input.sendWindowMinutes ?? 0,
         recurrenceDays: input.recurrenceDays,
+        targetEmployeeIds,
         campaignScenarios: {
           create: scenarios.map((s) => ({ scenarioId: s.id, tenantId })),
         },
@@ -149,6 +162,26 @@ export class CampaignsService {
     return campaign;
   }
 
+  /** Per-recipient delivery + engagement status for a campaign. */
+  async recipients(campaignId: string) {
+    await this.findOne(campaignId);
+    const rows = await this.prisma.db.send.findMany({
+      where: { campaignId },
+      orderBy: { createdAt: 'asc' },
+      include: { employee: { select: { name: true, email: true, department: true } } },
+    });
+    return rows.map((s) => ({
+      name: s.employee.name,
+      email: s.employee.email,
+      department: s.employee.department,
+      sentAt: s.sentAt,
+      openedAt: s.openedAt,
+      clickedAt: s.clickedAt,
+      credentialsSubmitted: s.credentialsSubmitted,
+      reportedAt: s.reportedAt,
+    }));
+  }
+
   /**
    * Materialises one send row per employee per scenario, then enqueues them.
    * Rows are created before any job runs so the kill switch has something to
@@ -166,9 +199,19 @@ export class CampaignsService {
       throw new ConflictException('Campaign already completed');
     }
 
-    const allEmployees = await this.prisma.db.employee.findMany({ select: { id: true, email: true } });
+    // Recipient set: the campaign's selected employees, or the whole roster
+    // when none were selected.
+    const targetIds = campaign.targetEmployeeIds ?? [];
+    const allEmployees = await this.prisma.db.employee.findMany({
+      where: targetIds.length ? { id: { in: targetIds } } : undefined,
+      select: { id: true, email: true },
+    });
     if (!allEmployees.length) {
-      throw new BadRequestException('No employees uploaded for this tenant');
+      throw new BadRequestException(
+        targetIds.length
+          ? 'None of the selected recipients are on the roster anymore.'
+          : 'No employees uploaded for this tenant',
+      );
     }
 
     // Domain guard (defence in depth): only send to addresses on a verified

@@ -184,6 +184,8 @@ model Campaign {
   launchedAt        DateTime?      @map("launched_at")
   killedAt          DateTime?      @map("killed_at")
   createdAt         DateTime       @default(now()) @map("created_at")
+  /// Recipients to send to. Empty = all employees on the roster.
+  targetEmployeeIds String[]       @default([]) @map("target_employee_ids") @db.Uuid
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaignScenarios CampaignScenario[]

@@ -13,6 +13,13 @@ interface Scenario {
   approvedAt: string | null;
 }
 
+interface Employee {
+  id: string;
+  name: string;
+  email: string;
+  department: string | null;
+}
+
 interface Campaign {
   id: string;
   name: string;
@@ -33,11 +40,14 @@ function Campaigns() {
   const tenantId = useActingTenant();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
+  const [recipientMode, setRecipientMode] = useState<'all' | 'selected'>('all');
+  const [recipients, setRecipients] = useState<string[]>([]);
   const [scheduledSendAt, setScheduledSendAt] = useState('');
   const [sendWindowMinutes, setSendWindowMinutes] = useState('0');
   const [recurrenceDays, setRecurrenceDays] = useState('');
@@ -45,12 +55,14 @@ function Campaigns() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const [c, s] = await Promise.all([
+      const [c, s, emp] = await Promise.all([
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
         api.get<Scenario[]>(`/tenants/${tenantId}/scenarios`),
+        api.get<Employee[]>(`/tenants/${tenantId}/employees`),
       ]);
       setCampaigns(c);
       setScenarios(s);
+      setEmployees(emp);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -92,12 +104,15 @@ function Campaigns() {
       await api.post(`/tenants/${tenantId}/campaigns`, {
         name,
         scenarioIds: selected,
+        employeeIds: recipientMode === 'selected' ? recipients : undefined,
         scheduledSendAt: scheduledSendAt ? new Date(scheduledSendAt).toISOString() : undefined,
         sendWindowMinutes: Number(sendWindowMinutes) || 0,
         recurrenceDays: recurrenceDays ? Number(recurrenceDays) : undefined,
       });
       setName('');
       setSelected([]);
+      setRecipientMode('all');
+      setRecipients([]);
       setScheduledSendAt('');
       setSendWindowMinutes('0');
       setRecurrenceDays('');
@@ -231,6 +246,61 @@ function Campaigns() {
               </div>
             </Field>
 
+            <Field label="Recipients">
+              <div className="space-y-2">
+                <div className="flex gap-4 text-xs text-slate-600">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="recipientMode"
+                      checked={recipientMode === 'all'}
+                      onChange={() => setRecipientMode('all')}
+                    />
+                    All staff ({employees.length})
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="recipientMode"
+                      checked={recipientMode === 'selected'}
+                      onChange={() => setRecipientMode('selected')}
+                    />
+                    Selected staff
+                  </label>
+                </div>
+                {recipientMode === 'selected' && (
+                  <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2">
+                    {employees.length === 0 && (
+                      <p className="px-1 py-2 text-[11px] text-slate-500">No employees on the roster yet — add them under People → Employees.</p>
+                    )}
+                    {employees.map((emp) => (
+                      <label key={emp.id} className="flex items-center gap-2 px-1 text-xs text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={recipients.includes(emp.id)}
+                          onChange={(e) =>
+                            setRecipients(
+                              e.target.checked
+                                ? [...recipients, emp.id]
+                                : recipients.filter((id) => id !== emp.id),
+                            )
+                          }
+                        />
+                        <span className="font-medium text-slate-700">{emp.name}</span>
+                        <span className="text-slate-400">{emp.email}</span>
+                        {emp.department && <Badge>{emp.department}</Badge>}
+                      </label>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-400">
+                  {recipientMode === 'all'
+                    ? 'The simulation goes to everyone on your roster (verified domains only).'
+                    : `${recipients.length} selected.`}
+                </p>
+              </div>
+            </Field>
+
             <div className="grid gap-3 sm:grid-cols-3">
               <Field label="Schedule send (optional)" hint="Leave blank to launch manually.">
                 <input
@@ -260,7 +330,15 @@ function Campaigns() {
                 />
               </Field>
             </div>
-            <Button type="submit" disabled={busy || !selected.length || name.trim().length < 2}>
+            <Button
+              type="submit"
+              disabled={
+                busy ||
+                !selected.length ||
+                name.trim().length < 2 ||
+                (recipientMode === 'selected' && recipients.length === 0)
+              }
+            >
               Create draft campaign
             </Button>
           </form>

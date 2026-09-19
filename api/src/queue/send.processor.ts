@@ -57,7 +57,7 @@ export class SendProcessor extends WorkerHost {
       await this.mailer.send({
         to: send.employee.email,
         fromName: scenario.senderSpoofName,
-        fromAddress: process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumeaware-trk.io',
+        fromAddress: process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumesec.com',
         subject: scenario.subjectLine,
         html,
         sendId: send.id,

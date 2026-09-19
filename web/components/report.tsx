@@ -40,6 +40,40 @@ interface Dashboard {
   generatedAt: string | null;
 }
 
+interface Recipient {
+  name: string;
+  email: string;
+  department: string | null;
+  sentAt: string | null;
+  openedAt: string | null;
+  clickedAt: string | null;
+  credentialsSubmitted: boolean;
+  reportedAt: string | null;
+}
+
+function StatusPills({ r }: { r: Recipient }) {
+  const pill = (label: string, tone: 'ok' | 'warn' | 'bad' | 'muted') => {
+    const cls = {
+      ok: 'bg-brand-50 text-brand-700 ring-brand-200',
+      warn: 'bg-amber-50 text-amber-700 ring-amber-200',
+      bad: 'bg-red-50 text-red-700 ring-red-200',
+      muted: 'bg-slate-100 text-slate-500 ring-slate-200',
+    }[tone];
+    return (
+      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset ${cls}`}>
+        {label}
+      </span>
+    );
+  };
+  const pills = [];
+  if (r.reportedAt) pills.push(pill('Reported', 'ok'));
+  if (r.credentialsSubmitted) pills.push(pill('Submitted', 'bad'));
+  if (r.clickedAt) pills.push(pill('Clicked', 'bad'));
+  if (r.openedAt) pills.push(pill('Opened', 'warn'));
+  if (!pills.length) pills.push(r.sentAt ? pill('Delivered', 'muted') : pill('Pending', 'muted'));
+  return <div className="flex flex-wrap gap-1">{pills}</div>;
+}
+
 /** Shared by the client_admin campaign view and the read-only viewer dashboard. */
 export function CampaignReport({
   tenantId,
@@ -51,12 +85,18 @@ export function CampaignReport({
   canGenerate: boolean;
 }) {
   const [data, setData] = useState<Dashboard | null>(null);
+  const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setData(await api.get<Dashboard>(`/tenants/${tenantId}/reports/${campaignId}`));
+      const [dash, recips] = await Promise.all([
+        api.get<Dashboard>(`/tenants/${tenantId}/reports/${campaignId}`),
+        api.get<Recipient[]>(`/tenants/${tenantId}/campaigns/${campaignId}/recipients`).catch(() => [] as Recipient[]),
+      ]);
+      setData(dash);
+      setRecipients(recips);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -196,6 +236,33 @@ export function CampaignReport({
             </tr>
           )}
         </Table>
+      </Card>
+
+      <Card
+        title="Recipients"
+        subtitle={`Who this went to and where each person is — ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}.`}
+      >
+        <div className="max-h-[28rem] overflow-y-auto">
+          <Table head={['Recipient', 'Department', 'Status']}>
+            {recipients.map((r) => (
+              <tr key={r.email} className="border-b border-slate-100">
+                <td className="px-2 py-2">
+                  <div className="font-medium text-slate-800">{r.name}</div>
+                  <div className="text-[11px] text-slate-500">{r.email}</div>
+                </td>
+                <td className="px-2 py-2 text-slate-500">{r.department ?? '—'}</td>
+                <td className="px-2 py-2"><StatusPills r={r} /></td>
+              </tr>
+            ))}
+            {!recipients.length && (
+              <tr>
+                <td colSpan={3} className="px-2 py-6 text-center text-slate-500">
+                  No recipients yet — launch the campaign to generate sends.
+                </td>
+              </tr>
+            )}
+          </Table>
+        </div>
       </Card>
 
       {m.submissionAnalytics.submissions > 0 && (
