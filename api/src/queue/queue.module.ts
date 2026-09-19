@@ -11,6 +11,16 @@ import { SendProcessor } from './send.processor';
  * Railway / Render give one, often rediss:// with a password), or discrete
  * REDIS_HOST/PORT/PASSWORD for local Docker. TLS is enabled for rediss:// or
  * when REDIS_TLS=true.
+ *
+ * `maxRetriesPerRequest: null` is required by BullMQ: workers issue blocking
+ * commands, and ioredis' default retry cap aborts them, killing the worker on
+ * the first blip from a managed host.
+ *
+ * NOTE — the Redis instance itself must run with `maxmemory-policy noeviction`.
+ * Managed hosts commonly default to `allkeys-lru`, which lets Redis evict queue
+ * keys under memory pressure: queued simulation sends would disappear silently,
+ * with no failed job and nothing in the logs. BullMQ warns about this at boot.
+ * On Render, set it on the Key Value instance under Settings → Maxmemory Policy.
  */
 function redisConnection() {
   const url = process.env.REDIS_URL;
@@ -22,6 +32,7 @@ function redisConnection() {
       username: u.username || undefined,
       password: u.password || undefined,
       tls: u.protocol === 'rediss:' ? {} : undefined,
+      maxRetriesPerRequest: null,
     };
   }
   return {
@@ -29,6 +40,7 @@ function redisConnection() {
     port: Number(process.env.REDIS_PORT ?? 6379),
     password: process.env.REDIS_PASSWORD || undefined,
     tls: process.env.REDIS_TLS === 'true' ? {} : undefined,
+    maxRetriesPerRequest: null,
   };
 }
 

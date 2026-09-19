@@ -1,9 +1,43 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
+/**
+ * Trims whitespace and strips a matched pair of surrounding quotes from an env
+ * value, returning undefined for anything empty. Deployment dashboards happily
+ * store `"eyJ…"` or a value with a trailing newline; neither is a usable key.
+ */
+export function cleanEnv(value: string | undefined): string | undefined {
+  const cleaned = value?.trim().replace(/^(['"])([\s\S]*)\1$/, '$2').trim();
+  return cleaned ? cleaned : undefined;
+}
+
+/** Turns a Supabase Storage error body into one actionable sentence. */
+function storageReason(status: number, detail: string): string {
+  let message = detail;
+  try {
+    const body = JSON.parse(detail) as { message?: string; error?: string };
+    message = body.message ?? body.error ?? detail;
+  } catch {
+    /* non-JSON error body — fall through to the raw text */
+  }
+  if (/Invalid Compact JWS|invalid signature|JWT/i.test(message)) {
+    return `the API's SUPABASE_SERVICE_ROLE_KEY is not a valid key (${message}). Re-copy the service_role key from Supabase → Project Settings → API.`;
+  }
+  if (/Bucket not found/i.test(message)) {
+    return `the storage bucket does not exist (${message}). Create it in Supabase → Storage as a private bucket.`;
+  }
+  if (/mime|content type/i.test(message)) {
+    return `the bucket does not allow this file type (${message}).`;
+  }
+  if (status === 413 || /too large|exceeded/i.test(message)) {
+    return `the file exceeds the bucket's size limit (${message}).`;
+  }
+  return `${message || 'no detail returned'} (HTTP ${status}).`;
+}
 
 /**
  * Object storage for uploaded videos and documents. Three backends, chosen by
@@ -22,10 +56,13 @@ import { join } from 'node:path';
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
 
-  // Supabase Storage
-  private readonly supabaseUrl = process.env.SUPABASE_URL?.replace(/\/+$/, '');
-  private readonly supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  private readonly supabaseBucket = process.env.SUPABASE_STORAGE_BUCKET ?? 'training-videos';
+  // Supabase Storage. Values are cleaned before use: a key pasted into a
+  // deployment dashboard carrying surrounding quotes or a trailing newline is
+  // not a parseable JWT, and Supabase rejects it with "Invalid Compact JWS" —
+  // a failure that is invisible from the outside, so it is closed off here.
+  private readonly supabaseUrl = cleanEnv(process.env.SUPABASE_URL)?.replace(/\/+$/, '');
+  private readonly supabaseKey = cleanEnv(process.env.SUPABASE_SERVICE_ROLE_KEY);
+  private readonly supabaseBucket = cleanEnv(process.env.SUPABASE_STORAGE_BUCKET) ?? 'training-videos';
 
   // AWS S3
   private readonly bucket = process.env.S3_BUCKET;
@@ -83,7 +120,10 @@ export class StorageService {
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
-      throw new Error(`Supabase Storage upload failed (${res.status}): ${detail}`);
+      this.logger.error(`Supabase Storage upload failed (${res.status}): ${detail}`);
+      // A plain Error here would reach the operator as "Internal server error"
+      // and hide the one line that identifies the misconfiguration.
+      throw new BadGatewayException(`Video storage rejected the upload: ${storageReason(res.status, detail)}`);
     }
     return `supabase://${this.supabaseBucket}/${objectPath}`;
   }
