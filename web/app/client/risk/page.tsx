@@ -150,7 +150,7 @@ function Risk() {
           {!advice && !advising && (
             <p className="text-xs text-slate-500">
               {rows.length
-                ? 'Nothing is sent to the assistant until you ask. It sees this table and your training modules — no message content and no employee email addresses.'
+                ? 'Nothing is sent to the assistant until you ask. It sees this table and your training modules, with no message content and no employee email addresses.'
                 : 'No employees have been through a simulation yet, so there is nothing to assess.'}
             </p>
           )}
@@ -196,7 +196,7 @@ function Risk() {
                     ))}
                   </ul>
                   <p className="mt-2 text-[11px] text-slate-400">
-                    Suggestions only — assign them from the Training page, or use the remediation
+                    These are suggestions. Assign them from the Training page, or use the remediation
                     enrolment below.
                   </p>
                 </div>

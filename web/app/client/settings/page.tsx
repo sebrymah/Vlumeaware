@@ -179,7 +179,7 @@ function Settings() {
               {tenant.logoUrl ? (
                 <img src={tenant.logoUrl} alt={`${tenant.name} logo`} className="max-h-12 w-auto" />
               ) : (
-                <span className="text-xs text-slate-400">None — your name is used instead</span>
+                <span className="text-xs text-slate-400">None. Your name is used instead</span>
               )}
             </div>
           </div>

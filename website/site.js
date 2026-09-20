@@ -34,7 +34,7 @@
   var footHTML =
     "<footer><div class=\"wrap\"><div class=\"cols\">" +
     '<div><a class="logo" href="index.html">Vlume<b>aware</b></a>' +
-    '<p style="margin-top:14px;max-width:34ch;color:#8D9E96">Phishing simulation and security awareness for teams anywhere — measure who clicks, then fix it. A Vlumetech product.</p></div>' +
+    '<p style="margin-top:14px;max-width:34ch;color:#8D9E96">Phishing simulation and security awareness for teams anywhere. Measure who clicks, then fix it. A Vlumetech product.</p></div>' +
     '<div><h4>Product</h4><a href="how-it-works.html">How it works</a><a href="features.html">Features</a><a href="content-pack.html">ISO 27001 content</a><a href="pricing.html">Pricing</a></div>' +
     '<div><h4>Company</h4><a href="about.html">About</a><a href="request-demo.html">Request a demo</a><a href="mailto:info@vlumetech.com.ng">info@vlumetech.com.ng</a></div>' +
     '<div><h4>Compliance</h4><a href="features.html#security">Security &amp; isolation</a><a href="content-pack.html">NDPA-aware training</a></div>' +

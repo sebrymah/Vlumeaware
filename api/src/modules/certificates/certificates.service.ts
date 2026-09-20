@@ -162,8 +162,8 @@ export class CertificatesService {
             ${cert.scorePct}%. Your certificate of completion is attached.
           </p>
           <p>
-            Serial <strong>${esc(cert.serial)}</strong> —
-            <a href="${verifyUrl}">verify this certificate</a>.
+            Serial <strong>${esc(cert.serial)}</strong>.
+            <a href="${verifyUrl}">Verify this certificate</a>.
           </p>
           <p>Thank you for taking the training seriously.<br />${esc(cert.tenant.name)}</p>
         `,

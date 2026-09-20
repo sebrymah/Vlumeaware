@@ -58,7 +58,7 @@ export default function VerifyPage({ params }: { params: Promise<{ serial: strin
           <p className="mt-2 text-sm text-slate-600">
             Nothing on record matches{' '}
             <span className="font-mono text-slate-900">{serial}</span>. Check the serial against the
-            certificate — they are case-sensitive — or ask the issuing organisation to confirm it.
+            certificate, which is case-sensitive, or ask the issuing organisation to confirm it.
           </p>
         </section>
       )}
@@ -98,7 +98,7 @@ export default function VerifyPage({ params }: { params: Promise<{ serial: strin
 
           <p className="border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
             This page reads the issuing record directly, so it confirms the certificate rather than
-            the document — an altered or forged PDF will not change what is shown here.
+            the document. An altered or forged PDF will not change what is shown here.
           </p>
         </section>
       )}
