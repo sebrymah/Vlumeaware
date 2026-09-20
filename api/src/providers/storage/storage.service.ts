@@ -31,7 +31,12 @@ function storageReason(status: number, detail: string): string {
     return `the storage bucket does not exist (${message}). Create it in Supabase → Storage as a private bucket.`;
   }
   if (/mime|content type/i.test(message)) {
-    return `the bucket does not allow this file type (${message}).`;
+    return (
+      `the storage bucket does not allow this file type (${message}). The bucket holds ` +
+      `awareness videos, signed agreements and client logos, so its allowed MIME types must ` +
+      `cover video/mp4, video/webm, video/ogg, video/quicktime, video/x-msvideo, ` +
+      `application/pdf, image/png and image/jpeg.`
+    );
   }
   if (status === 413 || /too large|exceeded/i.test(message)) {
     return `the file exceeds the bucket's size limit (${message}).`;
@@ -136,7 +141,7 @@ export class StorageService {
       this.logger.error(`Supabase Storage upload failed (${res.status}): ${detail}`);
       // A plain Error here would reach the operator as "Internal server error"
       // and hide the one line that identifies the misconfiguration.
-      throw new BadGatewayException(`Video storage rejected the upload: ${storageReason(res.status, detail)}`);
+      throw new BadGatewayException(`Storage rejected the upload: ${storageReason(res.status, detail)}`);
     }
     return `supabase://${this.supabaseBucket}/${objectPath}`;
   }

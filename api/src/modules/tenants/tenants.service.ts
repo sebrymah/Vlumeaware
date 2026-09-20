@@ -7,6 +7,9 @@ import { TrialService } from '../../common/trial/trial.service';
 import { StorageService } from '../../providers/storage/storage.service';
 import type { TenantRole } from '@prisma/client';
 
+/** A signed NDPA agreement: a PDF, or a photograph/scan of the signed page. */
+const AGREEMENT_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg']);
+
 @Injectable()
 export class TenantsService {
   constructor(
@@ -45,6 +48,11 @@ export class TenantsService {
     await this.findOne(tenantId);
     if (!file?.buffer?.length) {
       throw new BadRequestException('An agreement document is required');
+    }
+    if (!AGREEMENT_MIME.has(file.mimetype)) {
+      throw new BadRequestException(
+        `An agreement must be a PDF or a scanned image — ${file.mimetype} is not accepted.`,
+      );
     }
     const docUrl = await this.storage.put(`agreements/${tenantId}`, file.buffer, file.mimetype);
     return this.prisma.db.tenant.update({
