@@ -198,12 +198,21 @@ function formal(c: Ctx, d: CertificateInput) {
   page.drawRectangle({ x: (W - 64) / 2, y: 336, width: 64, height: 2, color: c.accent });
   centre('has completed the security awareness module', c.sans, 11, 308, MUTED);
 
-  let y = 282;
+  let y = 288;
   for (const line of wrap(d.moduleTitle, c.serif, 19, 520)) {
     centre(line, c.serif, 19, y, c.accent);
     y -= 24;
   }
-  centre(`with a score of ${d.scorePct}%`, c.sans, 11, y - 10, MUTED);
+  // Which assessment was passed is the part that makes this evidence rather
+  // than an attendance note, so it is named rather than alluded to.
+  if (d.quizTitle) {
+    y -= 6;
+    for (const line of wrap(`and passed ${d.quizTitle}`, c.sans, 11, 520)) {
+      centre(line, c.sans, 11, y, MUTED);
+      y -= 16;
+    }
+  }
+  centre(`with a score of ${d.scorePct}%`, c.sans, 11, y - 8, MUTED);
 
   page.drawLine({ start: { x: left, y: 122 }, end: { x: W - 62, y: 122 }, thickness: 1, color: HAIRLINE });
   footerField(c, left, 'ISSUED', formatDate(d.issued), c.sans);
@@ -252,7 +261,9 @@ function branded(c: Ctx, d: CertificateInput) {
   page.drawText(d.employeeName, { x: left, y: 356, size: 46, font: c.serifBold, color: INK });
 
   let y = 316;
-  const body = `completed ${d.moduleTitle} and passed its assessment with a score of ${d.scorePct}%.`;
+  const body = d.quizTitle
+    ? `completed ${d.moduleTitle} and passed ${d.quizTitle} with a score of ${d.scorePct}%.`
+    : `completed ${d.moduleTitle} with a score of ${d.scorePct}%.`;
   for (const line of wrap(body, c.sans, 12, W - left - 190)) {
     page.drawText(line, { x: left, y, size: 12, font: c.sans, color: MUTED });
     y -= 19;
