@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { notificationFromAddress, notificationFromIsConfigured } from './providers/mailer/from-addresses';
 import { ROLES } from './common/auth/roles';
 import { Public, Roles } from './common/auth/roles.decorator';
 import { cleanEnv } from './providers/storage/storage.service';
@@ -35,6 +36,11 @@ export class HealthController {
       mailer: selected === 'resend' || selected === 'ses' ? selected : 'log (default — no real email)',
       resendKeyPresent: Boolean(process.env.RESEND_API_KEY),
       fromAddress: process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumesec.com',
+      // Genuine mail to employees (certificates) goes from here, not the
+      // simulation address. If this is the unconfigured default, Resend will
+      // reject the send as an unverified sender.
+      notificationFromAddress: notificationFromAddress(),
+      notificationFromConfigured: notificationFromIsConfigured(),
       trackingBaseUrl: process.env.TRACKING_BASE_URL ?? null,
       publicWebUrl: process.env.PUBLIC_WEB_URL ?? null,
       // Storage backend for uploaded videos.

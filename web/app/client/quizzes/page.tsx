@@ -63,6 +63,11 @@ function Quizzes() {
   const [cloneSharedId, setCloneSharedId] = useState('');
   const [cloneModuleId, setCloneModuleId] = useState('');
 
+  // In-place pass-mark edits, keyed by quiz id. A quiz cloned from the shared
+  // library arrives with the library's pass mark, so a client admin needs to
+  // be able to change it without rebuilding the quiz.
+  const [passDraft, setPassDraft] = useState<Record<string, string>>({});
+
   // new-quiz form
   const [title, setTitle] = useState('');
   const [passMark, setPassMark] = useState('70');
@@ -99,6 +104,34 @@ function Quizzes() {
     setQuestions((qs) =>
       qs.map((q, idx) => (idx === qi ? { ...q, options: q.options.map((o, j) => (j === oi ? value : o)) } : q)),
     );
+  }
+
+  const passMarkChanged = (q: QuizListItem) =>
+    passDraft[q.id] !== undefined && passDraft[q.id] !== String(q.passingScorePct);
+
+  async function savePassMark(q: QuizListItem) {
+    const value = Number(passDraft[q.id]);
+    if (!Number.isInteger(value) || value < 1 || value > 100) {
+      setError('Pass mark must be a whole number between 1 and 100.');
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      await api.patch(`/tenants/${tenantId}/quizzes/${q.id}`, { passingScorePct: value });
+      setOk(`Pass mark for “${q.title}” is now ${value}%. It applies to attempts from here on.`);
+      setPassDraft((draft) => {
+        const next = { ...draft };
+        delete next[q.id];
+        return next;
+      });
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function createQuiz(e: React.FormEvent) {
@@ -225,9 +258,27 @@ function Quizzes() {
               </td>
               <td className="px-2 py-2">{q._count.questions}</td>
               <td className="px-2 py-2">{q._count.attempts}</td>
-              <td className="px-2 py-2">{q.passingScorePct}%</td>
+              <td className="px-2 py-2">
+                <div className="flex items-center gap-1">
+                  <input
+                    className={`${inputClass} w-16`}
+                    type="number"
+                    min={1}
+                    max={100}
+                    aria-label={`Pass mark for ${q.title}`}
+                    value={passDraft[q.id] ?? String(q.passingScorePct)}
+                    onChange={(e) => setPassDraft((d) => ({ ...d, [q.id]: e.target.value }))}
+                  />
+                  <span className="text-slate-400">%</span>
+                </div>
+              </td>
               <td className="px-2 py-2">
                 <div className="flex justify-end gap-2">
+                  {passMarkChanged(q) && (
+                    <Button variant="primary" onClick={() => savePassMark(q)} disabled={busy}>
+                      Save pass mark
+                    </Button>
+                  )}
                   <Button variant="ghost" onClick={() => viewResults(q)}>
                     Results
                   </Button>

@@ -149,10 +149,23 @@ export class LearnService {
           select: { name: true, brandLogoUrl: true, brandPrimaryColor: true },
         }),
       );
+      // The completion page is addressed by the same token and may be opened
+      // directly or refreshed, so the certificate has to come from the record
+      // rather than from whatever was in memory after the quiz was submitted.
+      const certificate =
+        assignment?.completedAt && module
+          ? await this.prisma.db.certificate.findFirst({
+              where: { employeeId: ref.employeeId, moduleTitle: module.title, sourceSendId: null },
+              select: { serial: true, moduleTitle: true, scorePct: true, issuedAt: true },
+              orderBy: { issuedAt: 'desc' },
+            })
+          : null;
+
       return {
         employeeName: employee?.name ?? 'there',
         tenant,
         completed: !!assignment?.completedAt,
+        certificate,
         module: module
           ? { title: module.title, description: module.description, videoUrl: await this.storage.signedUrl(module.videoUrl) }
           : null,

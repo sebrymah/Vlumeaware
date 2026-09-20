@@ -1,6 +1,7 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -26,6 +27,18 @@ interface Result {
   certificateEmailed?: boolean;
 }
 
+/** Pulls the API's explanation out of an error response. */
+async function messageFrom(res: Response): Promise<string> {
+  try {
+    const body = await res.json();
+    const message = Array.isArray(body.message) ? body.message.join(', ') : body.message;
+    if (message) return String(message);
+  } catch {
+    /* non-JSON error body */
+  }
+  return `Something went wrong (HTTP ${res.status}). Please try again.`;
+}
+
 export default function LearnPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
   const [data, setData] = useState<Learn | null>(null);
@@ -34,6 +47,14 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
   const [doneNoQuiz, setDoneNoQuiz] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const router = useRouter();
+
+  const completeHref = useCallback(
+    (emailed?: boolean) =>
+      `/learn/${encodeURIComponent(token)}/complete${emailed ? '?emailed=1' : ''}`,
+    [token],
+  );
 
   useEffect(() => {
     fetch(`${BASE}/learn/${encodeURIComponent(token)}`, { cache: 'no-store' })
@@ -41,6 +62,13 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
       .then((d: Learn) => setData(d))
       .catch(() => setLoadError(true));
   }, [token]);
+
+  // Someone returning to a finished assignment belongs on the completion page,
+  // not back on the quiz.
+  const alreadyCompleted = data?.completed ?? false;
+  useEffect(() => {
+    if (alreadyCompleted) router.replace(completeHref());
+  }, [alreadyCompleted, completeHref, router]);
 
   if (loadError) {
     return (
@@ -67,7 +95,15 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
           answers: Object.entries(answers).map(([questionId, choice]) => ({ questionId, choice })),
         }),
       });
-      if (res.ok) setResult(await res.json());
+      if (res.ok) {
+        const body: Result = await res.json();
+        setResult(body);
+        if (body.passed) router.push(completeHref(body.certificateEmailed));
+        return;
+      }
+      // The API explains its refusals — "You have already passed this quiz." —
+      // and discarding that left the button looking simply dead.
+      setSubmitError(await messageFrom(res));
     } finally {
       setBusy(false);
     }
@@ -77,7 +113,12 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
     setBusy(true);
     try {
       const res = await fetch(`${BASE}/learn/${encodeURIComponent(token)}/complete`, { method: 'POST' });
-      if (res.ok) setDoneNoQuiz(true);
+      if (res.ok) {
+        setDoneNoQuiz(true);
+        router.push(completeHref());
+        return;
+      }
+      setSubmitError(await messageFrom(res));
     } finally {
       setBusy(false);
     }
@@ -114,13 +155,15 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
         </section>
       )}
 
+      {submitError && (
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {submitError}
+        </div>
+      )}
+
       {already ? (
         <div className="mt-6 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: accent, color: accent }}>
-          ✓ Training complete. Thank you — nothing more to do.
-          {result?.certificateId &&
-            (result.certificateEmailed
-              ? ' Your certificate has been recorded and emailed to you.'
-              : ' Your certificate has been recorded.')}
+          ✓ Training complete — taking you to your certificate…
         </div>
       ) : data.quiz ? (
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

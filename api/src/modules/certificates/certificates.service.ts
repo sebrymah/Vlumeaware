@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
+import { notificationFromAddress } from '../../providers/mailer/from-addresses';
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { trackingBaseUrl } from '../tracking/render';
@@ -138,10 +139,7 @@ export class CertificatesService {
       await this.mailer.send({
         to: cert.employee.email,
         fromName: `${cert.tenant.name} Security Awareness`,
-        fromAddress:
-          process.env.NOTIFICATION_FROM_ADDRESS ??
-          process.env.DIGEST_FROM_ADDRESS ??
-          'reports@vlumeaware-trk.io',
+        fromAddress: notificationFromAddress(),
         subject: `Your certificate — ${cert.moduleTitle}`,
         html: `
           <p>Hello ${esc(cert.employee.name)},</p>
