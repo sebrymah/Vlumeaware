@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -17,6 +18,7 @@ import { ROLES } from '../../common/auth/roles';
 import { Roles } from '../../common/auth/roles.decorator';
 import { EmployeesService } from './employees.service';
 import { RiskService } from './risk.service';
+import { RiskAdviceService } from './risk-advice.service';
 import { RequiresWritableTenant } from '../../common/trial/writable-tenant.guard';
 
 class EmployeeRowDto {
@@ -43,6 +45,7 @@ export class EmployeesController {
   constructor(
     private readonly employees: EmployeesService,
     private readonly risk: RiskService,
+    private readonly riskAdvice: RiskAdviceService,
   ) {}
 
   @Get()
@@ -56,6 +59,18 @@ export class EmployeesController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   riskAll() {
     return this.risk.scoreAll();
+  }
+
+  /**
+   * What to do about the risk on that page. POST because each call is a paid
+   * request to the AI provider, and client_admin only: a read-only viewer
+   * should not be able to spend the tenant's budget.
+   */
+  @Post('risk/advice')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  adviseOnRisk() {
+    return this.riskAdvice.advise();
   }
 
   /** Employees who clicked in two or more simulations. */

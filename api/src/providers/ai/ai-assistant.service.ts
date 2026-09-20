@@ -10,6 +10,31 @@ export interface GeneratedScenario {
   redFlags: string[];
 }
 
+export interface RiskAdviceInput {
+  tenantName: string;
+  employees: Array<{
+    id: string;
+    name: string;
+    department: string | null;
+    riskScore: number;
+    riskLevel: string;
+    sends: number;
+    clicks: number;
+    reports: number;
+    credentialSubmissions: number;
+    quizPasses: number;
+    repeatClicker: boolean;
+  }>;
+  /** The tenant's own modules — the only things that may be recommended. */
+  modules: Array<{ id: string; title: string }>;
+}
+
+export interface RiskAdvice {
+  summary: string;
+  actions: string[];
+  assignments: Array<{ employeeId: string; moduleId: string; reason: string }>;
+}
+
 export interface NarrativeInput {
   tenantName: string;
   campaignName: string;
@@ -106,6 +131,89 @@ export class AiAssistantService {
       bodyHtml: parsed.bodyHtml,
       senderSpoofName: parsed.senderSpoofName,
       redFlags: Array.isArray(parsed.redFlags) ? parsed.redFlags.slice(0, 5) : [],
+    };
+  }
+
+  /**
+   * Reads the tenant's risk table and says what to do about it.
+   *
+   * The model is given the real rows and the tenant's real modules, and every
+   * id it returns is checked against them before anything is shown: a
+   * recommendation naming an employee who does not exist, or a module the
+   * client has not got, is worse than no recommendation on a page an admin
+   * acts on.
+   */
+  async adviseOnRisk(input: RiskAdviceInput): Promise<RiskAdvice> {
+    if (!input.employees.length) {
+      return {
+        summary: 'No employees have been through a simulation yet, so there is no risk to assess.',
+        actions: [],
+        assignments: [],
+      };
+    }
+
+    const system = [
+      'You advise the security lead of a Nigerian SME on what to do about the',
+      'human risk their phishing simulations have measured. You are reading a real',
+      'risk table, not a hypothetical one.',
+      '',
+      'Tone: measured and practical, the way a security consultant briefs a manager.',
+      'No alarmism, no vendor language, no praise. Name what the numbers show and',
+      'what to do about it, in that order. Be specific about people and modules',
+      'rather than giving generic awareness advice.',
+      '',
+      'Reporting is the behaviour worth building: an employee who reports a',
+      'simulation before clicking is the control working. Someone who clicks',
+      'repeatedly, or who submitted credentials, needs attention beyond a video.',
+      'Say so plainly, and keep remedies proportionate — remedial training, a',
+      'conversation, tighter controls for a specific role, not blanket punishment.',
+      '',
+      'Return ONLY a json object with keys:',
+      '  summary    — 2-4 sentences on where this organisation actually stands.',
+      '  actions    — 2-5 short strings, each one concrete step the admin can take.',
+      '  assignments — the employees who should be given a module now. Each entry is',
+      '                { employeeId, moduleId, reason }, using ONLY the ids given',
+      '                below. One short sentence of reason, naming the behaviour that',
+      '                justifies it. Return an empty array if nobody needs one.',
+      '',
+      'Never invent an employee or a module. If no listed module fits someone who',
+      'needs training, say so in actions instead of inventing an assignment.',
+    ].join('\n');
+
+    const user = [
+      `Organisation: ${input.tenantName}`,
+      '',
+      'Employees, highest risk first:',
+      ...input.employees.map(
+        (e) =>
+          `- id=${e.id} | ${e.name}${e.department ? ` (${e.department})` : ''} | score ${e.riskScore}/100 ${e.riskLevel}` +
+          ` | ${e.sends} simulations, ${e.clicks} clicks, ${e.reports} reported, ` +
+          `${e.credentialSubmissions} credential submissions, ${e.quizPasses} quizzes passed` +
+          `${e.repeatClicker ? ' | REPEAT CLICKER' : ''}`,
+      ),
+      '',
+      input.modules.length
+        ? 'Training modules available to assign:'
+        : 'This client has no training modules yet — recommend no assignments and say so in actions.',
+      ...input.modules.map((m) => `- id=${m.id} | ${m.title}`),
+    ].join('\n');
+
+    const text = await this.provider.complete({ system, user, maxTokens: 1200, json: true });
+    const parsed = this.parseJson<RiskAdvice>(text);
+
+    const employeeIds = new Set(input.employees.map((e) => e.id));
+    const moduleIds = new Set(input.modules.map((m) => m.id));
+    const assignments = (Array.isArray(parsed.assignments) ? parsed.assignments : []).filter(
+      (a) => employeeIds.has(a?.employeeId) && moduleIds.has(a?.moduleId),
+    );
+    if (assignments.length !== (parsed.assignments?.length ?? 0)) {
+      this.logger.warn('Risk advice referenced unknown employees or modules; those were dropped');
+    }
+
+    return {
+      summary: typeof parsed.summary === 'string' ? parsed.summary : '',
+      actions: Array.isArray(parsed.actions) ? parsed.actions.filter(Boolean).slice(0, 5) : [],
+      assignments: assignments.slice(0, 20),
     };
   }
 
