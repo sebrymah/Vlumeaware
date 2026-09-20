@@ -24,7 +24,7 @@ const tracking = new TrackingService(
   prismaService,
   new TrainingService(prismaService),
   modulesService,
-  new CertificatesService(prismaService, new LogMailer()),
+  new CertificatesService(prismaService, new LogMailer(), new StorageService()),
 );
 
 let tenantId: string;

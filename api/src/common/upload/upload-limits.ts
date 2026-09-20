@@ -30,6 +30,9 @@ export const AGREEMENT_UPLOAD = uploadLimits(10 * 1024 * 1024);
 /** Employee rosters. 10k rows of email/name/department fits comfortably. */
 export const ROSTER_UPLOAD = uploadLimits(5 * 1024 * 1024);
 
+/** Client logos. Embedded into every certificate PDF, so kept small. */
+export const LOGO_UPLOAD = uploadLimits(2 * 1024 * 1024);
+
 /**
  * Awareness videos. Buffered in memory for the dev/local path, so the cap is
  * deliberate. In production, prefer presigned direct-to-S3 upload for anything

@@ -3,6 +3,9 @@ import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
 import { notificationFromAddress } from '../../providers/mailer/from-addresses';
+import { StorageService } from '../../providers/storage/storage.service';
+import { renderCertificatePdf } from './certificate-pdf';
+import { isCertificateTemplate } from './certificate-templates';
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { trackingBaseUrl } from '../tracking/render';
@@ -14,6 +17,9 @@ export interface CertificateInput {
   scorePct: number;
   sourceSendId?: string;
 }
+
+/** PNG files start with these eight bytes; anything else we treat as JPEG. */
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 /** Escapes text interpolated into the certificate email body. */
 function esc(value: string): string {
@@ -27,6 +33,7 @@ export class CertificatesService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(MAILER) private readonly mailer: Mailer,
+    private readonly storage: StorageService,
   ) {}
 
   /**
@@ -88,7 +95,14 @@ export class CertificatesService {
       where: { id },
       include: {
         employee: { select: { name: true, email: true } },
-        tenant: { select: { name: true } },
+        tenant: {
+          select: {
+            name: true,
+            brandLogoUrl: true,
+            brandPrimaryColor: true,
+            certificateTemplate: true,
+          },
+        },
       },
     });
     if (!cert) throw new NotFoundException('Certificate not found');
@@ -180,71 +194,35 @@ export class CertificatesService {
    */
   async renderPdf(id: string): Promise<Buffer> {
     const cert = await this.findOne(id);
-    return buildCertificatePdf({
-      tenant: cert.tenant.name,
-      employee: cert.employee.name,
-      module: cert.moduleTitle,
-      score: cert.scorePct,
+    const tenant = cert.tenant;
+
+    // The logo is embedded, so the bytes are needed rather than a signed URL.
+    // A missing or unreadable one just leaves the client's name in its place.
+    let clientLogo: { bytes: Buffer; mimetype: string } | null = null;
+    if (tenant.brandLogoUrl) {
+      const bytes = await this.storage.get(tenant.brandLogoUrl);
+      if (bytes) {
+        const mimetype = bytes.subarray(0, 8).equals(PNG_MAGIC) ? 'image/png' : 'image/jpeg';
+        clientLogo = { bytes, mimetype };
+      } else {
+        this.logger.warn(`Certificate ${cert.serial}: logo could not be read; rendering without it`);
+      }
+    }
+
+    return renderCertificatePdf({
+      template: isCertificateTemplate(tenant.certificateTemplate)
+        ? tenant.certificateTemplate
+        : 'branded',
+      tenantName: tenant.name,
+      employeeName: cert.employee.name,
+      moduleTitle: cert.moduleTitle,
+      quizTitle: cert.quizTitle,
+      scorePct: cert.scorePct,
       serial: cert.serial,
-      issued: cert.issuedAt.toISOString().slice(0, 10),
+      issued: cert.issuedAt,
+      verifyUrl: `${trackingBaseUrl()}/verify/${cert.serial}`,
+      accentHex: tenant.brandPrimaryColor,
+      clientLogo,
     });
   }
-}
-
-/** Escapes text for a PDF string literal. */
-function pdfEsc(v: string): string {
-  return v.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
-}
-
-/**
- * Builds a minimal valid single-page PDF (Helvetica) with the certificate
- * text. Landscape A4. No external library.
- */
-function buildCertificatePdf(c: {
-  tenant: string;
-  employee: string;
-  module: string;
-  score: number;
-  serial: string;
-  issued: string;
-}): Buffer {
-  const line = (x: number, y: number, size: number, text: string) =>
-    `BT /F1 ${size} Tf ${x} ${y} Td (${pdfEsc(text)}) Tj ET`;
-
-  const content = [
-    '0.06 0.44 0.26 RG 3 w 30 30 782 535 re S',
-    line(120, 470, 34, 'Certificate of Completion'),
-    line(120, 420, 14, 'This certifies that'),
-    line(120, 385, 26, c.employee),
-    line(120, 345, 14, 'has completed the security awareness module'),
-    line(120, 315, 18, c.module),
-    line(120, 275, 14, `with a score of ${c.score}%`),
-    line(120, 210, 12, `Issued by ${c.tenant} via Vlumeaware`),
-    line(120, 190, 12, `Date: ${c.issued}`),
-    line(120, 170, 12, `Serial: ${c.serial}`),
-    line(120, 150, 10, 'Verify at /verify/' + c.serial),
-  ].join('\n');
-
-  const objects: string[] = [];
-  objects.push('<< /Type /Catalog /Pages 2 0 R >>');
-  objects.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
-  objects.push(
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>',
-  );
-  objects.push(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
-  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
-
-  let pdf = '%PDF-1.4\n';
-  const offsets: number[] = [];
-  objects.forEach((body, i) => {
-    offsets.push(Buffer.byteLength(pdf));
-    pdf += `${i + 1} 0 obj\n${body}\nendobj\n`;
-  });
-  const xrefStart = Buffer.byteLength(pdf);
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  offsets.forEach((off) => {
-    pdf += `${String(off).padStart(10, '0')} 00000 n \n`;
-  });
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`;
-  return Buffer.from(pdf, 'latin1');
 }

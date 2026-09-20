@@ -62,6 +62,7 @@ const NAV: Record<Role, NavEntry[]> = {
         { href: '/client/reported', label: 'Reported' },
       ],
     },
+    { kind: 'link', href: '/client/settings', label: 'Branding', icon: 'sparkles' },
   ],
   client_viewer: [
     { kind: 'link', href: '/dashboard', label: 'Reporting', icon: 'chart' },

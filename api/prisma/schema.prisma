@@ -54,6 +54,9 @@ model Tenant {
   name                  String
   brandLogoUrl          String?      @map("brand_logo_url")
   brandPrimaryColor     String?      @map("brand_primary_color")
+  /// Which layout this client's completion certificates are rendered in:
+  /// "formal", "branded" or "record". Chosen by the client admin.
+  certificateTemplate   String       @default("branded") @map("certificate_template")
   ndpaAgreementSignedAt DateTime?    @map("ndpa_agreement_signed_at")
   ndpaAgreementDocUrl   String?      @map("ndpa_agreement_doc_url")
   status                TenantStatus @default(active)

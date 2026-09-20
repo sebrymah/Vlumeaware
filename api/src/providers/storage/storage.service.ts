@@ -2,7 +2,7 @@ import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /**
@@ -139,6 +139,55 @@ export class StorageService {
       throw new BadGatewayException(`Video storage rejected the upload: ${storageReason(res.status, detail)}`);
     }
     return `supabase://${this.supabaseBucket}/${objectPath}`;
+  }
+
+  /**
+   * Reads an object back as bytes. Needed where the file has to be processed
+   * server-side rather than handed to a browser — embedding a client's logo
+   * into a certificate PDF, for one. Returns null rather than throwing: a
+   * missing or unreadable logo must degrade the certificate, not fail it.
+   */
+  async get(uri: string): Promise<Buffer | null> {
+    try {
+      if (!uri) return null;
+
+      if (uri.startsWith('supabase://')) {
+        if (!this.supabaseUrl || !this.supabaseKey) return null;
+        const path = uri.slice('supabase://'.length);
+        const res = await fetch(`${this.supabaseUrl}/storage/v1/object/${path}`, {
+          headers: { Authorization: `Bearer ${this.supabaseKey}` },
+        });
+        if (!res.ok) {
+          this.logger.warn(`Supabase read failed (${res.status}) for ${path}`);
+          return null;
+        }
+        return Buffer.from(await res.arrayBuffer());
+      }
+
+      if (uri.startsWith('s3://') && this.client && this.bucket) {
+        const key = uri.replace(`s3://${this.bucket}/`, '');
+        const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+        const res = await this.client.send(
+          new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+        );
+        const bytes = await res.Body?.transformToByteArray();
+        return bytes ? Buffer.from(bytes) : null;
+      }
+
+      if (uri.startsWith('file://')) {
+        return await readFile(uri.slice('file://'.length));
+      }
+
+      if (/^https?:\/\//i.test(uri)) {
+        const res = await fetch(uri);
+        return res.ok ? Buffer.from(await res.arrayBuffer()) : null;
+      }
+
+      return null;
+    } catch (err) {
+      this.logger.warn(`Could not read ${uri}: ${(err as Error).message}`);
+      return null;
+    }
   }
 
   /**

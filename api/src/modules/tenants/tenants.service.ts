@@ -53,6 +53,45 @@ export class TenantsService {
     });
   }
 
+  /**
+   * Branding a client controls for themselves: the colour and certificate
+   * layout their employees see. The logo is uploaded separately.
+   */
+  async setBranding(
+    tenantId: string,
+    input: { brandPrimaryColor?: string; certificateTemplate?: string },
+  ) {
+    await this.findOne(tenantId);
+    return this.prisma.db.tenant.update({
+      where: { id: tenantId },
+      data: {
+        brandPrimaryColor: input.brandPrimaryColor,
+        certificateTemplate: input.certificateTemplate,
+      },
+    });
+  }
+
+  /**
+   * Stores the client's logo. PNG and JPEG only: the certificate renderer
+   * embeds the bytes directly into the PDF and pdf-lib can embed those two
+   * formats only — an SVG would be accepted here and then fail silently at
+   * render time, so it is refused up front.
+   */
+  async setLogo(tenantId: string, file: { buffer: Buffer; mimetype: string }) {
+    await this.findOne(tenantId);
+    if (!file?.buffer?.length) throw new BadRequestException('A logo image is required');
+    if (!['image/png', 'image/jpeg'].includes(file.mimetype)) {
+      throw new BadRequestException(
+        `Logo must be a PNG or JPEG — ${file.mimetype} cannot be embedded in a certificate.`,
+      );
+    }
+    const logoUrl = await this.storage.put(`tenant-logos/${tenantId}`, file.buffer, file.mimetype);
+    return this.prisma.db.tenant.update({
+      where: { id: tenantId },
+      data: { brandLogoUrl: logoUrl },
+    });
+  }
+
   async setStatus(tenantId: string, status: 'active' | 'suspended' | 'offboarded') {
     await this.findOne(tenantId);
     return this.prisma.db.tenant.update({ where: { id: tenantId }, data: { status } });

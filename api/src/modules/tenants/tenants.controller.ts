@@ -10,7 +10,8 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { AGREEMENT_UPLOAD } from '../../common/upload/upload-limits';
+import { AGREEMENT_UPLOAD, LOGO_UPLOAD } from '../../common/upload/upload-limits';
+import { CERTIFICATE_TEMPLATES } from '../certificates/certificate-templates';
 import { IsBoolean, IsDateString, IsEmail, IsHexColor, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
 import { Roles } from '../../common/auth/roles.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
@@ -32,6 +33,11 @@ class CreateTenantUserDto {
   @IsEmail() email!: string;
   @IsString() @MinLength(12) password!: string;
   @IsIn(['client_admin', 'client_viewer']) role!: 'client_admin' | 'client_viewer';
+}
+
+class BrandingDto {
+  @IsOptional() @IsHexColor() brandPrimaryColor?: string;
+  @IsOptional() @IsIn(CERTIFICATE_TEMPLATES) certificateTemplate?: string;
 }
 
 class StatusDto {
@@ -111,6 +117,23 @@ export class TenantsController {
     @UploadedFile() document: { buffer: Buffer; mimetype: string; originalname: string },
   ) {
     return this.tenants.recordAgreement(tenantId, document, new Date(dto.signedAt));
+  }
+
+  /** A client admin controls their own look; Vlumetech staff can also set it. */
+  @Patch(':tenantId/branding')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  setBranding(@Param('tenantId', ParseUUIDPipe) tenantId: string, @Body() dto: BrandingDto) {
+    return this.tenants.setBranding(tenantId, dto);
+  }
+
+  @Post(':tenantId/branding/logo')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @UseInterceptors(FileInterceptor('logo', LOGO_UPLOAD))
+  setLogo(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @UploadedFile() logo: { buffer: Buffer; mimetype: string },
+  ) {
+    return this.tenants.setLogo(tenantId, logo);
   }
 
   @Patch(':tenantId/status')
