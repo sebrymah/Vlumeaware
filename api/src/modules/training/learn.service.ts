@@ -204,6 +204,7 @@ export class LearnService {
       });
 
       let certificateId: string | null = null;
+      let certificateEmailed = false;
       if (passed) {
         await this.prisma.db.trainingAssignment.updateMany({
           where: { id: ref.id, completedAt: null },
@@ -212,15 +213,24 @@ export class LearnService {
         const module = quiz.trainingModuleId
           ? await this.prisma.db.trainingModule.findUnique({ where: { id: quiz.trainingModuleId }, select: { title: true } })
           : null;
-        const cert = await this.certificates.issueForPass({
+        const cert = await this.certificates.issueAndEmail({
           employeeId: ref.employeeId,
           moduleTitle: module?.title ?? quiz.title,
           quizTitle: quiz.title,
           scorePct,
         });
         certificateId = cert.id;
+        certificateEmailed = cert.emailed;
       }
-      return { score, total, passed, passingScorePct: quiz.passingScorePct, results, certificateId };
+      return {
+        score,
+        total,
+        passed,
+        passingScorePct: quiz.passingScorePct,
+        results,
+        certificateId,
+        certificateEmailed,
+      };
     });
   }
 

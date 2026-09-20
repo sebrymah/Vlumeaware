@@ -6,6 +6,7 @@ import { TrackingService } from '../src/modules/tracking/tracking.service';
 import { TrainingService } from '../src/modules/training/training.service';
 import { TrainingModulesService } from '../src/modules/training-modules/training-modules.service';
 import { CertificatesService } from '../src/modules/certificates/certificates.service';
+import { LogMailer } from '../src/providers/mailer/log.mailer';
 import { StorageService } from '../src/providers/storage/storage.service';
 
 /**
@@ -23,7 +24,7 @@ const tracking = new TrackingService(
   prismaService,
   new TrainingService(prismaService),
   modulesService,
-  new CertificatesService(prismaService),
+  new CertificatesService(prismaService, new LogMailer()),
 );
 
 let tenantId: string;

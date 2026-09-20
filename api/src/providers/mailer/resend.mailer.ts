@@ -29,6 +29,15 @@ export class ResendMailer implements Mailer {
         html: email.html,
         // Correlates the provider message back to the send row.
         headers: { 'X-Entity-Ref-ID': email.sendId },
+        ...(email.attachments?.length
+          ? {
+              attachments: email.attachments.map((a) => ({
+                filename: a.filename,
+                content: a.content.toString('base64'),
+                content_type: a.contentType,
+              })),
+            }
+          : {}),
       }),
     });
     if (!res.ok) {

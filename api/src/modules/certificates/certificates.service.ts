@@ -1,23 +1,56 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
+import { MAILER } from '../../providers/mailer/mailer.interface';
+import type { Mailer } from '../../providers/mailer/mailer.interface';
+import { trackingBaseUrl } from '../tracking/render';
+
+export interface CertificateInput {
+  employeeId: string;
+  moduleTitle: string;
+  quizTitle: string;
+  scorePct: number;
+  sourceSendId?: string;
+}
+
+/** Escapes text interpolated into the certificate email body. */
+function esc(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 @Injectable()
 export class CertificatesService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(CertificatesService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(MAILER) private readonly mailer: Mailer,
+  ) {}
 
   /**
    * Issues a certificate for a passed module quiz. Idempotent per
    * employee+module+send, so a re-submit does not mint duplicates.
    */
-  async issueForPass(input: {
-    employeeId: string;
-    moduleTitle: string;
-    quizTitle: string;
-    scorePct: number;
-    sourceSendId?: string;
-  }) {
+  async issueForPass(input: CertificateInput) {
+    return (await this.issue(input)).certificate;
+  }
+
+  /**
+   * Issues the certificate and emails it to the employee — but only when it
+   * was newly minted. A re-submitted quiz returns the certificate already on
+   * file without posting the employee a second copy.
+   */
+  async issueAndEmail(input: CertificateInput): Promise<{ id: string; emailed: boolean }> {
+    const { certificate, created } = await this.issue(input);
+    return {
+      id: certificate.id,
+      emailed: created ? await this.emailToEmployee(certificate.id) : false,
+    };
+  }
+
+  /** Shared by both entry points; reports whether this call minted the row. */
+  private async issue(input: CertificateInput) {
     const existing = await this.prisma.db.certificate.findFirst({
       where: {
         employeeId: input.employeeId,
@@ -25,10 +58,10 @@ export class CertificatesService {
         sourceSendId: input.sourceSendId ?? null,
       },
     });
-    if (existing) return existing;
+    if (existing) return { certificate: existing, created: false };
 
     const serial = `VLA-${new Date().getFullYear()}-${randomBytes(4).toString('hex').toUpperCase()}`;
-    return this.prisma.db.certificate.create({
+    const certificate = await this.prisma.db.certificate.create({
       data: {
         tenantId: currentTenantId(),
         employeeId: input.employeeId,
@@ -39,6 +72,7 @@ export class CertificatesService {
         sourceSendId: input.sourceSendId,
       },
     });
+    return { certificate, created: true };
   }
 
   list() {
@@ -76,6 +110,69 @@ export class CertificatesService {
         },
       }),
     );
+  }
+
+  /**
+   * Emails the certificate PDF to the employee who earned it.
+   *
+   * Sent from the notification address, never SIMULATION_FROM_ADDRESS: that
+   * domain and IP pool exist to deliver fake phishing, and a genuine
+   * certificate must not arrive from the same sender the employee is being
+   * trained to distrust.
+   *
+   * Never throws. A mail failure must not fail the quiz submission that earned
+   * the certificate — the record is already saved and downloadable by the
+   * admin — so the outcome is returned instead and logged at error level.
+   */
+  async emailToEmployee(certificateId: string): Promise<boolean> {
+    try {
+      const cert = await this.findOne(certificateId);
+      if (!cert.employee.email) {
+        this.logger.warn(`Certificate ${cert.serial} has no employee email; not sending`);
+        return false;
+      }
+
+      const pdf = await this.renderPdf(certificateId);
+      const verifyUrl = `${trackingBaseUrl()}/verify/${cert.serial}`;
+
+      await this.mailer.send({
+        to: cert.employee.email,
+        fromName: `${cert.tenant.name} Security Awareness`,
+        fromAddress:
+          process.env.NOTIFICATION_FROM_ADDRESS ??
+          process.env.DIGEST_FROM_ADDRESS ??
+          'reports@vlumeaware-trk.io',
+        subject: `Your certificate — ${cert.moduleTitle}`,
+        html: `
+          <p>Hello ${esc(cert.employee.name)},</p>
+          <p>
+            You completed <strong>${esc(cert.moduleTitle)}</strong> with a score of
+            ${cert.scorePct}%. Your certificate of completion is attached.
+          </p>
+          <p>
+            Serial <strong>${esc(cert.serial)}</strong> —
+            <a href="${verifyUrl}">verify this certificate</a>.
+          </p>
+          <p>Thank you for taking the training seriously.<br />${esc(cert.tenant.name)}</p>
+        `,
+        sendId: `certificate-${cert.id}`,
+        attachments: [
+          {
+            filename: `certificate-${cert.serial}.pdf`,
+            content: pdf,
+            contentType: 'application/pdf',
+          },
+        ],
+      });
+
+      this.logger.log(`Certificate ${cert.serial} emailed to ${cert.employee.email}`);
+      return true;
+    } catch (err) {
+      this.logger.error(
+        `Failed to email certificate ${certificateId}: ${(err as Error).message}`,
+      );
+      return false;
+    }
   }
 
   /**

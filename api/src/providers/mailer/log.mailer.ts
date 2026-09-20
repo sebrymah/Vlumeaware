@@ -13,7 +13,10 @@ export class LogMailer implements Mailer {
 
   async send(email: OutboundEmail) {
     this.outbox.push(email);
-    this.logger.log(`[dev mailer] -> ${email.to} :: ${email.subject}`);
+    const files = email.attachments?.map((a) => a.filename).join(', ');
+    this.logger.log(
+      `[dev mailer] -> ${email.to} :: ${email.subject}${files ? ` (attached: ${files})` : ''}`,
+    );
     return { messageId: `dev-${email.sendId}` };
   }
 }

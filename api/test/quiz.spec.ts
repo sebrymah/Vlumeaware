@@ -5,6 +5,7 @@ import { PrismaService } from '../src/common/prisma/prisma.service';
 import { StorageService } from '../src/providers/storage/storage.service';
 import { TrainingModulesService } from '../src/modules/training-modules/training-modules.service';
 import { CertificatesService } from '../src/modules/certificates/certificates.service';
+import { LogMailer } from '../src/providers/mailer/log.mailer';
 import { TrainingService } from '../src/modules/training/training.service';
 import { TrackingService } from '../src/modules/tracking/tracking.service';
 import { QuizzesService } from '../src/modules/quizzes/quizzes.service';
@@ -12,12 +13,14 @@ import { QuizzesService } from '../src/modules/quizzes/quizzes.service';
 const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 const prisma = { db } as unknown as PrismaService;
+// Kept in scope so a test can assert the certificate email actually went out.
+const certificateMailer = new LogMailer();
 const quizzes = new QuizzesService(prisma);
 const tracking = new TrackingService(
   prisma,
   new TrainingService(prisma),
   new TrainingModulesService(prisma, new StorageService()),
-  new CertificatesService(prisma),
+  new CertificatesService(prisma, certificateMailer),
 );
 
 let tenantId: string;

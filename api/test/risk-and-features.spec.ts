@@ -4,13 +4,14 @@ import { runAsSystem, runInTenant, TenantScopeError } from '../src/common/prisma
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { RiskService } from '../src/modules/employees/risk.service';
 import { CertificatesService } from '../src/modules/certificates/certificates.service';
+import { LogMailer } from '../src/providers/mailer/log.mailer';
 import { IntakeService } from '../src/modules/intake/intake.service';
 
 const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 const prisma = { db } as unknown as PrismaService;
 const risk = new RiskService(prisma);
-const certs = new CertificatesService(prisma);
+const certs = new CertificatesService(prisma, new LogMailer());
 const intake = new IntakeService(prisma);
 
 let tenantId: string;

@@ -23,6 +23,7 @@ interface Result {
   passingScorePct: number;
   results: Array<{ questionId: string; correct: boolean; correctIndex: number; explanation: string | null }>;
   certificateId: string | null;
+  certificateEmailed?: boolean;
 }
 
 export default function LearnPage({ params }: { params: Promise<{ token: string }> }) {
@@ -116,7 +117,10 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
       {already ? (
         <div className="mt-6 rounded-xl border px-4 py-3 text-sm" style={{ borderColor: accent, color: accent }}>
           ✓ Training complete. Thank you — nothing more to do.
-          {result?.certificateId && ' Your certificate has been recorded.'}
+          {result?.certificateId &&
+            (result.certificateEmailed
+              ? ' Your certificate has been recorded and emailed to you.'
+              : ' Your certificate has been recorded.')}
         </div>
       ) : data.quiz ? (
         <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
