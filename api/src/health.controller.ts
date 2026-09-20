@@ -53,6 +53,10 @@ export class HealthController {
       supabaseKeyLooksLikeJwt: looksLikeJwt(process.env.SUPABASE_SERVICE_ROLE_KEY),
       supabaseKeyNeededCleaning: neededCleaning(process.env.SUPABASE_SERVICE_ROLE_KEY),
       storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? 'training-videos',
+      // Scenario generation is the one feature that silently does nothing when
+      // its key is absent, so whether it is configured belongs here too.
+      aiAssistantConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
+      aiModel: process.env.CLAUDE_MODEL ?? 'claude-sonnet-5',
       deployedCommit: process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? null,
       ts: new Date().toISOString(),
     };

@@ -193,7 +193,7 @@ section{padding:88px 0}
 .qa p{margin:12px 0 2px;color:var(--muted);font-size:15px}
 
 /* ---------- cta band ---------- */
-.ctaband{background:linear-gradient(120% 100% at 20% 0%,#0F5A3E,var(--forest));text-align:center}
+.ctaband{background:radial-gradient(120% 100% at 20% 0%,#0F5A3E,var(--forest));text-align:center}
 .ctaband h2{color:#fff;font-size:clamp(28px,4vw,44px)}
 .ctaband p{color:#B6C9BF;max-width:52ch;margin:16px auto 26px;font-size:18px}
 

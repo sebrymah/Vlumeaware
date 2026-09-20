@@ -101,7 +101,7 @@ function Approvals() {
           <h1 className="text-lg font-semibold text-slate-900">Scenario approvals</h1>
           <p className="mt-1 max-w-2xl text-xs text-slate-500">
             Every phishing scenario a client creates — whether written by hand or generated with
-            Claude — waits here for Vlumetech review before it can go out to their employees. Read
+            the Vlumeaware AI assistant — waits here for Vlumetech review before it can go out to their employees. Read
             the email as the employee will see it, then approve or reject.
           </p>
         </div>
