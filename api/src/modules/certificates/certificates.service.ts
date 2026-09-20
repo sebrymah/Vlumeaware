@@ -8,7 +8,7 @@ import { renderCertificatePdf } from './certificate-pdf';
 import { isCertificateTemplate } from './certificate-templates';
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
-import { trackingBaseUrl } from '../tracking/render';
+import { publicBaseUrl } from '../tracking/render';
 
 export interface CertificateInput {
   employeeId: string;
@@ -148,7 +148,7 @@ export class CertificatesService {
       }
 
       const pdf = await this.renderPdf(certificateId);
-      const verifyUrl = `${trackingBaseUrl()}/verify/${cert.serial}`;
+      const verifyUrl = `${publicBaseUrl()}/verify/${cert.serial}`;
 
       await this.mailer.send({
         to: cert.employee.email,
@@ -220,7 +220,7 @@ export class CertificatesService {
       scorePct: cert.scorePct,
       serial: cert.serial,
       issued: cert.issuedAt,
-      verifyUrl: `${trackingBaseUrl()}/verify/${cert.serial}`,
+      verifyUrl: `${publicBaseUrl()}/verify/${cert.serial}`,
       accentHex: tenant.brandPrimaryColor,
       clientLogo,
     });
