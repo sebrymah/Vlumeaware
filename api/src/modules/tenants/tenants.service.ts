@@ -54,6 +54,32 @@ export class TenantsService {
   }
 
   /**
+   * The branding a client admin may read about their own tenant. Deliberately
+   * narrow: findOne returns the whole tenant row — agreement document, seat
+   * limits, approval metadata — which is Vlumetech's to see, not the client's.
+   */
+  async getBranding(tenantId: string) {
+    const tenant = await this.prisma.db.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        name: true,
+        brandLogoUrl: true,
+        brandPrimaryColor: true,
+        certificateTemplate: true,
+      },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return {
+      name: tenant.name,
+      brandPrimaryColor: tenant.brandPrimaryColor,
+      certificateTemplate: tenant.certificateTemplate,
+      // The stored value is a private storage reference; the page needs
+      // something it can actually render.
+      logoUrl: tenant.brandLogoUrl ? await this.storage.signedUrl(tenant.brandLogoUrl) : null,
+    };
+  }
+
+  /**
    * Branding a client controls for themselves: the colour and certificate
    * layout their employees see. The logo is uploaded separately.
    */

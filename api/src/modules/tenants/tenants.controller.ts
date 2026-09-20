@@ -119,6 +119,12 @@ export class TenantsController {
     return this.tenants.recordAgreement(tenantId, document, new Date(dto.signedAt));
   }
 
+  @Get(':tenantId/branding')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  getBranding(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
+    return this.tenants.getBranding(tenantId);
+  }
+
   /** A client admin controls their own look; Vlumetech staff can also set it. */
   @Patch(':tenantId/branding')
   @Roles(ROLES.superadmin, ROLES.clientAdmin)

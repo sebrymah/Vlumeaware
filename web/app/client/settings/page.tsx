@@ -5,12 +5,12 @@ import { api, uploadWithProgress } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { Button, Card, Field, Notice, inputClass } from '@/components/ui';
 
-interface Tenant {
-  id: string;
+interface Branding {
   name: string;
-  brandLogoUrl: string | null;
   brandPrimaryColor: string | null;
   certificateTemplate: string;
+  /** A signed, displayable URL — null when no logo has been uploaded. */
+  logoUrl: string | null;
 }
 
 const TEMPLATES = [
@@ -41,7 +41,7 @@ export default function SettingsPage() {
 
 function Settings() {
   const tenantId = useActingTenant();
-  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [tenant, setTenant] = useState<Branding | null>(null);
   const [template, setTemplate] = useState('branded');
   const [colour, setColour] = useState('#0B7C57');
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ function Settings() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const t = await api.get<Tenant>(`/tenants/${tenantId}`);
+      const t = await api.get<Branding>(`/tenants/${tenantId}/branding`);
       setTenant(t);
       setTemplate(t.certificateTemplate ?? 'branded');
       setColour(t.brandPrimaryColor ?? '#0B7C57');
@@ -176,8 +176,8 @@ function Settings() {
           <div>
             <div className="text-xs text-slate-500">Current</div>
             <div className="mt-1 flex h-16 w-44 items-center justify-center rounded-lg border border-slate-200 bg-white px-3">
-              {tenant.brandLogoUrl ? (
-                <span className="text-xs text-slate-600">Logo on file</span>
+              {tenant.logoUrl ? (
+                <img src={tenant.logoUrl} alt={`${tenant.name} logo`} className="max-h-12 w-auto" />
               ) : (
                 <span className="text-xs text-slate-400">None — your name is used instead</span>
               )}
