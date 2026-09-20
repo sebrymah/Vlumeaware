@@ -51,13 +51,13 @@ export class RiskAdviceService {
    * would risk the document disagreeing with what the admin read on screen.
    */
   async pdf(advice?: RiskReportAdvice | null): Promise<Buffer> {
+    // Read the tenant id before entering system scope. Inside runAsSystem
+    // there is no tenant in the async context and currentTenantId() throws.
+    const tenantId = currentTenantId();
     const [employees, tenant] = await Promise.all([
       this.risk.scoreAll(),
       runAsSystem('risk report: tenant name', () =>
-        this.prisma.db.tenant.findUnique({
-          where: { id: currentTenantId() },
-          select: { name: true },
-        }),
+        this.prisma.db.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
       ),
     ]);
     return renderRiskReportPdf({
