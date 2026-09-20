@@ -1,6 +1,6 @@
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -92,6 +92,19 @@ export class StorageService {
         }),
       );
       return `s3://${this.bucket}/${scopedKey}`;
+    }
+
+    // Local disk is a development convenience. In a deployed container it is
+    // discarded on the next deploy, restart or scale-down, so accepting an
+    // upload here would return success and a durable-looking reference for a
+    // file that is already as good as gone — and leave a library row pointing
+    // at nothing. Fail loudly instead.
+    if (process.env.NODE_ENV === 'production') {
+      throw new ServiceUnavailableException(
+        'No object storage is configured on this deployment, so the upload was refused ' +
+          'rather than written to disposable container storage. Set SUPABASE_URL and ' +
+          'SUPABASE_SERVICE_ROLE_KEY, or S3_BUCKET.',
+      );
     }
 
     const dir = join(process.cwd(), '.local-storage', key);

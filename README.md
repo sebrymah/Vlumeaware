@@ -230,8 +230,14 @@ Password for all four: `vlumeaware-dev-password`
 
 ### Tests
 
+The suite needs **Node >= 24.9** — Jest cannot load `@nestjs/common` (ESM) on
+anything older, and every suite that imports it fails to run with an error that
+does not mention the Node version. `.nvmrc` pins it and `npm test` refuses to
+start on the wrong one. The application is unaffected and still ships on
+`node:22-slim`.
+
 ```bash
-cd api && npm test
+nvm use && cd api && npm test
 ```
 
 The isolation suite needs `postgres-test` up (port 5433) with migrations applied:
