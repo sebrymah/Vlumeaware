@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
-import { ClaudeService } from '../../providers/claude/claude.service';
+import { AiAssistantService } from '../../providers/ai/ai-assistant.service';
 
 export interface CampaignMetrics {
   campaignId: string;
@@ -39,7 +39,7 @@ export class ReportsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly claude: ClaudeService,
+    private readonly ai: AiAssistantService,
   ) {}
 
   /** Aggregate metrics. Rates are over delivered sends, not over the roster. */
@@ -172,9 +172,9 @@ export class ReportsService {
     });
 
     let narrative = '';
-    if (this.claude.available) {
+    if (this.ai.available) {
       try {
-        narrative = await this.claude.generateReportNarrative({
+        narrative = await this.ai.generateReportNarrative({
           tenantName: tenant?.name ?? 'Client',
           campaignName: metrics.campaignName,
           totalSent: metrics.totalSent,

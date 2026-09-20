@@ -55,8 +55,9 @@ export class HealthController {
       storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? 'training-videos',
       // Scenario generation is the one feature that silently does nothing when
       // its key is absent, so whether it is configured belongs here too.
-      aiAssistantConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
-      aiModel: process.env.CLAUDE_MODEL ?? 'claude-sonnet-5',
+      aiProvider: aiBackend().provider,
+      aiModel: aiBackend().model,
+      aiAssistantConfigured: aiBackend().configured,
       deployedCommit: process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? null,
       ts: new Date().toISOString(),
     };
@@ -72,4 +73,27 @@ function looksLikeJwt(raw: string | undefined): boolean {
 /** True when the stored value carried whitespace or quotes that had to be stripped. */
 function neededCleaning(raw: string | undefined): boolean {
   return Boolean(raw) && cleanEnv(raw) !== raw;
+}
+
+/**
+ * Which AI backend this process would use, without constructing it. Mirrors
+ * AiModule's selection so the diagnostic cannot drift from the real choice.
+ */
+function aiBackend(): { provider: string; model: string; configured: boolean } {
+  const chosen = (process.env.AI_PROVIDER ?? '').toLowerCase();
+  const deepseek = {
+    provider: 'deepseek',
+    model: process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
+    configured: Boolean(process.env.DEEPSEEK_API_KEY),
+  };
+  const anthropic = {
+    provider: 'anthropic',
+    model: process.env.CLAUDE_MODEL ?? 'claude-sonnet-5',
+    configured: Boolean(process.env.ANTHROPIC_API_KEY),
+  };
+  if (chosen === 'deepseek') return deepseek;
+  if (chosen === 'anthropic') return anthropic;
+  if (process.env.DEEPSEEK_API_KEY) return deepseek;
+  if (process.env.ANTHROPIC_API_KEY) return anthropic;
+  return { provider: 'none', model: 'none', configured: false };
 }

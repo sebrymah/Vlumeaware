@@ -31,9 +31,13 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 3001);
   await app.listen(port);
+  const aiKey = process.env.DEEPSEEK_API_KEY ?? process.env.ANTHROPIC_API_KEY;
+  const aiProvider =
+    (process.env.AI_PROVIDER ?? '').toLowerCase() ||
+    (process.env.DEEPSEEK_API_KEY ? 'deepseek' : process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'none');
   new Logger('bootstrap').log(
-    `Vlumeaware API on :${port} | mailer=${process.env.MAILER ?? 'log'} | claude=${
-      process.env.ANTHROPIC_API_KEY ? 'live' : 'disabled'
+    `Vlumeaware API on :${port} | mailer=${process.env.MAILER ?? 'log'} | ai=${
+      aiKey ? aiProvider : 'disabled'
     }`,
   );
 }

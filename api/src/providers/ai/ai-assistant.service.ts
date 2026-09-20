@@ -1,7 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
-
-const MODEL = process.env.CLAUDE_MODEL ?? 'claude-sonnet-5';
+import { Inject, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { AI_PROVIDER } from './ai.interface';
+import type { AiProvider } from './ai.interface';
 
 export interface GeneratedScenario {
   title: string;
@@ -24,15 +23,24 @@ export interface NarrativeInput {
   topDepartments: Array<{ department: string; clickRate: number; sent: number }>;
 }
 
+/**
+ * The Vlumeaware AI assistant: every prompt the product sends, and the parsing
+ * and guards around the replies. Which model answers is the provider's
+ * business — see AiProvider.
+ */
 @Injectable()
-export class ClaudeService {
-  private readonly logger = new Logger(ClaudeService.name);
-  private readonly client = process.env.ANTHROPIC_API_KEY
-    ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-    : null;
+export class AiAssistantService {
+  private readonly logger = new Logger(AiAssistantService.name);
+
+  constructor(@Inject(AI_PROVIDER) private readonly provider: AiProvider) {}
 
   get available() {
-    return this.client !== null;
+    return this.provider.available;
+  }
+
+  /** Diagnostics only. */
+  get backend() {
+    return { provider: this.provider.name, model: this.provider.model };
   }
 
   /**
@@ -44,12 +52,7 @@ export class ClaudeService {
     difficultyTier: 'low' | 'medium' | 'high';
     context?: string;
   }): Promise<GeneratedScenario> {
-    const client = this.requireClient();
-
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2000,
-      system: [
+    const system = [
         'You write authorized phishing simulation templates for Vlumeaware, a security',
         'awareness platform. Every template is used only against employees of a client',
         'that has signed a written authorization agreement, and every click leads to a',
@@ -65,30 +68,22 @@ export class ClaudeService {
         'giveaways an employee should have spotted). bodyHtml must be simple inline',
         'styled HTML and must contain the literal placeholder {{TRACKING_URL}} exactly',
         'once as the href of its primary call to action, and may use {{EMPLOYEE_NAME}}.',
-      ].join('\n'),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            `Industry: ${input.industry}`,
-            `Difficulty tier: ${input.difficultyTier}`,
-            input.context ? `Additional context: ${input.context}` : '',
-            '',
-            'Difficulty guidance: low = obvious errors and a generic greeting;',
-            'medium = plausible internal sender, mild urgency, one subtle domain tell;',
-            'high = context-aware pretext referencing a real business process, clean',
-            'writing, and only a single technical giveaway.',
-          ]
-            .filter(Boolean)
-            .join('\n'),
-        },
-      ],
-    });
+    ].join('\n');
 
-    const text = res.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('');
+    const user = [
+      `Industry: ${input.industry}`,
+      `Difficulty tier: ${input.difficultyTier}`,
+      input.context ? `Additional context: ${input.context}` : '',
+      '',
+      'Difficulty guidance: low = obvious errors and a generic greeting;',
+      'medium = plausible internal sender, mild urgency, one subtle domain tell;',
+      'high = context-aware pretext referencing a real business process, clean',
+      'writing, and only a single technical giveaway.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const text = await this.provider.complete({ system, user, maxTokens: 2000, json: true });
 
     const parsed = this.parseJson<GeneratedScenario>(text);
     if (!parsed.bodyHtml?.includes('{{TRACKING_URL}}')) {
@@ -107,13 +102,9 @@ export class ClaudeService {
 
   /** Board-report narrative in Vlumetech's governance tone. */
   async generateReportNarrative(input: NarrativeInput): Promise<string> {
-    const client = this.requireClient();
     const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
-    const res = await client.messages.create({
-      model: MODEL,
-      max_tokens: 1500,
-      system: [
+    const system = [
         'You write the narrative section of a Vlumetech security governance report.',
         'Audience: a Nigerian SME or mid-market board and its audit committee.',
         '',
@@ -124,13 +115,11 @@ export class ClaudeService {
         '',
         'Structure with these headings exactly: Summary, What The Numbers Show,',
         'Risk Assessment, Recommended Actions. Use short paragraphs. Plain prose, no',
-        'bullet lists except under Recommended Actions. 350-500 words.',
-      ].join('\n'),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            `Client: ${input.tenantName}`,
+      'bullet lists except under Recommended Actions. 350-500 words.',
+    ].join('\n');
+
+    const user = [
+      `Client: ${input.tenantName}`,
             `Campaign: ${input.campaignName}`,
             `Simulated emails delivered: ${input.totalSent}`,
             `Open rate: ${pct(input.openRate)}`,
@@ -145,28 +134,12 @@ export class ClaudeService {
               : 'No previous campaign for trend comparison.',
             '',
             'Click rate by department:',
-            ...input.topDepartments.map(
-              (d) => `- ${d.department}: ${pct(d.clickRate)} of ${d.sent} recipients`,
-            ),
-          ].join('\n'),
-        },
-      ],
-    });
+      ...input.topDepartments.map(
+        (d) => `- ${d.department}: ${pct(d.clickRate)} of ${d.sent} recipients`,
+      ),
+    ].join('\n');
 
-    return res.content
-      .filter((block): block is Anthropic.TextBlock => block.type === 'text')
-      .map((block) => block.text)
-      .join('')
-      .trim();
-  }
-
-  private requireClient(): Anthropic {
-    if (!this.client) {
-      throw new ServiceUnavailableException(
-        'ANTHROPIC_API_KEY is not configured; Claude-backed features are unavailable.',
-      );
-    }
-    return this.client;
+    return (await this.provider.complete({ system, user, maxTokens: 1500 })).trim();
   }
 
   private parseJson<T>(text: string): T {

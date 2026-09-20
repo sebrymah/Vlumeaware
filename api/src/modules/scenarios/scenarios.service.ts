@@ -3,13 +3,13 @@ import type { DifficultyTier } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context';
 import { sanitizeHtml } from '../../common/security/sanitize-html';
-import { ClaudeService } from '../../providers/claude/claude.service';
+import { AiAssistantService } from '../../providers/ai/ai-assistant.service';
 
 @Injectable()
 export class ScenariosService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly claude: ClaudeService,
+    private readonly ai: AiAssistantService,
   ) {}
 
   /**
@@ -17,7 +17,7 @@ export class ScenariosService {
    * so a weak or off-tone generation never reaches the template library.
    */
   generateDraft(input: { industry: string; difficultyTier: DifficultyTier; context?: string }) {
-    return this.claude.generateScenario({
+    return this.ai.generateScenario({
       industry: input.industry,
       difficultyTier: input.difficultyTier,
       context: input.context,
