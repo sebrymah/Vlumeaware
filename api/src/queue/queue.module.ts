@@ -56,7 +56,10 @@ const connection = redisConnection();
           attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
           removeOnComplete: 1000,
-          removeOnFail: false,
+          // Keep a deep failure history for diagnosis, but bounded: Redis runs
+          // with noeviction, so an unbounded backlog eventually fills the
+          // instance and campaign launches start erroring instead of queueing.
+          removeOnFail: 5000,
         },
       },
       { name: SCHEDULER_QUEUE, defaultJobOptions: { removeOnComplete: 50, removeOnFail: 50 } },
