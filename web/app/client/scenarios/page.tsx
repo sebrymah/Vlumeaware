@@ -47,9 +47,53 @@ function Scenarios() {
   const [context, setContext] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
   const [mode, setMode] = useState<'generate' | 'compose'>('generate');
+  // Set when the draft in the editor is an existing saved scenario rather
+  // than a new one, so Save updates it instead of creating a duplicate.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingApproved, setEditingApproved] = useState(false);
+
+  /** Loads a saved scenario back into the editor. */
+  function startEdit(scenario: Scenario) {
+    setMode('compose');
+    setEditingId(scenario.id);
+    setEditingApproved(Boolean(scenario.approvedAt));
+    setOk(null);
+    setError(null);
+    setDraft({
+      title: scenario.title,
+      subjectLine: scenario.subjectLine,
+      bodyHtml: scenario.bodyHtml,
+      senderSpoofName: scenario.senderSpoofName,
+      redFlags: scenario.redFlags,
+    });
+  }
+
+  function discardDraft() {
+    setDraft(null);
+    setEditingId(null);
+    setEditingApproved(false);
+  }
+
+  async function remove(scenario: Scenario) {
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      await api.del(`/tenants/${tenantId}/scenarios/${scenario.id}`);
+      if (editingId === scenario.id) discardDraft();
+      setOk(`Deleted “${scenario.title}”.`);
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function startBlankDraft() {
     setMode('compose');
+    setEditingId(null);
+    setEditingApproved(false);
     setDraft({
       title: '',
       subjectLine: '',
@@ -97,14 +141,23 @@ function Scenarios() {
     setBusy(true);
     setError(null);
     try {
-      await api.post(`/tenants/${tenantId}/scenarios`, {
-        ...draft,
-        difficultyTier: tier,
-        industryTag: industry,
-        createdByClaude: mode === 'generate',
-      });
-      setDraft(null);
-      setOk('Saved to your template library. It needs Vlumetech approval before use.');
+      if (editingId) {
+        await api.patch(`/tenants/${tenantId}/scenarios/${editingId}`, { ...draft });
+        setOk(
+          editingApproved
+            ? 'Updated. Because the content changed, it has returned to Vlumetech for approval before it can be sent again.'
+            : 'Updated. It still needs Vlumetech approval before use.',
+        );
+      } else {
+        await api.post(`/tenants/${tenantId}/scenarios`, {
+          ...draft,
+          difficultyTier: tier,
+          industryTag: industry,
+          createdByClaude: mode === 'generate',
+        });
+        setOk('Saved to your template library. It needs Vlumetech approval before use.');
+      }
+      discardDraft();
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -177,15 +230,19 @@ function Scenarios() {
 
       {draft && (
         <Card
-          title="Review draft"
-          subtitle="Edit anything before saving. Keep {{TRACKING_URL}} in the body — it becomes the tracked link."
+          title={editingId ? 'Edit scenario' : 'Review draft'}
+          subtitle={
+            editingId && editingApproved
+              ? 'This scenario is approved. Saving a change returns it to Vlumetech for review before it can be sent again.'
+              : 'Edit anything before saving. Keep {{TRACKING_URL}} in the body — it becomes the tracked link.'
+          }
           actions={
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setDraft(null)}>
-                Discard
+              <Button variant="ghost" onClick={discardDraft}>
+                {editingId ? 'Cancel' : 'Discard'}
               </Button>
               <Button onClick={save} disabled={busy || !draft.bodyHtml.includes('{{TRACKING_URL}}')}>
-                Save to library
+                {editingId ? 'Save changes' : 'Save to library'}
               </Button>
             </div>
           }
@@ -247,7 +304,7 @@ function Scenarios() {
       )}
 
       <Card title="Saved scenarios">
-        <Table head={['Title', 'Tier', 'Subject', 'Source', 'Approved']}>
+        <Table head={['Title', 'Tier', 'Subject', 'Source', 'Approved', '']}>
           {list.map((s) => (
             <tr key={s.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{s.title}</td>
@@ -259,11 +316,21 @@ function Scenarios() {
               <td className="px-2 py-2">
                 <Badge>{s.approvedAt ? 'yes' : 'no'}</Badge>
               </td>
+              <td className="px-2 py-2">
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => startEdit(s)} disabled={busy}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" onClick={() => remove(s)} disabled={busy}>
+                    Delete
+                  </Button>
+                </div>
+              </td>
             </tr>
           ))}
           {!list.length && (
             <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
+              <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
                 Nothing saved yet.
               </td>
             </tr>

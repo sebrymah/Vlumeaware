@@ -70,7 +70,16 @@ export class AiAssistantService {
         'once as the href of its primary call to action, and may use {{EMPLOYEE_NAME}}.',
     ].join('\n');
 
+    // The model has a training cutoff and will otherwise invent a plausible
+    // year — one draft dated a 2024 pension deadline. Both dates are computed
+    // here, weekday included, so no date arithmetic is left to the model.
+    const today = new Date();
+    const deadline = nextWorkingDay(today, 5);
     const user = [
+      `Today's date is ${formatLongDate(today)}.`,
+      `If the pretext needs a deadline, use ${formatLongDate(deadline)}.`,
+      `Never reference a date in the past, and never a year other than ${today.getFullYear()}.`,
+      '',
       `Industry: ${input.industry}`,
       `Difficulty tier: ${input.difficultyTier}`,
       input.context ? `Additional context: ${input.context}` : '',
@@ -155,4 +164,26 @@ export class AiAssistantService {
       throw new ServiceUnavailableException('Claude returned malformed JSON');
     }
   }
+}
+
+/** "Sunday, 20 September 2026" — the form a Nigerian corporate email would use. */
+function formatLongDate(date: Date): string {
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+/** `days` working days ahead, so a deadline never lands on a weekend. */
+function nextWorkingDay(from: Date, days: number): Date {
+  const date = new Date(from);
+  let remaining = days;
+  while (remaining > 0) {
+    date.setDate(date.getDate() + 1);
+    const day = date.getDay();
+    if (day !== 0 && day !== 6) remaining -= 1;
+  }
+  return date;
 }
