@@ -56,6 +56,26 @@ function storageReason(status: number, detail: string): string {
  * `put` returns a durable, non-public reference (supabase://…, s3://…, file://…).
  * Call `signedUrl` to turn a reference into a time-limited playable URL; hosted
  * https links pass through unchanged.
+ *
+ * WHAT MAY BE STORED IS DECIDED BY THE CALLER, NOT THE BUCKET.
+ *
+ * One bucket holds four different kinds of file, so any restriction set on it
+ * has to be the union of all of them — which means it cannot tell a logo from
+ * a video and would happily accept an MP4 posted to the logo endpoint. It is
+ * therefore deliberately left unrestricted, and each endpoint checks its own
+ * types before calling `put`:
+ *
+ *   shared awareness videos  VIDEO_MIME  (shared-modules.service)
+ *   tenant training videos   VIDEO_MIME  (training-modules.service)
+ *   signed NDPA agreements   PDF, PNG, JPEG (tenants.service)
+ *   client logos             PNG, JPEG      (tenants.service; pdf-lib embeds
+ *                                            only these two)
+ *
+ * Two ways to break this: re-add a MIME restriction on the bucket, which
+ * silently rejects whichever type was left off the list — that is what broke
+ * logo uploads, and agreement uploads before anyone noticed — or drop one of
+ * the checks above on the assumption the bucket still covers it. Adding a new
+ * kind of upload means adding its check here in the caller.
  */
 @Injectable()
 export class StorageService {
