@@ -1,4 +1,5 @@
 import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, degrees, rgb } from 'pdf-lib';
+import { winAnsi } from '../../common/pdf/win-ansi';
 import type { CertificateTemplate } from './certificate-templates';
 
 /** A4 landscape in points — the size the certificate has always been. */
@@ -83,7 +84,7 @@ function formatDate(date: Date): string {
  * which reads as a database field on a printed certificate.
  */
 export function humanizeTitle(title: string): string {
-  return title.replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
+  return winAnsi(title).replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 /** Draws the Vlumeaware wordmark: "Vlume" in ink, "aware" in Vlumeaware green. */
@@ -146,7 +147,18 @@ export async function renderCertificatePdf(input: CertificateInput): Promise<Buf
   }
 
   const ctx = { page, sans, sansBold, serif, serifBold, mono, logo, accent: hexColor(input.accentHex) };
-  const data = { ...input, moduleTitle: humanizeTitle(input.moduleTitle) };
+  // Every string reaching the page is caller data: an employee's name, a
+  // client's name, a title, a serial. One unencodable character would throw
+  // and cost the recipient their certificate and its email.
+  const data = {
+    ...input,
+    tenantName: winAnsi(input.tenantName),
+    employeeName: winAnsi(input.employeeName),
+    moduleTitle: humanizeTitle(input.moduleTitle),
+    quizTitle: input.quizTitle ? winAnsi(input.quizTitle) : null,
+    serial: winAnsi(input.serial),
+    verifyUrl: winAnsi(input.verifyUrl),
+  };
 
   if (input.template === 'formal') formal(ctx, data);
   else if (input.template === 'record') record(ctx, data);

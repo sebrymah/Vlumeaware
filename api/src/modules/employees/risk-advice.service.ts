@@ -4,6 +4,15 @@ import { currentTenantId, runAsSystem } from '../../common/prisma/tenant-context
 import { AiAssistantService } from '../../providers/ai/ai-assistant.service';
 import type { RiskAdvice } from '../../providers/ai/ai-assistant.service';
 import { RiskService } from './risk.service';
+import type { EmployeeRisk } from './risk.service';
+import { renderRiskReportPdf } from './risk-report-pdf';
+
+/** The advice shape a caller may hand back for inclusion in the PDF. */
+export interface RiskReportAdvice {
+  summary: string;
+  actions: string[];
+  assignments: Array<{ employeeName: string; moduleTitle: string; reason: string }>;
+}
 
 export interface RiskAdviceResult extends RiskAdvice {
   /** Resolved names, so the page never has to look an id back up. */
@@ -29,6 +38,35 @@ export class RiskAdviceService {
     private readonly risk: RiskService,
     private readonly ai: AiAssistantService,
   ) {}
+
+  /** The risk table as a CSV file. */
+  async csv(): Promise<string> {
+    return riskCsv(await this.risk.scoreAll());
+  }
+
+  /**
+   * The full report as a PDF: the table, and the recommendation when the
+   * caller passes back one it has already generated. The advice is not
+   * regenerated here — that would bill a second AI call for a download, and
+   * would risk the document disagreeing with what the admin read on screen.
+   */
+  async pdf(advice?: RiskReportAdvice | null): Promise<Buffer> {
+    const [employees, tenant] = await Promise.all([
+      this.risk.scoreAll(),
+      runAsSystem('risk report: tenant name', () =>
+        this.prisma.db.tenant.findUnique({
+          where: { id: currentTenantId() },
+          select: { name: true },
+        }),
+      ),
+    ]);
+    return renderRiskReportPdf({
+      tenantName: tenant?.name ?? 'Organisation',
+      employees,
+      advice: advice ?? null,
+      generatedAt: new Date(),
+    });
+  }
 
   async advise(): Promise<RiskAdviceResult> {
     const tenantId = currentTenantId();
@@ -71,4 +109,39 @@ export class RiskAdviceService {
       generatedAt: new Date().toISOString(),
     };
   }
+}
+
+/** The risk table as CSV, following the campaign export's shape. */
+export function riskCsv(employees: EmployeeRisk[]): string {
+  const esc = (v: string | number) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const lines = [
+    [
+      'Employee', 'Email', 'Department', 'Risk score', 'Risk level',
+      'Simulations sent', 'Clicks', 'Click rate', 'Reported', 'Report rate',
+      'Credential submissions', 'Quiz passes', 'Repeat clicker',
+    ]
+      .map(esc)
+      .join(','),
+  ];
+  for (const e of employees) {
+    lines.push(
+      [
+        esc(e.name),
+        esc(e.email),
+        esc(e.department ?? ''),
+        esc(e.riskScore),
+        esc(e.riskLevel),
+        esc(e.sends),
+        esc(e.clicks),
+        esc(pct(e.clickRate)),
+        esc(e.reports),
+        esc(pct(e.reportRate)),
+        esc(e.credentialSubmissions),
+        esc(e.quizPasses),
+        esc(e.repeatClicker ? 'yes' : 'no'),
+      ].join(','),
+    );
+  }
+  return lines.join('\n');
 }

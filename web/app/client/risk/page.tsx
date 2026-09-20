@@ -85,6 +85,35 @@ function Risk() {
     void load();
   }, [load]);
 
+  /** Authenticated fetch to a blob, since both export routes need the bearer token. */
+  async function downloadFile(path: string, filename: string, body?: unknown) {
+    const token = readSession()?.accessToken;
+    const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`${base}${path}`, {
+        method: body === undefined ? 'GET' : 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status}).`);
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function askAi() {
     setAdvising(true);
     setError(null);
@@ -123,12 +152,38 @@ function Risk() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-lg font-semibold text-slate-900">Employee risk</h1>
-        <p className="mt-1 text-xs text-slate-500">
-          A running score per person across every campaign. Higher = more likely to fall for a real
-          attack. Reporting and quiz passes lower it; clicks and credential entry raise it.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-900">Employee risk</h1>
+          <p className="mt-1 text-xs text-slate-500">
+            A running score per person across every campaign. Higher = more likely to fall for a real
+            attack. Reporting and quiz passes lower it; clicks and credential entry raise it.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            disabled={busy || !rows.length}
+            onClick={() => downloadFile(`/tenants/${tenantId}/employees/risk/export.csv`, 'employee-risk.csv')}
+          >
+            Export CSV
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={busy || !rows.length}
+            onClick={() =>
+              downloadFile(
+                `/tenants/${tenantId}/employees/risk/report.pdf`,
+                'employee-risk-report.pdf',
+                // Send the advice already on screen rather than regenerating it,
+                // so the document matches what the admin just read.
+                { advice: advice ?? null },
+              )
+            }
+          >
+            {advice ? 'Export report (PDF)' : 'Export table (PDF)'}
+          </Button>
+        </div>
       </div>
 
       {error && <Notice kind="error">{error}</Notice>}

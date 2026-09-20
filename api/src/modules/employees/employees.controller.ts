@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  Res,
   Param,
   ParseUUIDPipe,
   Post,
@@ -11,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { ROSTER_UPLOAD } from '../../common/upload/upload-limits';
 import { ArrayMaxSize, IsArray, IsEmail, IsOptional, IsString, IsUUID, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -19,6 +21,7 @@ import { Roles } from '../../common/auth/roles.decorator';
 import { EmployeesService } from './employees.service';
 import { RiskService } from './risk.service';
 import { RiskAdviceService } from './risk-advice.service';
+import type { RiskReportAdvice } from './risk-advice.service';
 import { RequiresWritableTenant } from '../../common/trial/writable-tenant.guard';
 
 class EmployeeRowDto {
@@ -71,6 +74,32 @@ export class EmployeesController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin)
   adviseOnRisk() {
     return this.riskAdvice.advise();
+  }
+
+  /** The risk table as a spreadsheet. Anyone who can read the page can export it. */
+  @Get('risk/export.csv')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  async riskCsv(@Res() res: Response) {
+    const csv = await this.riskAdvice.csv();
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="employee-risk.csv"');
+    res.send(csv);
+  }
+
+  /**
+   * The report as a PDF: the table, plus the recommendation when the caller
+   * passes back one it already has. POST because the advice travels in the
+   * body, and because regenerating it here would bill a second AI call for a
+   * download and could contradict what the admin just read on screen.
+   */
+  @Post('risk/report.pdf')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  async riskPdf(@Body() body: { advice?: RiskReportAdvice | null }, @Res() res: Response) {
+    const pdf = await this.riskAdvice.pdf(body?.advice ?? null);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="employee-risk-report.pdf"');
+    res.send(pdf);
   }
 
   /** Employees who clicked in two or more simulations. */
