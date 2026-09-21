@@ -1,4 +1,5 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
+import { drawLogoLockup } from '../../common/pdf/logo';
 import { winAnsi } from '../../common/pdf/win-ansi';
 import type { EmployeeRisk } from './risk.service';
 
@@ -252,14 +253,7 @@ export async function renderRiskReportPdf(raw: RiskReportInput): Promise<Buffer>
   // ---- footer on every page ----------------------------------------------
   const pages = doc.getPages();
   pages.forEach((p, i) => {
-    p.drawText('Vlume', { x: MARGIN, y: 26, size: 8, font: bold, color: INK });
-    p.drawText('aware', {
-      x: MARGIN + bold.widthOfTextAtSize('Vlume', 8),
-      y: 26,
-      size: 8,
-      font: bold,
-      color: GREEN,
-    });
+    drawLogoLockup(p, { x: MARGIN, y: 26, size: 8, bold });
     const label = `Page ${i + 1} of ${pages.length}`;
     p.drawText(label, {
       x: W - MARGIN - sans.widthOfTextAtSize(label, 8),

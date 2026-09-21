@@ -1,4 +1,5 @@
 import { PDFDocument, PDFFont, PDFImage, PDFPage, StandardFonts, degrees, rgb } from 'pdf-lib';
+import { drawLogoLockup, logoLockupWidth } from '../../common/pdf/logo';
 import { winAnsi } from '../../common/pdf/win-ansi';
 import type { CertificateTemplate } from './certificate-templates';
 
@@ -85,29 +86,6 @@ function formatDate(date: Date): string {
  */
 export function humanizeTitle(title: string): string {
   return winAnsi(title).replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-/** Draws the Vlumeaware wordmark: "Vlume" in ink, "aware" in Vlumeaware green. */
-function drawWordmark(
-  page: PDFPage,
-  x: number,
-  y: number,
-  size: number,
-  bold: PDFFont,
-  inkColor = INK,
-) {
-  page.drawText('Vlume', { x, y, size, font: bold, color: inkColor });
-  page.drawText('aware', {
-    x: x + bold.widthOfTextAtSize('Vlume', size),
-    y,
-    size,
-    font: bold,
-    color: VLUME_GREEN,
-  });
-}
-
-function wordmarkWidth(size: number, bold: PDFFont) {
-  return bold.widthOfTextAtSize('Vlumeaware', size);
 }
 
 /** Places the client logo inside a box, preserving its aspect ratio. */
@@ -239,7 +217,12 @@ function formal(c: Ctx, d: CertificateInput) {
   });
 
   page.drawText('Delivered via', { x: left, y: 52, size: 7, font: c.sans, color: MUTED });
-  drawWordmark(page, left + c.sans.widthOfTextAtSize('Delivered via ', 7), 51, 8, c.sansBold);
+  drawLogoLockup(page, {
+    x: left + c.sans.widthOfTextAtSize('Delivered via ', 7),
+    y: 51,
+    size: 8,
+    bold: c.sansBold,
+  });
 }
 
 function footerField(c: Ctx, x: number, label: string, value: string, valueFont: PDFFont) {
@@ -296,7 +279,12 @@ function branded(c: Ctx, d: CertificateInput) {
 
   page.drawLine({ start: { x: left, y: 76 }, end: { x: W - 56, y: 76 }, thickness: 1, color: HAIRLINE });
   page.drawText('Delivered via', { x: left, y: 54, size: 7, font: c.sans, color: MUTED });
-  drawWordmark(page, left + c.sans.widthOfTextAtSize('Delivered via ', 7), 53, 8, c.sansBold);
+  drawLogoLockup(page, {
+    x: left + c.sans.widthOfTextAtSize('Delivered via ', 7),
+    y: 53,
+    size: 8,
+    bold: c.sansBold,
+  });
 }
 
 /** C — header band and labelled fields: evidence rather than a keepsake. */
@@ -354,5 +342,5 @@ function record(c: Ctx, d: CertificateInput) {
   ].entries()) {
     page.drawText(line, { x: left, y: 74 - i * 13, size: 8.5, font: c.sans, color: MUTED });
   }
-  drawWordmark(page, W - 48 - wordmarkWidth(9, c.sansBold), 60, 9, c.sansBold);
+  drawLogoLockup(page, { x: W - 48 - logoLockupWidth(9, c.sansBold), y: 60, size: 9, bold: c.sansBold });
 }

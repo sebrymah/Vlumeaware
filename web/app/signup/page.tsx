@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { LogoMark } from '@/components/logo';
 import { useState } from 'react';
 import Link from 'next/link';
 import { login } from '@/lib/api';
@@ -53,6 +54,7 @@ export default function SignupPage() {
       <form onSubmit={submit} className="w-full max-w-sm space-y-4">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">
+            <LogoMark size={22} className="mr-1.5 inline-block align-[-3px]" />
             Vlume<span className="text-brand-600">aware</span>
           </h1>
           <p className="mt-1 text-xs text-slate-500">Start a free trial</p>

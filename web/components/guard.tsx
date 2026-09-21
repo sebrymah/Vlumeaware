@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
+import { LogoMark } from '@/components/logo';
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { clearSession, homeFor, loginPathFor, loginPathForAllowed, readSession, type Role, type Session } from '@/lib/session';
@@ -165,6 +166,7 @@ export function Guard({ allow, children }: { allow: Role[]; children: ReactNode 
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-7xl items-center gap-5 px-6">
           <Link href={homeFor(session.role)} className="text-[15px] font-extrabold tracking-tight text-slate-900">
+            <LogoMark size={18} className="mr-1.5 inline-block align-[-3px]" />
             Vlume<span className="text-brand-600">aware</span>
           </Link>
           <div className="hidden md:block">

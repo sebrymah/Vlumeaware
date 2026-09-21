@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useEffect, useState } from 'react';
+import { LogoMark } from '@/components/logo';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
@@ -43,6 +44,7 @@ export default function VerifyPage({ params }: { params: Promise<{ serial: strin
     <main className="mx-auto max-w-xl px-6 py-14">
       <div className="mb-8 flex items-center justify-between">
         <span className="text-base font-semibold text-slate-900">
+          <LogoMark size={18} className="mr-1.5 inline-block align-[-3px]" />
           Vlume<span className="text-brand-600">aware</span>
         </span>
         <span className="text-[11px] uppercase tracking-widest text-slate-400">
