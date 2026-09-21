@@ -62,6 +62,67 @@ export class TenantsService {
   }
 
   /**
+   * The client's own security posture: the policy they set, and the state of
+   * each of their console users. Deliberately narrow, like getBranding.
+   */
+  async getSecurity(tenantId: string) {
+    const tenant = await this.prisma.db.tenant.findUnique({
+      where: { id: tenantId },
+      select: { passwordMinLength: true, sessionTimeoutMinutes: true, requireMfa: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const users = await this.prisma.db.tenantUser.findMany({
+      where: { tenantId },
+      select: { id: true, email: true, role: true, mfaEnabledAt: true, lockedUntil: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return {
+      passwordMinLength: tenant.passwordMinLength,
+      sessionTimeoutMinutes: tenant.sessionTimeoutMinutes,
+      requireMfa: tenant.requireMfa,
+      users: users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        role: u.role,
+        mfaEnabled: Boolean(u.mfaEnabledAt),
+        locked: Boolean(u.lockedUntil && u.lockedUntil > new Date()),
+        createdAt: u.createdAt,
+      })),
+    };
+  }
+
+  async setSecurity(
+    tenantId: string,
+    input: { passwordMinLength?: number; sessionTimeoutMinutes?: number; requireMfa?: boolean },
+  ) {
+    await this.findOne(tenantId);
+    await this.prisma.db.tenant.update({ where: { id: tenantId }, data: input });
+    return this.getSecurity(tenantId);
+  }
+
+  /** Releases a lockout early, so an admin is not stuck waiting one out. */
+  async unlockUser(tenantId: string, userId: string) {
+    const user = await this.prisma.db.tenantUser.findFirst({ where: { id: userId, tenantId } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.prisma.db.tenantUser.update({
+      where: { id: userId },
+      data: { failedLoginCount: 0, lockedUntil: null },
+    });
+    return { unlocked: true };
+  }
+
+  /** This client's slice of the audit trail. */
+  auditLog(tenantId: string, limit = 100) {
+    return runAsSystem('client reads own audit log', () =>
+      this.prisma.db.auditLog.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        take: Math.min(limit, 500),
+      }),
+    );
+  }
+
+  /**
    * The branding a client admin may read about their own tenant. Deliberately
    * narrow: findOne returns the whole tenant row — agreement document, seat
    * limits, approval metadata — which is Vlumetech's to see, not the client's.

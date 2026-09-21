@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -12,7 +13,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AGREEMENT_UPLOAD, LOGO_UPLOAD } from '../../common/upload/upload-limits';
 import { CERTIFICATE_TEMPLATES } from '../certificates/certificate-templates';
-import { IsBoolean, IsDateString, IsEmail, IsHexColor, IsIn, IsInt, IsOptional, IsString, Min, MinLength } from 'class-validator';
+import { IsBoolean, IsDateString, IsEmail, IsHexColor, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { Roles } from '../../common/auth/roles.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
 import type { JwtPayload } from '../../common/auth/roles';
@@ -33,6 +34,15 @@ class CreateTenantUserDto {
   @IsEmail() email!: string;
   @IsString() @MinLength(12) password!: string;
   @IsIn(['client_admin', 'client_viewer']) role!: 'client_admin' | 'client_viewer';
+}
+
+class SecurityDto {
+  // A floor of 8 and a ceiling of 64: below 8 is indefensible, above 64 people
+  // start writing passwords down.
+  @IsOptional() @IsInt() @Min(8) @Max(64) passwordMinLength?: number;
+  // 15 minutes to 30 days.
+  @IsOptional() @IsInt() @Min(15) @Max(43200) sessionTimeoutMinutes?: number;
+  @IsOptional() @IsBoolean() requireMfa?: boolean;
 }
 
 class BrandingDto {
@@ -117,6 +127,36 @@ export class TenantsController {
     @UploadedFile() document: { buffer: Buffer; mimetype: string; originalname: string },
   ) {
     return this.tenants.recordAgreement(tenantId, document, new Date(dto.signedAt));
+  }
+
+  /** A client admin manages their own console security. */
+  @Get(':tenantId/security')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  getSecurity(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
+    return this.tenants.getSecurity(tenantId);
+  }
+
+  @Patch(':tenantId/security')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  setSecurity(@Param('tenantId', ParseUUIDPipe) tenantId: string, @Body() dto: SecurityDto) {
+    return this.tenants.setSecurity(tenantId, dto);
+  }
+
+  @Post(':tenantId/users/:userId/unlock')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  unlockUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.tenants.unlockUser(tenantId, userId);
+  }
+
+  /** The client's own slice of the audit trail. */
+  @Get(':tenantId/audit-log')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  auditLog(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
+    return this.tenants.auditLog(tenantId);
   }
 
   @Get(':tenantId/branding')

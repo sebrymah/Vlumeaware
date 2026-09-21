@@ -18,6 +18,13 @@ class MfaVerifyDto {
   @Matches(/^\d{6}$/, { message: 'Enter the 6-digit code' }) code!: string;
 }
 
+class ChangePasswordDto {
+  @IsString() currentPassword!: string;
+  // The real minimum is the tenant's policy, checked server-side; this is only
+  // a floor so an obviously bad value never reaches the hash.
+  @IsString() @MinLength(8) newPassword!: string;
+}
+
 class MfaCodeDto {
   @IsString() @Length(6, 6) @Matches(/^\d{6}$/, { message: 'Enter the 6-digit code' }) code!: string;
 }
@@ -42,19 +49,36 @@ export class AuthController {
     return this.auth.verifyMfa(dto.challenge, dto.code);
   }
 
-  /** Begin enrolment (signed-in staff). Returns the otpauth URI + secret. */
-  @Roles(ROLES.superadmin)
+  /** Begin enrolment for whoever is signed in, staff or client user. */
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   @Post('mfa/setup')
   setupMfa(@CurrentUser() user: JwtPayload) {
     return this.auth.setupMfa(user.sub);
   }
 
   /** Finish enrolment by confirming a code from the authenticator app. */
-  @Roles(ROLES.superadmin)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   @HttpCode(200)
   @Post('mfa/activate')
   activateMfa(@CurrentUser() user: JwtPayload, @Body() dto: MfaCodeDto) {
     return this.auth.activateMfa(user.sub, dto.code);
+  }
+
+  /** Turn MFA off. Refused when the client's policy requires it. */
+  @Roles(ROLES.clientAdmin, ROLES.clientViewer)
+  @HttpCode(200)
+  @Post('mfa/disable')
+  disableMfa(@CurrentUser() user: JwtPayload) {
+    return this.auth.disableMfa(user.sub, user.tenantId);
+  }
+
+  /** Change your own password, checked against your organisation's minimum. */
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  @Throttle({ limit: 5, windowMs: 60_000 })
+  @HttpCode(200)
+  @Post('password')
+  changePassword(@CurrentUser() user: JwtPayload, @Body() dto: ChangePasswordDto) {
+    return this.auth.changePassword(user.sub, user.tenantId, dto.currentPassword, dto.newPassword);
   }
 
   @Get('me')

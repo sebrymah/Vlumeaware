@@ -57,6 +57,12 @@ model Tenant {
   /// Which layout this client's completion certificates are rendered in:
   /// "formal", "branded" or "record". Chosen by the client admin.
   certificateTemplate   String       @default("branded") @map("certificate_template")
+  /// Security policy the client sets for their own console users.
+  passwordMinLength     Int          @default(12) @map("password_min_length")
+  /// How long a session lasts before re-authentication, in minutes.
+  sessionTimeoutMinutes Int          @default(480) @map("session_timeout_minutes")
+  /// When true, a client user cannot finish signing in without MFA enrolled.
+  requireMfa            Boolean      @default(false) @map("require_mfa")
   ndpaAgreementSignedAt DateTime?    @map("ndpa_agreement_signed_at")
   ndpaAgreementDocUrl   String?      @map("ndpa_agreement_doc_url")
   status                TenantStatus @default(active)
@@ -124,6 +130,13 @@ model TenantUser {
   passwordHash String     @map("password_hash")
   role         TenantRole
   createdAt    DateTime   @default(now()) @map("created_at")
+  /// TOTP shared secret. Present once enrolment starts; MFA is only active
+  /// once mfaEnabledAt is set. Mirrors the staff User model.
+  mfaSecret        String?   @map("mfa_secret")
+  mfaEnabledAt     DateTime? @map("mfa_enabled_at")
+  /// Brute-force protection, which client logins previously had none of.
+  failedLoginCount Int       @default(0) @map("failed_login_count")
+  lockedUntil      DateTime? @map("locked_until")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
