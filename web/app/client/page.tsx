@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
+import { ReadinessChecklist } from '@/components/readiness';
 import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
 
 interface Scenario {
@@ -51,6 +52,7 @@ function Campaigns() {
   const [scheduledSendAt, setScheduledSendAt] = useState('');
   const [sendWindowMinutes, setSendWindowMinutes] = useState('0');
   const [recurrenceDays, setRecurrenceDays] = useState('');
+  const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -72,6 +74,43 @@ function Campaigns() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Checks the gates before asking the server to launch. The server enforces
+   * them too — this only means the reason lands next to the button instead of
+   * as a rejection after the fact.
+   */
+  async function checkThenLaunch(campaignId: string) {
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      const pre = await api.get<{ ready: boolean; checks: { label: string; ok: boolean; detail?: string }[] }>(
+        `/tenants/${tenantId}/campaigns/${campaignId}/preflight`,
+      );
+      if (!pre.ready) {
+        setBlocked((b) => ({
+          ...b,
+          [campaignId]: pre.checks
+            .filter((c) => !c.ok)
+            .map((c) => (c.detail ? `${c.label} (${c.detail})` : c.label)),
+        }));
+        setBusy(false);
+        return;
+      }
+      setBlocked((b) => {
+        const next = { ...b };
+        delete next[campaignId];
+        return next;
+      });
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+      return;
+    }
+    setBusy(false);
+    await act(campaignId, 'launch');
+  }
 
   async function act(campaignId: string, action: 'launch' | 'pause' | 'resume' | 'kill') {
     setBusy(true);
@@ -144,14 +183,26 @@ function Campaigns() {
       {error && <Notice kind="error">{error}</Notice>}
       {ok && <Notice kind="ok">{ok}</Notice>}
 
+      <ReadinessChecklist tenantId={tenantId} />
+
       <Card title="Your campaigns">
         <Table head={['Campaign', 'Scenarios', 'Status', 'Created', 'Actions']}>
           {campaigns.map((c) => (
-            <tr key={c.id} className="border-b border-slate-100">
+            <tr key={c.id} className="border-b border-slate-100 align-top">
               <td className="px-2 py-2">
                 <Link href={`/client/campaigns/${c.id}`} className="text-brand-600 hover:underline">
                   {c.name}
                 </Link>
+                {blocked[c.id] && (
+                  <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] leading-relaxed text-amber-800">
+                    <p className="font-semibold">Not ready to launch</p>
+                    <ul className="mt-0.5 list-disc pl-4">
+                      {blocked[c.id].map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </td>
               <td className="px-2 py-2 text-slate-500">
                 {c.campaignScenarios.map((cs) => cs.scenario.title).join(', ') || '—'}
@@ -163,7 +214,7 @@ function Campaigns() {
               <td className="px-2 py-2">
                 <div className="flex justify-end gap-2">
                   {c.status === 'draft' && (
-                    <Button onClick={() => act(c.id, 'launch')} disabled={busy}>
+                    <Button onClick={() => void checkThenLaunch(c.id)} disabled={busy}>
                       Launch
                     </Button>
                   )}

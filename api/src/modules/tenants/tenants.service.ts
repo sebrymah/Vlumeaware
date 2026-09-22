@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { MAILER } from '../../providers/mailer/mailer.interface';
+import type { Mailer } from '../../providers/mailer/mailer.interface';
+import { notificationFromAddress } from '../../providers/mailer/from-addresses';
+import { publicBaseUrl } from '../tracking/render';
+import { escapeHtml as esc } from '../../common/html/escape';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { runAsSystem, runInTenant } from '../../common/prisma/tenant-context';
 import { allowlistGuidance } from '../../common/config/allowlist';
@@ -21,6 +26,7 @@ export class TenantsService {
     private readonly storage: StorageService,
     private readonly audit: AuditService,
     private readonly trial: TrialService,
+    @Inject(MAILER) private readonly mailer: Mailer,
   ) {}
 
   create(input: { name: string; brandPrimaryColor?: string; brandLogoUrl?: string }) {
@@ -294,6 +300,160 @@ export class TenantsService {
   }
 
   /**
+   * Emails the client's admins what their IT team needs to allow, and what is
+   * still outstanding. Best effort: a mail failure must not roll back an
+   * approval that already succeeded, so it is logged and swallowed.
+   */
+  async emailSetupInstructions(tenantId: string, tenantName: string): Promise<number> {
+    try {
+      const [admins, guidance, state] = await Promise.all([
+        runAsSystem('setup email: admins', () =>
+          this.prisma.db.tenantUser.findMany({
+            where: { tenantId, role: 'client_admin' },
+            select: { email: true },
+          }),
+        ),
+        this.allowlist(tenantId),
+        this.readiness(tenantId),
+      ]);
+      if (!admins.length) {
+        this.logger.warn(`No client_admin to send setup instructions to for ${tenantId}`);
+        return 0;
+      }
+
+      const ips = guidance.ips.length
+        ? guidance.ips.map((ip) => `<li><code>${esc(ip)}</code></li>`).join('')
+        : '<li>Vlumetech will confirm these separately.</li>';
+      const outstanding = state.checks
+        .filter((c) => !c.ok)
+        .map((c) => `<li>${esc(c.label)}</li>`)
+        .join('');
+
+      let sent = 0;
+      for (const admin of admins) {
+        await this.mailer.send({
+          to: admin.email,
+          fromName: 'Vlumeaware',
+          fromAddress: notificationFromAddress(),
+          subject: `${tenantName} is approved — one thing for your IT team`,
+          html: `
+            <p>Hello,</p>
+            <p>
+              Your Vlumeaware account is approved, so live campaigns are unlocked.
+              Before the first one, your IT team has to let our simulated mail
+              through your gateway. Without it your own filters quarantine the
+              test and the result tells you nothing.
+            </p>
+            <p><strong>Give them these:</strong></p>
+            <ul>
+              <li>Sending domain: <code>${esc(guidance.sendingDomain ?? 'provided by Vlumetech')}</code></li>
+              <li>Link / tracking domain: <code>${esc(guidance.trackingDomain ?? 'provided by Vlumetech')}</code></li>
+            </ul>
+            <p><strong>Sending IP addresses:</strong></p>
+            <ul>${ips}</ul>
+            <p>
+              In Microsoft 365 this goes under Security &rarr; Policies &amp; rules &rarr;
+              Advanced delivery &rarr; Phishing simulation, which needs the domain and the
+              IPs together. In Google Workspace it is an inbound gateway or email
+              allow-list entry. Use the phishing-simulation setting rather than a blanket
+              allow rule, so only this traffic is exempted.
+            </p>
+            ${outstanding ? `<p><strong>Also still outstanding:</strong></p><ul>${outstanding}</ul>` : ''}
+            <p>
+              You can see all of this any time under People &rarr; Domains:
+              <a href="${publicBaseUrl()}/client/domains">${publicBaseUrl()}/client/domains</a>
+            </p>
+            <p>Vlumeaware</p>
+          `,
+          sendId: `setup-${tenantId}-${admin.email}`,
+        });
+        sent += 1;
+      }
+      await this.audit.record(
+        'tenant.setup.emailed',
+        `sent allow-list setup instructions to ${sent} admin(s)`,
+        tenantId,
+      );
+      return sent;
+    } catch (err) {
+      this.logger.error(
+        `Could not email setup instructions for ${tenantId}: ${(err as Error).message}`,
+      );
+      return 0;
+    }
+  }
+
+  /**
+   * Whether this client is set up enough to run a campaign, as a checklist.
+   *
+   * The same gates campaign preflight applies, minus the two that belong to a
+   * specific campaign (scenarios attached and approved). Split out because a
+   * client needs to see what is outstanding *before* they build a campaign —
+   * the gateway allow-list in particular is somebody else's IT team and has a
+   * lead time measured in days, so discovering it at launch is too late.
+   */
+  async readiness(tenantId: string) {
+    const tenant = await runAsSystem('readiness: read tenant', () =>
+      this.prisma.db.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          ndpaAgreementSignedAt: true,
+          sendingDomain: true,
+          allowlistConfirmedAt: true,
+        },
+      }),
+    );
+    if (!tenant) throw new NotFoundException('Tenant not found');
+
+    const [employees, verifiedDomains] = await runAsSystem('readiness: counts', () =>
+      Promise.all([
+        this.prisma.db.employee.count({ where: { tenantId } }),
+        this.prisma.db.verifiedDomain.count({ where: { tenantId, status: 'verified' } }),
+      ]),
+    );
+
+    const checks = [
+      {
+        key: 'agreementSigned',
+        label: 'Authorization agreement accepted',
+        ok: !!tenant.ndpaAgreementSignedAt,
+        hint: 'Accepted at signup, or filed by Vlumetech as a countersigned document.',
+        href: null as string | null,
+      },
+      {
+        key: 'domainVerified',
+        label: 'At least one domain verified',
+        ok: verifiedDomains > 0,
+        hint: 'Simulations can only be sent to addresses on a domain you have proved you own.',
+        href: '/client/domains',
+      },
+      {
+        key: 'employeesUploaded',
+        label: 'Employees added',
+        ok: employees > 0,
+        hint: 'Upload a CSV or add people directly.',
+        href: '/client/employees',
+      },
+      {
+        key: 'gatewayAllowlist',
+        label: 'Mail gateway allow-list applied by your IT',
+        ok: !!tenant.allowlistConfirmedAt,
+        hint:
+          'Your IT team must let our sending domain and IPs through, or your own filters ' +
+          'quarantine the simulation and the result means nothing. This one needs another ' +
+          'team, so start it early.',
+        href: '/client/domains',
+      },
+    ];
+
+    return {
+      ready: checks.every((c) => c.ok),
+      outstanding: checks.filter((c) => !c.ok).length,
+      checks,
+    };
+  }
+
+  /**
    * The gateway allow-list details plus this tenant's confirmation state.
    * Deliberately a narrow projection rather than the whole tenant row: this is
    * the only tenants read a client_viewer can reach.
@@ -484,6 +644,11 @@ export class TenantsService {
       },
     });
     await this.audit.record('tenant.approve', `approved self-signup "${tenant.name}"`, tenantId);
+    // Approval is the moment the client can act, and the gateway allow-list is
+    // the one task that needs another team and has a lead time. Telling them
+    // now, in writing, with the values in the message, is the difference
+    // between starting it today and discovering it at launch.
+    await this.emailSetupInstructions(tenantId, tenant.name);
     return updated;
   }
 

@@ -200,6 +200,25 @@ export class CampaignsService {
       throw new ConflictException('Campaign already completed');
     }
 
+    // The preflight gates are enforced here, not merely reported. They used to
+    // be advisory: the endpoint existed, nothing called it, and a campaign
+    // could go out with an unsigned agreement or a mail gateway that had never
+    // been told to let it through — which lands the whole send in quarantine
+    // and reports a clean result that is not real.
+    //
+    // Enforcing in launch() rather than in the controller covers the scheduler
+    // too: SchedulerProcessor auto-launches due campaigns through this same
+    // method, and a scheduled send is exactly the one nobody is watching.
+    const pre = await this.preflight(campaignId);
+    if (!pre.ready) {
+      const outstanding = pre.checks.filter((c) => !c.ok);
+      throw new BadRequestException(
+        `Not ready to launch. Outstanding: ${outstanding
+          .map((c) => c.detail ? `${c.label} (${c.detail})` : c.label)
+          .join('; ')}.`,
+      );
+    }
+
     // Recipient set: the campaign's selected employees, or the whole roster
     // when none were selected.
     const targetIds = campaign.targetEmployeeIds ?? [];

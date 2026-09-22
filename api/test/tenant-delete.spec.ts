@@ -11,7 +11,10 @@ const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 const prisma = { db } as unknown as PrismaService;
 const storage = new StorageService();
-const tenants = new TenantsService(prisma, storage, new AuditService(prisma), new TrialService(prisma));
+/** The service now emails setup instructions on approval; nothing under test
+ *  asserts on that, so the mailer is a no-op here. */
+const noopMailer = { send: async () => ({ messageId: 'test' }) } as never;
+const tenants = new TenantsService(prisma, storage, new AuditService(prisma), new TrialService(prisma), noopMailer);
 
 const uniq = () => `del-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const sys = <T>(fn: () => Promise<T>) => runAsSystem('test', fn);

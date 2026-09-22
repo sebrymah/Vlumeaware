@@ -8,10 +8,7 @@ import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { publicBaseUrl } from '../tracking/render';
 import { notificationFromAddress } from '../../providers/mailer/from-addresses';
-
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+import { escapeHtml as esc } from '../../common/html/escape';
 
 export interface AssignTargets {
   employeeIds?: string[];

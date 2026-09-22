@@ -13,7 +13,10 @@ const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 const prisma = { db } as unknown as PrismaService;
 const employees = new EmployeesService(prisma, new DomainsService(prisma));
-const tenants = new TenantsService(prisma, new StorageService(), new AuditService(prisma), new TrialService(prisma));
+/** The service now emails setup instructions on approval; nothing under test
+ *  asserts on that, so the mailer is a no-op here. */
+const noopMailer = { send: async () => ({ messageId: 'test' }) } as never;
+const tenants = new TenantsService(prisma, new StorageService(), new AuditService(prisma), new TrialService(prisma), noopMailer);
 
 let tenantId: string;
 

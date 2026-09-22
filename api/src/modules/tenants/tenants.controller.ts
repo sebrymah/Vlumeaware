@@ -125,6 +125,13 @@ export class TenantsController {
    * by the client because they are the ones who have to action it; the
    * confirmation that it was actioned stays a Vlumetech-only write.
    */
+  /** Setup checklist for the client's own dashboard. */
+  @Get(':tenantId/readiness')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  readiness(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
+    return this.tenants.readiness(tenantId);
+  }
+
   @Get(':tenantId/allowlist')
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   allowlist(@Param('tenantId', ParseUUIDPipe) tenantId: string) {

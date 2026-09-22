@@ -6,6 +6,7 @@ import { notificationFromAddress } from '../../providers/mailer/from-addresses';
 import { StorageService } from '../../providers/storage/storage.service';
 import { renderCertificatePdf } from './certificate-pdf';
 import { isCertificateTemplate } from './certificate-templates';
+import { escapeHtml as esc } from '../../common/html/escape';
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { publicBaseUrl } from '../tracking/render';
@@ -20,11 +21,6 @@ export interface CertificateInput {
 
 /** PNG files start with these eight bytes; anything else we treat as JPEG. */
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-/** Escapes text interpolated into the certificate email body. */
-function esc(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
 
 @Injectable()
 export class CertificatesService {
