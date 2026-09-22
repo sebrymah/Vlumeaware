@@ -38,7 +38,7 @@ export class LicensesService {
   async issue(
     tenantId: string,
     actorId: string | undefined,
-    input: { licenseTier: string; seatLimit?: number; validDays?: number },
+    input: { licenseTier: string; seatLimit?: number; validDays?: number; termDays?: number },
   ) {
     const tenant = await runAsSystem('license: read tenant', () =>
       this.prisma.db.tenant.findUnique({ where: { id: tenantId }, select: { id: true, name: true } }),
@@ -57,6 +57,7 @@ export class LicensesService {
           tenantId,
           licenseTier: input.licenseTier,
           seatLimit: input.seatLimit ?? null,
+          termDays: input.termDays ?? null,
           createdById: actorId ?? null,
           expiresAt,
         },
@@ -66,7 +67,8 @@ export class LicensesService {
     await this.audit.record(
       'license.issue',
       `issued a ${input.licenseTier} license key (…${token.displayHint}) for "${tenant.name}"` +
-        `${input.seatLimit != null ? `, ${input.seatLimit} seats` : ''}, valid ${validDays} days`,
+        `${input.seatLimit != null ? `, ${input.seatLimit} seats` : ''}` +
+        `${input.termDays != null ? `, ${input.termDays}-day term` : ''}, key valid ${validDays} days`,
       tenantId,
     );
 
@@ -163,6 +165,11 @@ export class LicensesService {
         });
         if (claimed.count === 0) throw new BadRequestException('That license key has already been redeemed.');
 
+        // The redeemed term, applied from now. Null term = no fixed expiry.
+        const start = new Date();
+        const end = token.termDays != null
+          ? new Date(start.getTime() + token.termDays * 86_400_000)
+          : null;
         return tx.tenant.update({
           where: { id: tenantId },
           data: {
@@ -172,6 +179,8 @@ export class LicensesService {
             approvedAt: new Date(),
             // The trial no longer governs this account.
             trialEndsAt: null,
+            licenseStartsAt: start,
+            licenseEndsAt: end,
           },
         });
       }),

@@ -164,3 +164,25 @@ describe('issuing and redeeming', () => {
     expect(serialised).not.toContain('tokenHash');
   });
 });
+
+describe('licence term and expiry', () => {
+  it('a key with a term sets the licence end date on redemption', async () => {
+    const tenantId = await newTenant();
+    const { key } = await licenses.issue(tenantId, 'staff-1', { licenseTier: 'Growth', termDays: 365 });
+    await licenses.redeem(tenantId, 'admin@client.test', key);
+
+    const t = await sys(() => db.tenant.findUnique({ where: { id: tenantId } }));
+    expect(t?.licenseStartsAt).toBeInstanceOf(Date);
+    expect(t?.licenseEndsAt).toBeInstanceOf(Date);
+    const days = Math.round((t!.licenseEndsAt!.getTime() - t!.licenseStartsAt!.getTime()) / 86_400_000);
+    expect(days).toBe(365);
+  });
+
+  it('a key with no term leaves the licence open-ended', async () => {
+    const tenantId = await newTenant();
+    const { key } = await licenses.issue(tenantId, 'staff-1', { licenseTier: 'Starter' });
+    await licenses.redeem(tenantId, 'admin@client.test', key);
+    const t = await sys(() => db.tenant.findUnique({ where: { id: tenantId } }));
+    expect(t?.licenseEndsAt).toBeNull();
+  });
+});

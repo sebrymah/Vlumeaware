@@ -11,6 +11,8 @@ class IssueDto {
   @IsString() @MinLength(2) licenseTier!: string;
   @IsOptional() @IsInt() @Min(1) @Max(100_000) seatLimit?: number;
   @IsOptional() @IsInt() @Min(1) @Max(365) validDays?: number;
+  /** Length of the licence granted, in days. Omit for no fixed term. */
+  @IsOptional() @IsInt() @Min(1) @Max(3650) termDays?: number;
 }
 
 class RedeemDto {

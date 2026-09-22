@@ -26,7 +26,7 @@ export class SendProcessor extends WorkerHost {
     return runInTenant(tenantId, async () => {
       const send = await this.prisma.db.send.findUnique({
         where: { id: sendId },
-        include: { employee: true, campaign: true },
+        include: { employee: true, campaign: { include: { sendingDomain: true } } },
       });
 
       if (!send) {
@@ -54,10 +54,19 @@ export class SendProcessor extends WorkerHost {
         employeeName: send.employee.name,
       });
 
+      // The campaign's chosen verified sending domain decides the From. New
+      // campaigns cannot launch without one (preflight), so this branch is
+      // taken for anything created after the feature shipped; the env fallback
+      // covers campaigns that launched before it existed.
+      const fromAddress =
+        send.campaign.sendingDomain?.status === 'verified'
+          ? `${send.campaign.fromLocalPart?.trim() || 'no-reply'}@${send.campaign.sendingDomain.domain}`
+          : (process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumesec.com');
+
       await this.mailer.send({
         to: send.employee.email,
         fromName: scenario.senderSpoofName,
-        fromAddress: process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumesec.com',
+        fromAddress,
         subject: scenario.subjectLine,
         html,
         sendId: send.id,

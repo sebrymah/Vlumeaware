@@ -10,6 +10,8 @@ interface TrialAccess {
   daysLeft: number | null;
   approved: boolean;
   licenseTier: string | null;
+  licenseEndsAt: string | null;
+  licenseDaysLeft: number | null;
 }
 
 /**
@@ -28,7 +30,27 @@ export function TrialBanner() {
       .catch(() => setAccess(null));
   }, []);
 
-  if (!access || access.level === 'full') return null;
+  if (!access) return null;
+
+  // A licensed account within its term is 'full', but a term close to ending
+  // (or ended and now read-only) still warrants a strip.
+  if (access.level === 'full') {
+    if (
+      access.licenseEndsAt &&
+      access.licenseDaysLeft != null &&
+      access.licenseDaysLeft <= 30
+    ) {
+      return (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-2 text-center text-xs text-amber-700">
+          Licence ends in {access.licenseDaysLeft} day{access.licenseDaysLeft === 1 ? '' : 's'}.{' '}
+          <Link href="/client/license" className="font-semibold underline">
+            Renew
+          </Link>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const styles: Record<string, string> = {
     trial: 'border-brand-200 bg-brand-50 text-brand-700',
@@ -41,7 +63,9 @@ export function TrialBanner() {
     access.level === 'trial'
       ? `Free trial — ${access.daysLeft} day${access.daysLeft === 1 ? '' : 's'} left. You can set up your workspace and add up to 20 employees. Live campaigns unlock once Vlumetech approves your account.`
       : access.level === 'readonly'
-        ? 'Your free trial has ended and is awaiting Vlumetech approval. The account is read-only until then.'
+        ? access.licenseEndsAt
+          ? 'Your licence has ended. The account is read-only until it is renewed. Enter a new licence key under License.'
+          : 'Your free trial has ended and is awaiting Vlumetech approval. The account is read-only until then.'
         : `Account is ${access.level}. Contact Vlumetech.`;
 
   // Only offer the key where entering one would actually change something.

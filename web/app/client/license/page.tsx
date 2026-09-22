@@ -11,6 +11,8 @@ interface Access {
   daysLeft: number | null;
   seatLimit: number | null;
   licenseTier: string | null;
+  licenseEndsAt: string | null;
+  licenseDaysLeft: number | null;
 }
 
 export default function LicensePage() {
@@ -79,6 +81,16 @@ function License() {
       {error && <Notice kind="error">{error}</Notice>}
       {ok && <Notice kind="ok">{ok}</Notice>}
 
+      {access?.licenseEndsAt &&
+        access.licenseDaysLeft != null &&
+        access.licenseDaysLeft <= 30 && (
+          <Notice kind={access.licenseDaysLeft <= 0 ? 'error' : 'info'}>
+            {access.licenseDaysLeft <= 0
+              ? 'Your licence has ended. The account is read-only until it is renewed — contact Vlumetech for a new licence key.'
+              : `Your licence ends in ${access.licenseDaysLeft} day${access.licenseDaysLeft === 1 ? '' : 's'}. Contact Vlumetech to renew before it lapses, or enter a new key below.`}
+          </Notice>
+        )}
+
       <Card title="Current plan">
         {!access ? (
           <p className="text-sm text-slate-400">Loading…</p>
@@ -95,6 +107,26 @@ function License() {
               <dd className="mt-1 text-sm font-medium text-slate-900">
                 {access.seatLimit != null ? access.seatLimit : 'Unlimited'}
               </dd>
+            </div>
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Term</dt>
+              <dd className="mt-1 text-sm font-medium text-slate-900">
+                {access.licenseEndsAt ? (
+                  access.licenseDaysLeft != null && access.licenseDaysLeft > 0 ? (
+                    <span>{access.licenseDaysLeft} day{access.licenseDaysLeft === 1 ? '' : 's'} left</span>
+                  ) : (
+                    <span className="text-red-700">Expired</span>
+                  )
+                ) : (
+                  'No fixed term'
+                )}
+              </dd>
+              {access.licenseEndsAt && (
+                <dd className="mt-0.5 text-[11px] text-slate-400">
+                  {access.licenseDaysLeft != null && access.licenseDaysLeft > 0 ? 'renews' : 'ended'}{' '}
+                  {new Date(access.licenseEndsAt).toLocaleDateString()}
+                </dd>
+              )}
             </div>
             <div>
               <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Status</dt>

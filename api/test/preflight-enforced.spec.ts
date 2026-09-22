@@ -57,13 +57,20 @@ async function readyTenant() {
       },
     }),
   );
-  const campaign = await sys(() => db.campaign.create({ data: { tenantId: t.id, name: 'C' } }));
+  const sendingDomain = await sys(() =>
+    db.sendingDomain.create({
+      data: { tenantId: t.id, domain: `send-${uniq()}.test`, providerId: 'p', status: 'verified', verifiedAt: new Date() },
+    }),
+  );
+  const campaign = await sys(() =>
+    db.campaign.create({ data: { tenantId: t.id, name: 'C', sendingDomainId: sendingDomain.id } }),
+  );
   await sys(() =>
     db.campaignScenario.create({
       data: { tenantId: t.id, campaignId: campaign.id, scenarioId: scenario.id },
     }),
   );
-  return { tenantId: t.id, campaignId: campaign.id, scenarioId: scenario.id };
+  return { tenantId: t.id, campaignId: campaign.id, scenarioId: scenario.id, sendingDomainId: sendingDomain.id };
 }
 
 const launch = (tenantId: string, campaignId: string) =>
@@ -101,10 +108,16 @@ describe('preflight is enforced at launch, not merely reported', () => {
     await expect(launch(tenantId, campaignId)).rejects.toThrow(/Not ready to launch/i);
   });
 
-  it('refuses when an attached scenario is unapproved', async () => {
-    const { tenantId, campaignId, scenarioId } = await readyTenant();
-    await sys(() => db.scenario.update({ where: { id: scenarioId }, data: { approvedAt: null } }));
-    await expect(launch(tenantId, campaignId)).rejects.toThrow(/approved/i);
+  it('refuses when no verified sending domain is chosen', async () => {
+    const { tenantId, campaignId } = await readyTenant();
+    await sys(() => db.campaign.update({ where: { id: campaignId }, data: { sendingDomainId: null } }));
+    await expect(launch(tenantId, campaignId)).rejects.toThrow(/sending domain/i);
+  });
+
+  it('refuses when the chosen sending domain is not yet verified', async () => {
+    const { tenantId, campaignId, sendingDomainId } = await readyTenant();
+    await sys(() => db.sendingDomain.update({ where: { id: sendingDomainId }, data: { status: 'pending' } }));
+    await expect(launch(tenantId, campaignId)).rejects.toThrow(/sending domain/i);
   });
 
   it('refuses when no scenario is attached', async () => {

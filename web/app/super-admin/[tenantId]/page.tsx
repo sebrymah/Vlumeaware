@@ -25,6 +25,7 @@ interface Tenant {
   lastDigestSentAt: string | null;
   licenseTier: string | null;
   seatLimit: number | null;
+  licenseEndsAt: string | null;
 }
 
 interface LicenseKey {
@@ -75,6 +76,7 @@ function TenantDetail() {
   const [showDelete, setShowDelete] = useState(false);
   const [keys, setKeys] = useState<LicenseKey[]>([]);
   const [keyValidDays, setKeyValidDays] = useState('30');
+  const [termDays, setTermDays] = useState('365');
   const [issuedKey, setIssuedKey] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
   const [deleted, setDeleted] = useState<{
@@ -206,6 +208,9 @@ function TenantDetail() {
       await api.patch(`/tenants/${tenantId}/license`, {
         licenseTier: licenseTier || null,
         seatLimit: seatLimit === '' ? null : Number(seatLimit),
+        // Blank leaves the term untouched; a number sets a fresh term; the
+        // "No expiry" control sends null.
+        termDays: termDays === '' ? undefined : termDays === 'none' ? null : Number(termDays),
       });
       setOk('License updated.');
       await load();
@@ -238,6 +243,7 @@ function TenantDetail() {
         licenseTier: licenseTier || 'Starter',
         seatLimit: seatLimit ? Number(seatLimit) : undefined,
         validDays: Number(keyValidDays) || 30,
+        termDays: termDays === 'none' || termDays === '' ? undefined : Number(termDays),
       });
       // Shown once and never retrievable, so it is held in state rather than
       // refetched with the list below.
@@ -500,7 +506,7 @@ function TenantDetail() {
         subtitle="Set the client's tier and how many employees (seats) they may add."
       >
         <div className="space-y-3">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-4">
             <Field label="License tier">
               <input
                 className={inputClass}
@@ -519,6 +525,20 @@ function TenantDetail() {
                 placeholder="—"
               />
             </Field>
+            <Field label="Term (days)" hint="365, or 'No expiry'.">
+              <select
+                className={inputClass}
+                value={termDays}
+                onChange={(e) => setTermDays(e.target.value)}
+              >
+                <option value="">Leave unchanged</option>
+                <option value="30">30 days</option>
+                <option value="90">90 days</option>
+                <option value="365">365 days</option>
+                <option value="730">730 days</option>
+                <option value="none">No expiry</option>
+              </select>
+            </Field>
             <div className="flex items-end">
               <Button onClick={saveLicense} disabled={busy}>
                 Save license
@@ -531,14 +551,25 @@ function TenantDetail() {
               {tenant.seatLimit != null ? `of ${tenant.seatLimit} seats` : 'seats (unlimited)'}.
             </p>
           )}
+          <p className="text-xs text-slate-500">
+            Licence term:{' '}
+            {tenant.licenseEndsAt ? (
+              <span className="font-semibold text-slate-700">
+                ends {new Date(tenant.licenseEndsAt).toLocaleDateString()}
+              </span>
+            ) : (
+              <span className="text-slate-400">no fixed term</span>
+            )}
+            . A redeemed key with a term overrides this.
+          </p>
 
           <div className="space-y-3 border-t border-slate-200 pt-4">
             <div>
               <p className="text-[13px] font-semibold text-slate-800">License key</p>
               <p className="mt-0.5 text-xs text-slate-500">
-                Issues a key for the tier and seats above. Send it to the client admin — redeeming
-                it activates their account, so they go live when they are ready rather than when
-                you happen to click Save.
+                Issues a key for the tier, seats and term above. Send it to the client admin —
+                redeeming it activates their account and starts the term, so they go live when
+                they are ready rather than when you happen to click Save.
               </p>
             </div>
 

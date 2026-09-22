@@ -11,7 +11,11 @@ interface Scenario {
   id: string;
   title: string;
   difficultyTier: string;
-  approvedAt: string | null;
+}
+
+interface SendingDomain {
+  id: string;
+  domain: string;
 }
 
 interface Employee {
@@ -52,19 +56,24 @@ function Campaigns() {
   const [scheduledSendAt, setScheduledSendAt] = useState('');
   const [sendWindowMinutes, setSendWindowMinutes] = useState('0');
   const [recurrenceDays, setRecurrenceDays] = useState('');
+  const [sendingDomains, setSendingDomains] = useState<SendingDomain[]>([]);
+  const [sendingDomainId, setSendingDomainId] = useState('');
+  const [fromLocalPart, setFromLocalPart] = useState('no-reply');
   const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const [c, s, emp] = await Promise.all([
+      const [c, s, emp, sd] = await Promise.all([
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
         api.get<Scenario[]>(`/tenants/${tenantId}/scenarios`),
         api.get<Employee[]>(`/tenants/${tenantId}/employees`),
+        api.get<SendingDomain[]>(`/tenants/${tenantId}/sending-domains/verified`),
       ]);
       setCampaigns(c);
       setScenarios(s);
       setEmployees(emp);
+      setSendingDomains(sd);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -147,6 +156,8 @@ function Campaigns() {
         scheduledSendAt: scheduledSendAt ? new Date(scheduledSendAt).toISOString() : undefined,
         sendWindowMinutes: Number(sendWindowMinutes) || 0,
         recurrenceDays: recurrenceDays ? Number(recurrenceDays) : undefined,
+        sendingDomainId: sendingDomainId || undefined,
+        fromLocalPart: fromLocalPart.trim() || undefined,
       });
       setName('');
       setSelected([]);
@@ -155,6 +166,8 @@ function Campaigns() {
       setScheduledSendAt('');
       setSendWindowMinutes('0');
       setRecurrenceDays('');
+      setSendingDomainId('');
+      setFromLocalPart('no-reply');
       setOk(
         scheduledSendAt
           ? 'Campaign scheduled. It will auto-launch at the set time.'
@@ -167,8 +180,6 @@ function Campaigns() {
       setBusy(false);
     }
   }
-
-  const approved = scenarios.filter((s) => s.approvedAt);
 
   return (
     <div className="space-y-6">
@@ -254,12 +265,11 @@ function Campaigns() {
 
       <Card
         title="Create a campaign"
-        subtitle="Only approved scenarios can be attached. Vlumetech approves scenarios on your behalf."
+        subtitle="Attach one or more scenarios, choose who receives them, and launch when ready."
       >
-        {!approved.length ? (
+        {!scenarios.length ? (
           <Notice kind="info">
-            No approved scenarios yet. Generate and save one under Scenarios, then ask Vlumetech to
-            approve it.
+            No scenarios yet. Create one under Scenarios, or add one from the shared library.
           </Notice>
         ) : (
           <form onSubmit={create} className="space-y-4">
@@ -277,7 +287,7 @@ function Campaigns() {
             </div>
             <Field label="Scenarios">
               <div className="space-y-1">
-                {approved.map((s) => (
+                {scenarios.map((s) => (
                   <label key={s.id} className="flex items-center gap-2 text-xs text-slate-600">
                     <input
                       type="checkbox"
@@ -350,6 +360,55 @@ function Campaigns() {
                     : `${recipients.length} selected.`}
                 </p>
               </div>
+            </Field>
+
+            <Field
+              label="Send from"
+              hint="Which of your verified domains this campaign appears to come from."
+            >
+              {sendingDomains.length === 0 ? (
+                <Notice kind="info">
+                  No verified sending domain yet. Add and verify one under People → Sending domains
+                  before you can launch. You can still save this campaign as a draft.
+                </Notice>
+              ) : (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="w-40">
+                    <input
+                      className={inputClass}
+                      value={fromLocalPart}
+                      onChange={(e) => setFromLocalPart(e.target.value)}
+                      placeholder="it-support"
+                      aria-label="From local part"
+                    />
+                  </div>
+                  <span className="pb-2 text-sm text-slate-400">@</span>
+                  <div className="min-w-[12rem] flex-1">
+                    <select
+                      className={inputClass}
+                      value={sendingDomainId}
+                      onChange={(e) => setSendingDomainId(e.target.value)}
+                    >
+                      <option value="">Choose a domain…</option>
+                      {sendingDomains.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.domain}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {sendingDomainId && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Mail will come from{' '}
+                  <span className="font-mono text-slate-700">
+                    {(fromLocalPart.trim() || 'no-reply')}@
+                    {sendingDomains.find((d) => d.id === sendingDomainId)?.domain}
+                  </span>
+                  . The display name is each scenario&rsquo;s sender name.
+                </p>
+              )}
             </Field>
 
             <div className="grid gap-3 sm:grid-cols-3">
