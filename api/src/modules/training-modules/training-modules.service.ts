@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId } from '../../common/prisma/tenant-context';
 import { runAsSystem } from '../../common/prisma/tenant-context';
@@ -70,6 +70,15 @@ export class TrainingModulesService {
       file.buffer,
       file.mimetype,
     );
+    // Same guard as the shared library: a put() that reports success without
+    // the bytes landing would leave a module pointing at nothing, and the
+    // first person to notice is a learner with a dead player.
+    if (!(await this.storage.exists(storedUrl))) {
+      throw new BadGatewayException(
+        'The video did not survive the upload — storage accepted it but cannot read it back. ' +
+          'Nothing was added to your library. Try again, or contact Vlumetech if it persists.',
+      );
+    }
     return this.prisma.db.trainingModule.create({
       data: {
         tenantId,

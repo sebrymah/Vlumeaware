@@ -221,6 +221,49 @@ export class StorageService {
    * unchanged; supabase:// and s3:// references are signed with a short TTL.
    */
   /**
+   * Confirms an object is actually readable at the reference we hold.
+   *
+   * Two library rows once pointed at objects that were never written: the
+   * upload reported success during a window when the storage key was
+   * malformed, the row was created, and the failure only surfaced as a video
+   * that would not play for a learner. Checking after write turns that into an
+   * error the uploader sees.
+   */
+  async exists(uri: string): Promise<boolean> {
+    try {
+      if (!uri) return false;
+
+      if (uri.startsWith('supabase://')) {
+        if (!this.supabaseUrl || !this.supabaseKey) return false;
+        // Same URL shape get() uses, which is proven against the live bucket.
+        const url = `${this.supabaseUrl}/storage/v1/object/${uri.slice('supabase://'.length)}`;
+        const auth = { Authorization: `Bearer ${this.supabaseKey}` };
+
+        // HEAD first, so a 200MB video is not pulled back to answer yes or no.
+        const head = await fetch(url, { method: 'HEAD', headers: auth });
+        if (head.ok) return true;
+        // 404 is a real answer; anything else may be the server declining the
+        // method rather than denying the object. This guard blocks uploads, so
+        // it must not turn "HEAD unsupported" into "every upload failed".
+        if (head.status === 404) return false;
+
+        // One byte is enough to prove the object is readable.
+        const ranged = await fetch(url, { headers: { ...auth, Range: 'bytes=0-0' } });
+        return ranged.ok;
+      }
+
+      if (uri.startsWith('s3://') || uri.startsWith('file://')) {
+        return (await this.get(uri)) !== null;
+      }
+
+      // A hosted http(s) link is somebody else's server; not ours to vouch for.
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Deletes a stored object. Used when a tenant is removed: the database rows
    * go, and the videos, logos and signed agreements they pointed at have to go
    * with them or the client's data outlives the account that held it.

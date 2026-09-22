@@ -4,7 +4,8 @@ import { ArrayMinSize, IsArray, IsBoolean, IsInt, IsOptional, IsUUID, Max, Min, 
 import { Type } from 'class-transformer';
 import { Public } from '../../common/auth/roles.decorator';
 import { Throttle } from '../../common/ratelimit/rate-limit.decorator';
-import { publicBaseUrl } from './render';
+import { publicBaseUrl, renderAllowlistResult } from './render';
+import { TenantsService } from '../tenants/tenants.service';
 import { TrackingService } from './tracking.service';
 
 /** 1x1 transparent GIF, served whatever happens so email clients see an image. */
@@ -41,7 +42,23 @@ class QuizSubmissionDto {
 // real inbox (images prefetched, links followed twice) but not for scraping.
 @Throttle({ limit: 120, windowMs: 60_000 })
 export class TrackingController {
-  constructor(private readonly tracking: TrackingService) {}
+  constructor(
+    private readonly tracking: TrackingService,
+    private readonly tenants: TenantsService,
+  ) {}
+
+  /**
+   * Opened from the gateway delivery test. Living on /track is deliberate: it
+   * shares the path and host a simulation's links use, so a gateway that
+   * rewrites or blocks those will block this too and the test stays honest.
+   */
+  @Get('allowlist/:token')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Cache-Control', 'no-store')
+  async allowlist(@Param('token') token: string, @Res() res: Response) {
+    const tenant = await this.tenants.confirmAllowlistProbe(token);
+    res.send(renderAllowlistResult(tenant?.name ?? null));
+  }
 
   @Get('open/:token')
   @Header('Content-Type', 'image/gif')

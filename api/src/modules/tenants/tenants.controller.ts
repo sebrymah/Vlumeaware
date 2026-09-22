@@ -17,6 +17,7 @@ import { CERTIFICATE_TEMPLATES } from '../certificates/certificate-templates';
 import { IsBoolean, IsDateString, IsEmail, IsHexColor, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { Roles } from '../../common/auth/roles.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
+import { Throttle } from '../../common/ratelimit/rate-limit.decorator';
 import type { JwtPayload } from '../../common/auth/roles';
 import { ROLES } from '../../common/auth/roles';
 import { TenantsService } from './tenants.service';
@@ -80,6 +81,10 @@ class DeleteTenantDto {
   @IsString() @MinLength(1) confirmName!: string;
 }
 
+class ProbeDto {
+  @IsEmail() email!: string;
+}
+
 @Controller('tenants')
 @Roles(ROLES.superadmin)
 export class TenantsController {
@@ -130,6 +135,22 @@ export class TenantsController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   readiness(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
     return this.tenants.readiness(tenantId);
+  }
+
+  /**
+   * Client admin proves their gateway lets our mail through, without needing
+   * Vlumetech to tick a box on their behalf. Throttled: it sends real mail.
+   */
+  @Post(':tenantId/allowlist/probe')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @Throttle({ limit: 5, windowMs: 15 * 60_000 })
+  @HttpCode(200)
+  sendAllowlistProbe(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: ProbeDto,
+  ) {
+    return this.tenants.sendAllowlistProbe(tenantId, dto.email, user.email ?? user.sub);
   }
 
   @Get(':tenantId/allowlist')
