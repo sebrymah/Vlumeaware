@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -72,6 +73,11 @@ class LicenseDto {
 class ApproveDto {
   @IsOptional() @IsString() licenseTier?: string;
   @IsOptional() @IsInt() @Min(1) seatLimit?: number;
+}
+
+class DeleteTenantDto {
+  /** Must equal the tenant's name exactly. Guards against deleting the wrong client. */
+  @IsString() @MinLength(1) confirmName!: string;
 }
 
 @Controller('tenants')
@@ -196,6 +202,19 @@ export class TenantsController {
   @Patch(':tenantId/status')
   setStatus(@Param('tenantId', ParseUUIDPipe) tenantId: string, @Body() dto: StatusDto) {
     return this.tenants.setStatus(tenantId, dto.status);
+  }
+
+  /**
+   * Permanently deletes a suspended or offboarded client and all their data.
+   * There is no undo, so it takes the client's name as typed confirmation.
+   */
+  @Delete(':tenantId')
+  @HttpCode(200)
+  removeTenant(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: DeleteTenantDto,
+  ) {
+    return this.tenants.remove(tenantId, dto.confirmName);
   }
 
   @Patch(':tenantId/deliverability')

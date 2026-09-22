@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
@@ -58,6 +59,14 @@ function TenantDetail() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmName, setConfirmName] = useState('');
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleted, setDeleted] = useState<{
+    name: string;
+    rows: number;
+    filesDeleted: number;
+    filesFailed: string[];
+  } | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [signedAt, setSignedAt] = useState(() => new Date().toISOString().slice(0, 10));
@@ -201,6 +210,23 @@ function TenantDetail() {
     }
   }
 
+  async function deleteTenant() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.del<{ name: string; rows: number; filesDeleted: number; filesFailed: string[] }>(
+        `/tenants/${tenantId}`,
+        { confirmName },
+      );
+      // The tenant is gone, so there is nothing left to reload. Show the
+      // outcome here rather than bouncing to a list that cannot explain it.
+      setDeleted(res);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
   async function kill(campaignId: string) {
     setBusy(true);
     try {
@@ -214,6 +240,28 @@ function TenantDetail() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Checked before the loading guard: once deleted there is no tenant to load,
+  // so the ordinary "Loading…" state would be wrong and permanent.
+  if (deleted) {
+    return (
+      <div className="space-y-4">
+        <Notice kind="ok">
+          Deleted <strong>{deleted.name}</strong>. {deleted.rows} rows and {deleted.filesDeleted}{' '}
+          stored file(s) removed. The name is free to onboard again.
+        </Notice>
+        {deleted.filesFailed.length > 0 && (
+          <Notice kind="error">
+            {deleted.filesFailed.length} stored file(s) could not be deleted and are still in the
+            bucket. The client rows are gone; these need removing by hand. See the server log.
+          </Notice>
+        )}
+        <Link href="/super-admin" className="text-sm font-medium text-brand-700 underline">
+          Back to clients
+        </Link>
+      </div>
+    );
   }
 
   if (!tenant) {
@@ -431,6 +479,66 @@ function TenantDetail() {
             </p>
           )}
         </div>
+      </Card>
+
+      <Card
+        title="Delete this client"
+        subtitle="Removes the client and everything belonging to them. There is no undo."
+      >
+        {tenant.status === 'active' ? (
+          <p className="text-xs text-slate-500">
+            An active client cannot be deleted. Suspend or offboard it first — the server enforces
+            this, not just this page.
+          </p>
+        ) : !showDelete ? (
+          <div className="flex items-center gap-3">
+            <Button variant="danger" onClick={() => setShowDelete(true)}>
+              Delete permanently
+            </Button>
+            <span className="text-xs text-slate-500">
+              Frees the name so the same company can be onboarded again.
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800">
+              <p className="font-semibold">This deletes everything, permanently.</p>
+              <p className="mt-1">
+                Employees, campaigns, sends, scenarios, training modules, quizzes, certificates,
+                verified domains and console users — plus the videos, logos and signed agreements
+                in storage. Issued certificates stop verifying. Only the audit log survives.
+              </p>
+            </div>
+            <Field label={`Type the client's name to confirm: ${tenant.name}`}>
+              <input
+                className={inputClass}
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+                placeholder={tenant.name}
+                autoComplete="off"
+              />
+            </Field>
+            <div className="flex gap-2">
+              <Button
+                variant="danger"
+                onClick={deleteTenant}
+                disabled={busy || confirmName.trim() !== tenant.name.trim()}
+              >
+                {busy ? 'Deleting…' : 'Delete this client forever'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowDelete(false);
+                  setConfirmName('');
+                }}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
 
