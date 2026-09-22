@@ -17,6 +17,7 @@ interface Tenant {
   allowlistConfirmedAt: string | null;
   digestEmail: string | null;
   digestEnabled: boolean;
+  lastDigestSentAt: string | null;
   licenseTier: string | null;
   seatLimit: number | null;
 }
@@ -351,6 +352,21 @@ function TenantDetail() {
                 </Button>
               )}
             </div>
+          </div>
+          <div className="text-xs text-slate-600">
+            {/* Without this there is no way to tell a working digest from a
+                silently failing one until the client asks where it is. */}
+            {tenant.digestEnabled ? (
+              tenant.lastDigestSentAt ? (
+                <>Last digest sent {new Date(tenant.lastDigestSentAt).toLocaleString()}. Sends weekly.</>
+              ) : (
+                <span className="text-amber-700">
+                  Enabled, but none sent yet. The first goes out within the hour.
+                </span>
+              )
+            ) : (
+              <>Off. When enabled, one digest is sent within the hour and weekly after that.</>
+            )}
           </div>
         </div>
       </Card>

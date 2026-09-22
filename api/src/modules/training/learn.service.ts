@@ -7,6 +7,7 @@ import { CertificatesService } from '../certificates/certificates.service';
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { publicBaseUrl } from '../tracking/render';
+import { notificationFromAddress } from '../../providers/mailer/from-addresses';
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -98,7 +99,10 @@ export class LearnService {
           await this.mailer.send({
             to: emp.email,
             fromName: `${tenant?.name ?? 'Vlumeaware'} Security Awareness`,
-            fromAddress: process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumesec.com',
+            // Genuine mail, so the notification address: sending a real
+            // training invite from the simulation domain teaches staff to
+            // trust the exact address they are being trained to distrust.
+            fromAddress: notificationFromAddress(),
             subject: `Training assigned: ${module.title}`,
             html:
               `<p>Hi ${esc(emp.name)},</p>` +

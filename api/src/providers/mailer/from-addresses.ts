@@ -10,7 +10,24 @@ export function notificationFromAddress(): string {
   return (
     process.env.NOTIFICATION_FROM_ADDRESS ??
     process.env.DIGEST_FROM_ADDRESS ??
-    'reports@vlumeaware-trk.io'
+    'notifications@vlumesec.com'
+  );
+}
+
+/**
+ * Where the weekly client digest comes from. Falls back to the notification
+ * address because both are genuine mail and belong on the same verified
+ * domain — never on the simulation domain, for the reason above.
+ *
+ * The default is a real address on a domain we own. The previous default,
+ * reports@vlumeaware-trk.io, was a placeholder: Resend rejects sends from an
+ * unverified domain, so with DIGEST_FROM_ADDRESS unset every digest failed.
+ */
+export function digestFromAddress(): string {
+  return (
+    process.env.DIGEST_FROM_ADDRESS ??
+    process.env.NOTIFICATION_FROM_ADDRESS ??
+    'reports@vlumesec.com'
   );
 }
 

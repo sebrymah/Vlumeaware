@@ -70,6 +70,12 @@ model Tenant {
   allowlistConfirmedAt  DateTime?    @map("allowlist_confirmed_at")
   digestEmail           String?      @map("digest_email")
   digestEnabled         Boolean      @default(false) @map("digest_enabled")
+  /// When the last digest actually went out. Null means one has never been
+  /// sent, which is what makes the first digest arrive on the next tick after
+  /// a client opts in rather than a week later. The digest worker reads this
+  /// to decide whether a tenant is due; without it the hourly tick sent to
+  /// every opted-in tenant every hour.
+  lastDigestSentAt      DateTime?    @map("last_digest_sent_at")
   /// License tier label (e.g. "Starter", "Growth", "Enterprise"). Display only.
   licenseTier           String?      @map("license_tier")
   /// Max employees (seats) this client may have. null = unlimited.
