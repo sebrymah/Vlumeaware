@@ -527,10 +527,11 @@ export class TenantsService {
     );
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const [employees, verifiedDomains] = await runAsSystem('readiness: counts', () =>
+    const [employees, verifiedDomains, sendingDomains] = await runAsSystem('readiness: counts', () =>
       Promise.all([
         this.prisma.db.employee.count({ where: { tenantId } }),
         this.prisma.db.verifiedDomain.count({ where: { tenantId, status: 'verified' } }),
+        this.prisma.db.sendingDomain.count({ where: { tenantId, status: 'verified' } }),
       ]),
     );
 
@@ -548,6 +549,15 @@ export class TenantsService {
         ok: verifiedDomains > 0,
         hint: 'Simulations can only be sent to addresses on a domain you have proved you own.',
         href: '/client/domains',
+      },
+      {
+        key: 'sendingDomainVerified',
+        label: 'At least one sending domain verified',
+        ok: sendingDomains > 0,
+        hint:
+          'The domain your simulations appear to come from. Add one and publish its DNS records ' +
+          'so campaigns have a verified sender to send from.',
+        href: '/client/sending-domains',
       },
       {
         key: 'employeesUploaded',

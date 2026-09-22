@@ -137,6 +137,7 @@ model Tenant {
   phishReports          PhishReport[]
   verifiedDomains       VerifiedDomain[]
   licenseTokens         LicenseToken[]
+  sendingDomains        SendingDomain[]
 
   @@map("tenants")
 }
@@ -239,6 +240,12 @@ model Campaign {
   createdAt         DateTime       @default(now()) @map("created_at")
   /// Recipients to send to. Empty = all employees on the roster.
   targetEmployeeIds String[]       @default([]) @map("target_employee_ids") @db.Uuid
+  /// The verified sending domain this campaign's mail goes out from, chosen
+  /// per campaign. Required to launch — enforced in preflight.
+  sendingDomainId   String?        @map("sending_domain_id") @db.Uuid
+  /// Local part of the From address, e.g. "it-support" → it-support@<domain>.
+  /// The display name is the scenario's senderSpoofName.
+  fromLocalPart     String?        @map("from_local_part")
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaignScenarios CampaignScenario[]
@@ -247,6 +254,7 @@ model Campaign {
   quiz              Quiz?
   parent            Campaign?          @relation("CampaignRecurrence", fields: [parentCampaignId], references: [id], onDelete: SetNull)
   children          Campaign[]         @relation("CampaignRecurrence")
+  sendingDomain     SendingDomain?     @relation(fields: [sendingDomainId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@map("campaigns")
@@ -559,6 +567,39 @@ model SharedTrainingModule {
  * only be onboarded — and simulations only sent — to addresses on a verified
  * domain, so a client cannot phish people outside their own organisation.
  */
+/// A domain the client may send simulated phishing *as* (distinct from
+/// VerifiedDomain, which is who they may send *to*). Registered with the email
+/// provider (Resend) and verified by DNS the client's IT publishes, so mail
+/// from it passes authentication. Only a verified sending domain can be chosen
+/// for a campaign.
+model SendingDomain {
+  id          String              @id @default(uuid()) @db.Uuid
+  tenantId    String              @map("tenant_id") @db.Uuid
+  domain      String
+  /// The provider's id for this domain, used to poll verification and to
+  /// delete it provider-side when the client removes it here.
+  providerId  String?             @map("provider_id")
+  status      SendingDomainStatus @default(pending)
+  /// The DNS records the client must publish, as returned by the provider.
+  /// Shown to the client with copy buttons; opaque to us.
+  dnsRecords  Json?               @map("dns_records")
+  verifiedAt  DateTime?           @map("verified_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+
+  @@unique([tenantId, domain])
+  @@index([tenantId])
+  @@map("sending_domains")
+}
+
+enum SendingDomainStatus {
+  pending
+  verified
+  failed
+}
+
 model VerifiedDomain {
   id         String       @id @default(uuid()) @db.Uuid
   tenantId   String       @map("tenant_id") @db.Uuid

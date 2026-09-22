@@ -29,6 +29,8 @@ export class CampaignsService {
     scheduledSendAt?: Date;
     sendWindowMinutes?: number;
     recurrenceDays?: number;
+    sendingDomainId?: string;
+    fromLocalPart?: string;
   }) {
     if (!input.scenarioIds.length) {
       throw new BadRequestException('A campaign needs at least one scenario');
@@ -56,6 +58,19 @@ export class CampaignsService {
       throw new BadRequestException('One or more scenarios do not exist in this tenant');
     }
 
+    // A chosen sending domain must be this tenant's own and verified. Read
+    // under tenant scope, so another tenant's domain simply is not found.
+    if (input.sendingDomainId) {
+      const domain = await this.prisma.db.sendingDomain.findUnique({
+        where: { id: input.sendingDomainId },
+        select: { status: true },
+      });
+      if (!domain) throw new BadRequestException('Selected sending domain does not exist in this tenant');
+      if (domain.status !== 'verified') {
+        throw new BadRequestException('Selected sending domain is not verified yet');
+      }
+    }
+
     const tenantId = currentTenantId();
     const campaign = await this.prisma.db.campaign.create({
       data: {
@@ -65,6 +80,8 @@ export class CampaignsService {
         sendWindowMinutes: input.sendWindowMinutes ?? 0,
         recurrenceDays: input.recurrenceDays,
         targetEmployeeIds,
+        sendingDomainId: input.sendingDomainId ?? null,
+        fromLocalPart: input.fromLocalPart?.trim() || null,
         campaignScenarios: {
           create: scenarios.map((s) => ({ scenarioId: s.id, tenantId })),
         },
@@ -108,22 +125,35 @@ export class CampaignsService {
         where: { id: tenantId },
         select: {
           ndpaAgreementSignedAt: true,
-          sendingDomain: true,
           allowlistConfirmedAt: true,
         },
       }),
     );
 
-    const [employeeCount, scenarioCount] = await Promise.all([
+    const [employeeCount, scenarioCount, sendingDomain] = await Promise.all([
       this.prisma.db.employee.count(),
       this.prisma.db.campaignScenario.count({ where: { campaignId } }),
+      campaign.sendingDomainId
+        ? this.prisma.db.sendingDomain.findUnique({
+            where: { id: campaign.sendingDomainId },
+            select: { domain: true, status: true },
+          })
+        : Promise.resolve(null),
     ]);
 
     const checks = [
       { key: 'agreementSigned', label: 'NDPA authorization agreement signed', ok: !!tenant?.ndpaAgreementSignedAt },
       { key: 'employeesUploaded', label: 'Employees uploaded', ok: employeeCount > 0, detail: `${employeeCount} employees` },
       { key: 'scenariosAttached', label: 'At least one scenario attached', ok: scenarioCount > 0 },
-      { key: 'sendingDomain', label: 'Sending / tracking domain configured', ok: !!(tenant?.sendingDomain || process.env.TRACKING_BASE_URL) },
+      {
+        key: 'sendingDomain',
+        label: 'Verified sending domain chosen for this campaign',
+        ok: !!sendingDomain && sendingDomain.status === 'verified',
+        detail: sendingDomain
+          ? `${sendingDomain.domain}${sendingDomain.status !== 'verified' ? ' (not verified)' : ''}`
+          : 'none chosen',
+      },
+      { key: 'trackingConfigured', label: 'Tracking domain configured', ok: !!process.env.TRACKING_BASE_URL },
       { key: 'gatewayAllowlist', label: "Client IT confirmed our IPs are allow-listed", ok: !!tenant?.allowlistConfirmedAt },
     ];
 

@@ -50,6 +50,7 @@ const NAV: Record<Role, NavEntry[]> = {
       items: [
         { href: '/client/employees', label: 'Employees' },
         { href: '/client/domains', label: 'Domains' },
+        { href: '/client/sending-domains', label: 'Sending domains' },
         { href: '/client/risk', label: 'Risk' },
       ],
     },

@@ -13,6 +13,11 @@ interface Scenario {
   difficultyTier: string;
 }
 
+interface SendingDomain {
+  id: string;
+  domain: string;
+}
+
 interface Employee {
   id: string;
   name: string;
@@ -51,19 +56,24 @@ function Campaigns() {
   const [scheduledSendAt, setScheduledSendAt] = useState('');
   const [sendWindowMinutes, setSendWindowMinutes] = useState('0');
   const [recurrenceDays, setRecurrenceDays] = useState('');
+  const [sendingDomains, setSendingDomains] = useState<SendingDomain[]>([]);
+  const [sendingDomainId, setSendingDomainId] = useState('');
+  const [fromLocalPart, setFromLocalPart] = useState('no-reply');
   const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const [c, s, emp] = await Promise.all([
+      const [c, s, emp, sd] = await Promise.all([
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
         api.get<Scenario[]>(`/tenants/${tenantId}/scenarios`),
         api.get<Employee[]>(`/tenants/${tenantId}/employees`),
+        api.get<SendingDomain[]>(`/tenants/${tenantId}/sending-domains/verified`),
       ]);
       setCampaigns(c);
       setScenarios(s);
       setEmployees(emp);
+      setSendingDomains(sd);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -146,6 +156,8 @@ function Campaigns() {
         scheduledSendAt: scheduledSendAt ? new Date(scheduledSendAt).toISOString() : undefined,
         sendWindowMinutes: Number(sendWindowMinutes) || 0,
         recurrenceDays: recurrenceDays ? Number(recurrenceDays) : undefined,
+        sendingDomainId: sendingDomainId || undefined,
+        fromLocalPart: fromLocalPart.trim() || undefined,
       });
       setName('');
       setSelected([]);
@@ -154,6 +166,8 @@ function Campaigns() {
       setScheduledSendAt('');
       setSendWindowMinutes('0');
       setRecurrenceDays('');
+      setSendingDomainId('');
+      setFromLocalPart('no-reply');
       setOk(
         scheduledSendAt
           ? 'Campaign scheduled. It will auto-launch at the set time.'
@@ -346,6 +360,55 @@ function Campaigns() {
                     : `${recipients.length} selected.`}
                 </p>
               </div>
+            </Field>
+
+            <Field
+              label="Send from"
+              hint="Which of your verified domains this campaign appears to come from."
+            >
+              {sendingDomains.length === 0 ? (
+                <Notice kind="info">
+                  No verified sending domain yet. Add and verify one under People → Sending domains
+                  before you can launch. You can still save this campaign as a draft.
+                </Notice>
+              ) : (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="w-40">
+                    <input
+                      className={inputClass}
+                      value={fromLocalPart}
+                      onChange={(e) => setFromLocalPart(e.target.value)}
+                      placeholder="it-support"
+                      aria-label="From local part"
+                    />
+                  </div>
+                  <span className="pb-2 text-sm text-slate-400">@</span>
+                  <div className="min-w-[12rem] flex-1">
+                    <select
+                      className={inputClass}
+                      value={sendingDomainId}
+                      onChange={(e) => setSendingDomainId(e.target.value)}
+                    >
+                      <option value="">Choose a domain…</option>
+                      {sendingDomains.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.domain}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
+              {sendingDomainId && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  Mail will come from{' '}
+                  <span className="font-mono text-slate-700">
+                    {(fromLocalPart.trim() || 'no-reply')}@
+                    {sendingDomains.find((d) => d.id === sendingDomainId)?.domain}
+                  </span>
+                  . The display name is each scenario&rsquo;s sender name.
+                </p>
+              )}
             </Field>
 
             <div className="grid gap-3 sm:grid-cols-3">

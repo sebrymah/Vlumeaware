@@ -16,6 +16,10 @@ class CreateCampaignDto {
   @IsOptional() @IsInt() @Min(0) @Max(10080) sendWindowMinutes?: number;
   /** Auto-repeat every N days (e.g. 90 for quarterly). */
   @IsOptional() @IsInt() @Min(1) @Max(365) recurrenceDays?: number;
+  /** The verified sending domain this campaign sends from. */
+  @IsOptional() @IsUUID('4') sendingDomainId?: string;
+  /** From local part, e.g. "it-support" -> it-support@<domain>. */
+  @IsOptional() @IsString() @MinLength(1) fromLocalPart?: string;
 }
 
 class ScheduleDto {
@@ -39,6 +43,8 @@ export class CampaignsController {
       scheduledSendAt: dto.scheduledSendAt ? new Date(dto.scheduledSendAt) : undefined,
       sendWindowMinutes: dto.sendWindowMinutes,
       recurrenceDays: dto.recurrenceDays,
+      sendingDomainId: dto.sendingDomainId,
+      fromLocalPart: dto.fromLocalPart,
     });
   }
 

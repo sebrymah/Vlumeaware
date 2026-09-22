@@ -28,6 +28,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'PhishReport',
   'VerifiedDomain',
   'LicenseToken',
+  'SendingDomain',
 ]);
 
 /** Operations whose `where` must be narrowed to the current tenant. */
