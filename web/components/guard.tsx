@@ -64,6 +64,7 @@ const NAV: Record<Role, NavEntry[]> = {
       ],
     },
     { kind: 'link', href: '/client/settings', label: 'Branding', icon: 'sparkles' },
+    { kind: 'link', href: '/client/license', label: 'License', icon: 'award' },
     { kind: 'link', href: '/client/security', label: 'Security', icon: 'shield' },
   ],
   client_viewer: [

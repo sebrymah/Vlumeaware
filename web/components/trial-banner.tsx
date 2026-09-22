@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { readSession } from '@/lib/session';
@@ -43,7 +44,20 @@ export function TrialBanner() {
         ? 'Your free trial has ended and is awaiting Vlumetech approval. The account is read-only until then.'
         : `Account is ${access.level}. Contact Vlumetech.`;
 
+  // Only offer the key where entering one would actually change something.
+  const canActivate = access.level === 'trial' || access.level === 'readonly';
+
   return (
-    <div className={`border-b px-6 py-2 text-center text-xs ${styles[access.level]}`}>{message}</div>
+    <div className={`border-b px-6 py-2 text-center text-xs ${styles[access.level]}`}>
+      {message}
+      {canActivate && (
+        <>
+          {' '}
+          <Link href="/client/license" className="font-semibold underline">
+            Have a license key?
+          </Link>
+        </>
+      )}
+    </div>
   );
 }

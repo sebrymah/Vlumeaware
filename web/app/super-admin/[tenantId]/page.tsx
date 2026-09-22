@@ -27,6 +27,18 @@ interface Tenant {
   seatLimit: number | null;
 }
 
+interface LicenseKey {
+  id: string;
+  displayHint: string;
+  licenseTier: string;
+  seatLimit: number | null;
+  createdAt: string;
+  expiresAt: string;
+  redeemedAt: string | null;
+  redeemedBy: string | null;
+  revokedAt: string | null;
+}
+
 interface TenantUser {
   id: string;
   email: string;
@@ -61,6 +73,10 @@ function TenantDetail() {
   const [busy, setBusy] = useState(false);
   const [confirmName, setConfirmName] = useState('');
   const [showDelete, setShowDelete] = useState(false);
+  const [keys, setKeys] = useState<LicenseKey[]>([]);
+  const [keyValidDays, setKeyValidDays] = useState('30');
+  const [issuedKey, setIssuedKey] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
   const [deleted, setDeleted] = useState<{
     name: string;
     rows: number;
@@ -79,11 +95,13 @@ function TenantDetail() {
 
   const load = useCallback(async () => {
     try {
-      const [t, u, c] = await Promise.all([
+      const [t, u, c, k] = await Promise.all([
         api.get<Tenant>(`/tenants/${tenantId}`),
         api.get<TenantUser[]>(`/tenants/${tenantId}/users`),
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
+        api.get<LicenseKey[]>(`/tenants/${tenantId}/license/keys`),
       ]);
+      setKeys(k);
       setTenant(t);
       setSendingDomain(t.sendingDomain ?? '');
       setDigestEmail(t.digestEmail ?? '');
@@ -203,6 +221,41 @@ function TenantDetail() {
     try {
       await api.patch(`/tenants/${tenantId}/status`, { status });
       await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function issueKey() {
+    setBusy(true);
+    setError(null);
+    setIssuedKey(null);
+    setKeyCopied(false);
+    try {
+      const res = await api.post<{ key: string }>(`/tenants/${tenantId}/license/keys`, {
+        licenseTier: licenseTier || 'Starter',
+        seatLimit: seatLimit ? Number(seatLimit) : undefined,
+        validDays: Number(keyValidDays) || 30,
+      });
+      // Shown once and never retrievable, so it is held in state rather than
+      // refetched with the list below.
+      setIssuedKey(res.key);
+      setKeys(await api.get<LicenseKey[]>(`/tenants/${tenantId}/license/keys`));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeKey(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.del(`/tenants/${tenantId}/license/keys/${id}`);
+      setKeys(await api.get<LicenseKey[]>(`/tenants/${tenantId}/license/keys`));
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -478,6 +531,108 @@ function TenantDetail() {
               {tenant.seatLimit != null ? `of ${tenant.seatLimit} seats` : 'seats (unlimited)'}.
             </p>
           )}
+
+          <div className="space-y-3 border-t border-slate-200 pt-4">
+            <div>
+              <p className="text-[13px] font-semibold text-slate-800">License key</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Issues a key for the tier and seats above. Send it to the client admin — redeeming
+                it activates their account, so they go live when they are ready rather than when
+                you happen to click Save.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Valid for (days)">
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={keyValidDays}
+                  onChange={(e) => setKeyValidDays(e.target.value)}
+                />
+              </Field>
+              <Button onClick={issueKey} disabled={busy}>
+                Generate license key
+              </Button>
+            </div>
+
+            {issuedKey && (
+              <div className="rounded-lg border border-brand-200 bg-brand-50 p-3">
+                <p className="text-xs font-semibold text-brand-900">
+                  Copy this now — it is shown once and cannot be retrieved.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <code className="rounded bg-white px-2.5 py-1.5 font-mono text-sm tracking-wider text-slate-900 ring-1 ring-inset ring-brand-200">
+                    {issuedKey}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(issuedKey);
+                        setKeyCopied(true);
+                      } catch {
+                        /* clipboard unavailable */
+                      }
+                    }}
+                  >
+                    {keyCopied ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+                <p className="mt-2 text-[11px] text-brand-800">
+                  Only the hash is stored. If it is lost, revoke it and issue another.
+                </p>
+              </div>
+            )}
+
+            {keys.length > 0 && (
+              <Table head={['Key', 'Tier', 'Seats', 'Expires', 'Status', '']}>
+                {keys.map((k) => {
+                  const expired = !k.redeemedAt && new Date(k.expiresAt).getTime() < Date.now();
+                  const status = k.redeemedAt
+                    ? `redeemed ${new Date(k.redeemedAt).toLocaleDateString()}`
+                    : k.revokedAt
+                      ? 'revoked'
+                      : expired
+                        ? 'expired'
+                        : 'unused';
+                  return (
+                    <tr key={k.id} className="border-b border-slate-100 last:border-0">
+                      <td className="px-2 py-2 font-mono text-xs text-slate-500">…{k.displayHint}</td>
+                      <td className="px-2 py-2">{k.licenseTier}</td>
+                      <td className="px-2 py-2">{k.seatLimit ?? '—'}</td>
+                      <td className="px-2 py-2">{new Date(k.expiresAt).toLocaleDateString()}</td>
+                      <td className="px-2 py-2">
+                        <span
+                          className={
+                            k.redeemedAt
+                              ? 'text-brand-700'
+                              : k.revokedAt || expired
+                                ? 'text-slate-400'
+                                : 'text-amber-700'
+                          }
+                        >
+                          {status}
+                        </span>
+                        {k.redeemedBy && (
+                          <span className="block text-[11px] text-slate-400">{k.redeemedBy}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {!k.redeemedAt && !k.revokedAt && (
+                          <Button variant="ghost" onClick={() => revokeKey(k.id)} disabled={busy}>
+                            Revoke
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </Table>
+            )}
+          </div>
         </div>
       </Card>
 
