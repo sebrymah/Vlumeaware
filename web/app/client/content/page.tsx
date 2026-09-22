@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, uploadWithProgress } from '@/lib/api';
+import { formatDuration, readVideoDuration } from '@/lib/video-duration';
 import { Guard, useActingTenant } from '@/components/guard';
 import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
@@ -57,6 +58,7 @@ function Content() {
   const [description, setDescription] = useState('');
   const [videoUrl, setVideoUrl] = useState('');
   const [duration, setDuration] = useState('');
+  const [probing, setProbing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
 
@@ -199,8 +201,24 @@ function Content() {
             <Field label="Title">
               <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} required minLength={2} />
             </Field>
-            <Field label="Duration (seconds, optional)">
-              <input className={inputClass} type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} />
+            <Field
+              label="Duration (seconds)"
+              hint={
+                mode === 'upload'
+                  ? probing
+                    ? 'Reading from the file…'
+                    : 'Read from the file. Override if you need to.'
+                  : 'Optional for a hosted link.'
+              }
+            >
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder={probing ? '…' : undefined}
+              />
             </Field>
           </div>
           <Field label="Description (optional)">
@@ -217,6 +235,13 @@ function Content() {
                 onChange={(e) => {
                   const f = e.target.files?.[0];
                   setFilePreview(f ? URL.createObjectURL(f) : null);
+                  setDuration('');
+                  if (f) {
+                    setProbing(true);
+                    void readVideoDuration(f)
+                      .then((secs) => setDuration(secs ? String(secs) : ''))
+                      .finally(() => setProbing(false));
+                  }
                 }}
               />
               {filePreview && (
@@ -267,7 +292,7 @@ function Content() {
                   {m.description && <div className="text-[11px] text-slate-500">{m.description}</div>}
                 </td>
                 <td className="px-2 py-2 text-slate-500">{m.category ?? '—'}</td>
-                <td className="px-2 py-2">{m.durationSeconds ? `${m.durationSeconds}s` : '—'}</td>
+                <td className="px-2 py-2">{formatDuration(m.durationSeconds)}</td>
                 <td className="px-2 py-2">
                   <div className="flex items-center justify-end gap-2">
                     <VideoPreviewButton url={m.videoUrl} title={m.title} />

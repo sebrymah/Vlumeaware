@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { tenantGuardExtension } from '../src/common/prisma/tenant-guard.extension';
 import { runAsSystem, runInTenant } from '../src/common/prisma/tenant-context';
+import { AGREEMENT_VERSION } from '../src/common/config/agreement';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { StorageService } from '../src/providers/storage/storage.service';
 import { AuditService } from '../src/common/audit/audit.service';
@@ -31,9 +32,56 @@ beforeAll(async () => {
 });
 
 describe('self-signup & trial lifecycle', () => {
+  it('records the click-through acceptance and opens the consent gate', async () => {
+    const email = `${uniq()}@x.test`;
+    const res = await signup.signup({
+      companyName: 'Consent Co',
+      email,
+      password: 'longenoughpw12',
+      acceptedAgreement: true,
+      acceptedIp: '203.0.113.7',
+    });
+    created.push(res.tenantId);
+
+    const t = await runAsSystem('read', () => db.tenant.findUnique({ where: { id: res.tenantId } }));
+    // The same field the countersigned-document route sets, so ConsentGuard
+    // needs no knowledge of which route was taken.
+    expect(t?.ndpaAgreementSignedAt).toBeInstanceOf(Date);
+    expect(t?.agreementMethod).toBe('click_through');
+    expect(t?.agreementVersion).toBe(AGREEMENT_VERSION);
+    expect(t?.agreementAcceptedBy).toBe(email);
+    expect(t?.agreementAcceptedIp).toBe('203.0.113.7');
+    // Nothing was uploaded, and nothing should have been.
+    expect(t?.ndpaAgreementDocUrl).toBeNull();
+  });
+
+  it('refuses to create a workspace when the agreement is not accepted', async () => {
+    await expect(
+      signup.signup({
+        companyName: 'No Consent',
+        email: `${uniq()}@x.test`,
+        password: 'longenoughpw12',
+        acceptedAgreement: false,
+      }),
+    ).rejects.toThrow(/must be accepted/i);
+  });
+
+  // Accepting the terms is not approval: the six preflight gates and the
+  // Vlumetech review are separate, so a self-signup still cannot send.
+  it('accepting the agreement does not by itself grant full access', async () => {
+    const r = await signup.signup({
+      companyName: uniq(),
+      email: `${uniq()}@x.test`,
+      password: 'longenoughpw12',
+      acceptedAgreement: true,
+    });
+    created.push(r.tenantId);
+    expect((await trial.access(r.tenantId)).level).toBe('trial');
+  });
+
   it('creates a Free-trial tenant + client_admin, capped at 20 seats', async () => {
     const email = `${uniq()}@x.test`;
-    const res = await signup.signup({ companyName: 'Acme Trial', email, password: 'longenoughpw12' });
+    const res = await signup.signup({ companyName: 'Acme Trial', email, password: 'longenoughpw12', acceptedAgreement: true });
     created.push(res.tenantId);
     expect(res.seatLimit).toBe(20);
     const access = await trial.access(res.tenantId);
@@ -46,13 +94,13 @@ describe('self-signup & trial lifecycle', () => {
 
   it('rejects a duplicate email', async () => {
     const email = `${uniq()}@x.test`;
-    const r = await signup.signup({ companyName: 'Dup', email, password: 'longenoughpw12' });
+    const r = await signup.signup({ companyName: 'Dup', email, password: 'longenoughpw12', acceptedAgreement: true });
     created.push(r.tenantId);
-    await expect(signup.signup({ companyName: 'Dup2', email, password: 'longenoughpw12' })).rejects.toThrow(/already/i);
+    await expect(signup.signup({ companyName: 'Dup2', email, password: 'longenoughpw12', acceptedAgreement: true })).rejects.toThrow(/already/i);
   });
 
   it('a trial can add employees up to the 20-seat cap', async () => {
-    const r = await signup.signup({ companyName: uniq(), email: `${uniq()}@x.test`, password: 'longenoughpw12' });
+    const r = await signup.signup({ companyName: uniq(), email: `${uniq()}@x.test`, password: 'longenoughpw12', acceptedAgreement: true });
     created.push(r.tenantId);
     await runAsSystem('seed domain', () =>
       db.verifiedDomain.create({
@@ -66,7 +114,7 @@ describe('self-signup & trial lifecycle', () => {
   });
 
   it('goes read-only once the trial window lapses', async () => {
-    const r = await signup.signup({ companyName: uniq(), email: `${uniq()}@x.test`, password: 'longenoughpw12' });
+    const r = await signup.signup({ companyName: uniq(), email: `${uniq()}@x.test`, password: 'longenoughpw12', acceptedAgreement: true });
     created.push(r.tenantId);
     // Backdate the trial end to the past.
     await runAsSystem('expire', () =>
@@ -77,7 +125,7 @@ describe('self-signup & trial lifecycle', () => {
   });
 
   it('approval flips it to full access', async () => {
-    const r = await signup.signup({ companyName: uniq(), email: `${uniq()}@x.test`, password: 'longenoughpw12' });
+    const r = await signup.signup({ companyName: uniq(), email: `${uniq()}@x.test`, password: 'longenoughpw12', acceptedAgreement: true });
     created.push(r.tenantId);
     await tenants.approveSignup(r.tenantId, 'staff-1', { licenseTier: 'Growth', seatLimit: 250 });
     const access = await trial.access(r.tenantId);

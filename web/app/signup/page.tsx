@@ -22,6 +22,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [accepted, setAccepted] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +32,7 @@ export default function SignupPage() {
       const res = await fetch(`${BASE}/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyName, email, password }),
+        body: JSON.stringify({ companyName, email, password, acceptedAgreement: accepted }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -75,9 +76,26 @@ export default function SignupPage() {
         <Field label="Password" hint="At least 12 characters.">
           <input className={inputClass} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={12} />
         </Field>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <input
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            required
+            className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+          />
+          <span className="text-[11px] leading-relaxed text-slate-600">
+            I am authorised to act for this organisation, and I accept the{' '}
+            <Link href="/terms" target="_blank" className="font-medium text-brand-700 underline">
+              authorization agreement and terms of use
+            </Link>
+            . This permits Vlumeaware to send simulated phishing to our own employees.
+          </span>
+        </label>
+
         <button
           type="submit"
-          disabled={busy}
+          disabled={busy || !accepted}
           className="w-full rounded bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-40"
         >
           {busy ? 'Creating your workspace…' : 'Start free trial'}

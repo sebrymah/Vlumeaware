@@ -20,7 +20,7 @@ describe('ConsentGuard', () => {
     const { guard } = guardWith({ id: TENANT_ID, status: 'active', ndpaAgreementSignedAt: null });
     await expect(
       guard.canActivate(ctx({ role: ROLES.clientAdmin, tenantId: TENANT_ID })),
-    ).rejects.toThrow(/no signed NDPA authorization agreement/i);
+    ).rejects.toThrow(/has not accepted the authorization agreement/i);
   });
 
   it('allows a tenant with a signed agreement', async () => {

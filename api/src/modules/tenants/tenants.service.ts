@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { runAsSystem, runInTenant } from '../../common/prisma/tenant-context';
+import { allowlistGuidance } from '../../common/config/allowlist';
+import { AGREEMENT_VERSION } from '../../common/config/agreement';
 import { AuthService } from '../../common/auth/auth.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { TrialService } from '../../common/trial/trial.service';
@@ -57,7 +59,12 @@ export class TenantsService {
     const docUrl = await this.storage.put(`agreements/${tenantId}`, file.buffer, file.mimetype);
     return this.prisma.db.tenant.update({
       where: { id: tenantId },
-      data: { ndpaAgreementSignedAt: signedAt, ndpaAgreementDocUrl: docUrl },
+      data: {
+        ndpaAgreementSignedAt: signedAt,
+        ndpaAgreementDocUrl: docUrl,
+        agreementMethod: 'signed_document',
+        agreementVersion: AGREEMENT_VERSION,
+      },
     });
   }
 
@@ -282,6 +289,25 @@ export class TenantsService {
         orderBy: { createdAt: 'asc' },
       }),
     );
+  }
+
+  /**
+   * The gateway allow-list details plus this tenant's confirmation state.
+   * Deliberately a narrow projection rather than the whole tenant row: this is
+   * the only tenants read a client_viewer can reach.
+   */
+  async allowlist(tenantId: string) {
+    const tenant = await runAsSystem('read tenant for allowlist guidance', () =>
+      this.prisma.db.tenant.findUnique({
+        where: { id: tenantId },
+        select: { sendingDomain: true, allowlistConfirmedAt: true },
+      }),
+    );
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return {
+      ...allowlistGuidance(tenant.sendingDomain),
+      confirmedAt: tenant.allowlistConfirmedAt,
+    };
   }
 
   /** Enables/disables the periodic email digest for a tenant. */

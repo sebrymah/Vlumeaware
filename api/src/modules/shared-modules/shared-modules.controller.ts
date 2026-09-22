@@ -21,7 +21,7 @@ import { SharedModulesService } from './shared-modules.service';
 class LinkDto {
   @IsString() @MinLength(2) title!: string;
   @IsOptional() @IsString() description?: string;
-  @IsOptional() @IsString() category?: string;
+  @IsString() @MinLength(2) category!: string;
   @IsUrl({ require_protocol: true }) videoUrl!: string;
   @IsOptional() @IsInt() @Min(1) durationSeconds?: number;
 }
@@ -29,7 +29,7 @@ class LinkDto {
 class UploadDto {
   @IsString() @MinLength(2) title!: string;
   @IsOptional() @IsString() description?: string;
-  @IsOptional() @IsString() category?: string;
+  @IsString() @MinLength(2) category!: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) durationSeconds?: number;
 }
 

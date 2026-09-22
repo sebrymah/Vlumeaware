@@ -63,8 +63,22 @@ model Tenant {
   sessionTimeoutMinutes Int          @default(480) @map("session_timeout_minutes")
   /// When true, a client user cannot finish signing in without MFA enrolled.
   requireMfa            Boolean      @default(false) @map("require_mfa")
+  /// When the authorization agreement was accepted, by either route. This is
+  /// the field the consent gate and preflight read; the three below only
+  /// record how it happened.
   ndpaAgreementSignedAt DateTime?    @map("ndpa_agreement_signed_at")
+  /// Set only for the countersigned-document route.
   ndpaAgreementDocUrl   String?      @map("ndpa_agreement_doc_url")
+  /// "click_through" when accepted online at signup, "signed_document" when
+  /// Vlumetech filed a countersigned PDF.
+  agreementMethod       String?      @map("agreement_method")
+  /// Which published version of the terms was accepted. Without this an
+  /// acceptance cannot be tied to the wording that was actually on screen.
+  agreementVersion      String?      @map("agreement_version")
+  /// Who clicked accept, and from where. Evidence that a named person at the
+  /// client did it, which is the whole point of a click-through.
+  agreementAcceptedBy   String?      @map("agreement_accepted_by")
+  agreementAcceptedIp   String?      @map("agreement_accepted_ip")
   status                TenantStatus @default(active)
   sendingDomain         String?      @map("sending_domain")
   allowlistConfirmedAt  DateTime?    @map("allowlist_confirmed_at")
@@ -512,7 +526,9 @@ model SharedTrainingModule {
   id              String      @id @default(uuid()) @db.Uuid
   title           String
   description     String?
-  category        String?
+  /// Required: the library is browsed by category, and an uncategorised item
+  /// is effectively invisible to the client choosing training to assign.
+  category        String
   videoUrl        String      @map("video_url")
   videoSource     VideoSource @map("video_source")
   durationSeconds Int?        @map("duration_seconds")

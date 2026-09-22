@@ -114,6 +114,17 @@ export class TenantsController {
     return this.tenants.trialStatus(tenantId);
   }
 
+  /**
+   * What the client's IT team must allow through their mail gateway. Readable
+   * by the client because they are the ones who have to action it; the
+   * confirmation that it was actioned stays a Vlumetech-only write.
+   */
+  @Get(':tenantId/allowlist')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  allowlist(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
+    return this.tenants.allowlist(tenantId);
+  }
+
   @Get(':tenantId')
   findOne(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
     return this.tenants.findOne(tenantId);

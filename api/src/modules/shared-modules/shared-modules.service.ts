@@ -40,7 +40,7 @@ export class SharedModulesService {
     return { ...module, videoUrl: await this.storage.signedUrl(module.videoUrl) };
   }
 
-  createFromLink(input: { title: string; description?: string; category?: string; videoUrl: string; durationSeconds?: number }) {
+  createFromLink(input: { title: string; description?: string; category: string; videoUrl: string; durationSeconds?: number }) {
     if (!/^https?:\/\//i.test(input.videoUrl)) {
       throw new BadRequestException('videoUrl must be an http(s) URL');
     }
@@ -60,7 +60,7 @@ export class SharedModulesService {
 
   async createFromUpload(
     file: { buffer: Buffer; mimetype: string; originalname: string },
-    input: { title: string; description?: string; category?: string; durationSeconds?: number },
+    input: { title: string; description?: string; category: string; durationSeconds?: number },
   ) {
     if (!file?.buffer?.length) throw new BadRequestException('A video file is required');
     if (!VIDEO_MIME.has(file.mimetype)) {

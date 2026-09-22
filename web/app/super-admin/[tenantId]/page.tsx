@@ -12,6 +12,10 @@ interface Tenant {
   status: string;
   ndpaAgreementSignedAt: string | null;
   ndpaAgreementDocUrl: string | null;
+  agreementMethod: string | null;
+  agreementVersion: string | null;
+  agreementAcceptedBy: string | null;
+  agreementAcceptedIp: string | null;
   brandPrimaryColor: string | null;
   sendingDomain: string | null;
   allowlistConfirmedAt: string | null;
@@ -227,7 +231,12 @@ function TenantDetail() {
             <Badge>{tenant.status}</Badge>
             <span>NDPA agreement:</span>
             <Badge>{signed ? 'yes' : 'no'}</Badge>
-            {signed && <span>signed {new Date(tenant.ndpaAgreementSignedAt!).toLocaleDateString()}</span>}
+            {signed && (
+              <span>
+                {tenant.agreementMethod === 'click_through' ? 'accepted online' : 'signed'}{' '}
+                {new Date(tenant.ndpaAgreementSignedAt!).toLocaleDateString()}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -251,15 +260,29 @@ function TenantDetail() {
 
       {!signed && (
         <Notice kind="error">
-          Campaign creation is blocked for this client until a signed NDPA authorization agreement
+          Campaign creation is blocked for this client until the authorization agreement
           is on file. The server enforces this, not just the interface.
         </Notice>
       )}
 
       <Card
-        title="NDPA authorization agreement"
-        subtitle="The signed document that makes simulations against this client's employees lawful."
+        title="Authorization agreement"
+        subtitle="What makes simulations against this client's employees lawful. Accepted online at signup, or filed here as a countersigned document."
       >
+        {tenant.agreementMethod === 'click_through' && (
+          <div className="mb-4 rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs leading-relaxed text-brand-900">
+            <p className="font-semibold">Accepted online at signup — nothing to upload.</p>
+            <p className="mt-1">
+              {tenant.agreementAcceptedBy ?? 'unknown user'} accepted version{' '}
+              {tenant.agreementVersion ?? 'unrecorded'} on{' '}
+              {new Date(tenant.ndpaAgreementSignedAt!).toLocaleString()}
+              {tenant.agreementAcceptedIp ? ` from ${tenant.agreementAcceptedIp}` : ''}.
+            </p>
+            <p className="mt-1 text-brand-800">
+              Use the form below only if this client also needs a countersigned document on file.
+            </p>
+          </div>
+        )}
         <form onSubmit={uploadAgreement} className="flex flex-wrap items-end gap-3">
           <Field label="Signed document" hint="PDF or scan, up to 10 MB">
             <input
