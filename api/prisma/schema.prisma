@@ -102,6 +102,12 @@ model Tenant {
   lastDigestSentAt      DateTime?    @map("last_digest_sent_at")
   /// License tier label (e.g. "Starter", "Growth", "Enterprise"). Display only.
   licenseTier           String?      @map("license_tier")
+  /// Licence term. Set when a licence key is redeemed (from its term) or by a
+  /// Vlumetech admin directly. Distinct from trialEndsAt: the trial governs an
+  /// unapproved self-signup, this governs a licensed account. Null means no
+  /// fixed term — the account does not expire on a clock.
+  licenseStartsAt       DateTime?    @map("license_starts_at")
+  licenseEndsAt         DateTime?    @map("license_ends_at")
   /// Max employees (seats) this client may have. null = unlimited.
   seatLimit             Int?         @map("seat_limit")
   /// True when the client self-signed-up rather than being onboarded by staff.
@@ -619,6 +625,10 @@ model LicenseToken {
   tenantId    String    @map("tenant_id") @db.Uuid
   licenseTier String    @map("license_tier")
   seatLimit   Int?      @map("seat_limit")
+  /// Length of the licence this key grants, in days, applied from the moment
+  /// it is redeemed. Null = no fixed term. Not to be confused with expiresAt,
+  /// which is how long the key itself stays redeemable.
+  termDays    Int?      @map("term_days")
   createdById String?   @map("created_by_id")
   createdAt   DateTime  @default(now()) @map("created_at")
   expiresAt   DateTime  @map("expires_at")

@@ -216,7 +216,7 @@ export class TenantsService {
    */
   async setLicense(
     tenantId: string,
-    input: { licenseTier?: string | null; seatLimit?: number | null },
+    input: { licenseTier?: string | null; seatLimit?: number | null; termDays?: number | null },
   ) {
     await this.findOne(tenantId);
     if (input.seatLimit != null) {
@@ -229,13 +229,25 @@ export class TenantsService {
         );
       }
     }
+    // termDays is optional and tri-state: undefined leaves the term untouched,
+    // a number sets a fresh term from now, null clears it (no expiry).
+    const term: { licenseStartsAt?: Date; licenseEndsAt?: Date | null } = {};
+    if (input.termDays !== undefined) {
+      if (input.termDays === null) {
+        term.licenseEndsAt = null;
+      } else {
+        term.licenseStartsAt = new Date();
+        term.licenseEndsAt = new Date(Date.now() + input.termDays * 86_400_000);
+      }
+    }
     const updated = await this.prisma.db.tenant.update({
       where: { id: tenantId },
-      data: { licenseTier: input.licenseTier, seatLimit: input.seatLimit },
+      data: { licenseTier: input.licenseTier, seatLimit: input.seatLimit, ...term },
     });
     await this.audit.record(
       'tenant.license',
-      `tier=${input.licenseTier ?? '—'} seatLimit=${input.seatLimit ?? 'unlimited'}`,
+      `tier=${input.licenseTier ?? '—'} seatLimit=${input.seatLimit ?? 'unlimited'}` +
+        `${input.termDays !== undefined ? ` term=${input.termDays === null ? 'none' : `${input.termDays}d`}` : ''}`,
       tenantId,
     );
     return updated;

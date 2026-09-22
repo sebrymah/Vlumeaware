@@ -69,6 +69,8 @@ class DigestDto {
 class LicenseDto {
   @IsOptional() @IsString() licenseTier?: string | null;
   @IsOptional() @IsInt() @Min(0) seatLimit?: number | null;
+  /** Set the licence term to this many days from now; null clears the term. */
+  @IsOptional() @IsInt() @Min(1) @Max(3650) termDays?: number | null;
 }
 
 class ApproveDto {
