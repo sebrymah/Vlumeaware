@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -74,6 +75,11 @@ class ApproveDto {
   @IsOptional() @IsInt() @Min(1) seatLimit?: number;
 }
 
+class DeleteTenantDto {
+  /** Must equal the tenant's name exactly. Guards against deleting the wrong client. */
+  @IsString() @MinLength(1) confirmName!: string;
+}
+
 @Controller('tenants')
 @Roles(ROLES.superadmin)
 export class TenantsController {
@@ -112,6 +118,17 @@ export class TenantsController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   trial(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
     return this.tenants.trialStatus(tenantId);
+  }
+
+  /**
+   * What the client's IT team must allow through their mail gateway. Readable
+   * by the client because they are the ones who have to action it; the
+   * confirmation that it was actioned stays a Vlumetech-only write.
+   */
+  @Get(':tenantId/allowlist')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  allowlist(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
+    return this.tenants.allowlist(tenantId);
   }
 
   @Get(':tenantId')
@@ -185,6 +202,19 @@ export class TenantsController {
   @Patch(':tenantId/status')
   setStatus(@Param('tenantId', ParseUUIDPipe) tenantId: string, @Body() dto: StatusDto) {
     return this.tenants.setStatus(tenantId, dto.status);
+  }
+
+  /**
+   * Permanently deletes a suspended or offboarded client and all their data.
+   * There is no undo, so it takes the client's name as typed confirmation.
+   */
+  @Delete(':tenantId')
+  @HttpCode(200)
+  removeTenant(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: DeleteTenantDto,
+  ) {
+    return this.tenants.remove(tenantId, dto.confirmName);
   }
 
   @Patch(':tenantId/deliverability')

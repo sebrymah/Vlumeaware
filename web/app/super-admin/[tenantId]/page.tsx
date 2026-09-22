@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
@@ -12,13 +13,30 @@ interface Tenant {
   status: string;
   ndpaAgreementSignedAt: string | null;
   ndpaAgreementDocUrl: string | null;
+  agreementMethod: string | null;
+  agreementVersion: string | null;
+  agreementAcceptedBy: string | null;
+  agreementAcceptedIp: string | null;
   brandPrimaryColor: string | null;
   sendingDomain: string | null;
   allowlistConfirmedAt: string | null;
   digestEmail: string | null;
   digestEnabled: boolean;
+  lastDigestSentAt: string | null;
   licenseTier: string | null;
   seatLimit: number | null;
+}
+
+interface LicenseKey {
+  id: string;
+  displayHint: string;
+  licenseTier: string;
+  seatLimit: number | null;
+  createdAt: string;
+  expiresAt: string;
+  redeemedAt: string | null;
+  redeemedBy: string | null;
+  revokedAt: string | null;
 }
 
 interface TenantUser {
@@ -53,6 +71,18 @@ function TenantDetail() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmName, setConfirmName] = useState('');
+  const [showDelete, setShowDelete] = useState(false);
+  const [keys, setKeys] = useState<LicenseKey[]>([]);
+  const [keyValidDays, setKeyValidDays] = useState('30');
+  const [issuedKey, setIssuedKey] = useState<string | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [deleted, setDeleted] = useState<{
+    name: string;
+    rows: number;
+    filesDeleted: number;
+    filesFailed: string[];
+  } | null>(null);
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [signedAt, setSignedAt] = useState(() => new Date().toISOString().slice(0, 10));
@@ -65,11 +95,13 @@ function TenantDetail() {
 
   const load = useCallback(async () => {
     try {
-      const [t, u, c] = await Promise.all([
+      const [t, u, c, k] = await Promise.all([
         api.get<Tenant>(`/tenants/${tenantId}`),
         api.get<TenantUser[]>(`/tenants/${tenantId}/users`),
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
+        api.get<LicenseKey[]>(`/tenants/${tenantId}/license/keys`),
       ]);
+      setKeys(k);
       setTenant(t);
       setSendingDomain(t.sendingDomain ?? '');
       setDigestEmail(t.digestEmail ?? '');
@@ -196,6 +228,58 @@ function TenantDetail() {
     }
   }
 
+  async function issueKey() {
+    setBusy(true);
+    setError(null);
+    setIssuedKey(null);
+    setKeyCopied(false);
+    try {
+      const res = await api.post<{ key: string }>(`/tenants/${tenantId}/license/keys`, {
+        licenseTier: licenseTier || 'Starter',
+        seatLimit: seatLimit ? Number(seatLimit) : undefined,
+        validDays: Number(keyValidDays) || 30,
+      });
+      // Shown once and never retrievable, so it is held in state rather than
+      // refetched with the list below.
+      setIssuedKey(res.key);
+      setKeys(await api.get<LicenseKey[]>(`/tenants/${tenantId}/license/keys`));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeKey(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.del(`/tenants/${tenantId}/license/keys/${id}`);
+      setKeys(await api.get<LicenseKey[]>(`/tenants/${tenantId}/license/keys`));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteTenant() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.del<{ name: string; rows: number; filesDeleted: number; filesFailed: string[] }>(
+        `/tenants/${tenantId}`,
+        { confirmName },
+      );
+      // The tenant is gone, so there is nothing left to reload. Show the
+      // outcome here rather than bouncing to a list that cannot explain it.
+      setDeleted(res);
+    } catch (err) {
+      setError((err as Error).message);
+      setBusy(false);
+    }
+  }
+
   async function kill(campaignId: string) {
     setBusy(true);
     try {
@@ -209,6 +293,28 @@ function TenantDetail() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Checked before the loading guard: once deleted there is no tenant to load,
+  // so the ordinary "Loading…" state would be wrong and permanent.
+  if (deleted) {
+    return (
+      <div className="space-y-4">
+        <Notice kind="ok">
+          Deleted <strong>{deleted.name}</strong>. {deleted.rows} rows and {deleted.filesDeleted}{' '}
+          stored file(s) removed. The name is free to onboard again.
+        </Notice>
+        {deleted.filesFailed.length > 0 && (
+          <Notice kind="error">
+            {deleted.filesFailed.length} stored file(s) could not be deleted and are still in the
+            bucket. The client rows are gone; these need removing by hand. See the server log.
+          </Notice>
+        )}
+        <Link href="/super-admin" className="text-sm font-medium text-brand-700 underline">
+          Back to clients
+        </Link>
+      </div>
+    );
   }
 
   if (!tenant) {
@@ -226,7 +332,12 @@ function TenantDetail() {
             <Badge>{tenant.status}</Badge>
             <span>NDPA agreement:</span>
             <Badge>{signed ? 'yes' : 'no'}</Badge>
-            {signed && <span>signed {new Date(tenant.ndpaAgreementSignedAt!).toLocaleDateString()}</span>}
+            {signed && (
+              <span>
+                {tenant.agreementMethod === 'click_through' ? 'accepted online' : 'signed'}{' '}
+                {new Date(tenant.ndpaAgreementSignedAt!).toLocaleDateString()}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -250,15 +361,29 @@ function TenantDetail() {
 
       {!signed && (
         <Notice kind="error">
-          Campaign creation is blocked for this client until a signed NDPA authorization agreement
+          Campaign creation is blocked for this client until the authorization agreement
           is on file. The server enforces this, not just the interface.
         </Notice>
       )}
 
       <Card
-        title="NDPA authorization agreement"
-        subtitle="The signed document that makes simulations against this client's employees lawful."
+        title="Authorization agreement"
+        subtitle="What makes simulations against this client's employees lawful. Accepted online at signup, or filed here as a countersigned document."
       >
+        {tenant.agreementMethod === 'click_through' && (
+          <div className="mb-4 rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs leading-relaxed text-brand-900">
+            <p className="font-semibold">Accepted online at signup — nothing to upload.</p>
+            <p className="mt-1">
+              {tenant.agreementAcceptedBy ?? 'unknown user'} accepted version{' '}
+              {tenant.agreementVersion ?? 'unrecorded'} on{' '}
+              {new Date(tenant.ndpaAgreementSignedAt!).toLocaleString()}
+              {tenant.agreementAcceptedIp ? ` from ${tenant.agreementAcceptedIp}` : ''}.
+            </p>
+            <p className="mt-1 text-brand-800">
+              Use the form below only if this client also needs a countersigned document on file.
+            </p>
+          </div>
+        )}
         <form onSubmit={uploadAgreement} className="flex flex-wrap items-end gap-3">
           <Field label="Signed document" hint="PDF or scan, up to 10 MB">
             <input
@@ -352,6 +477,21 @@ function TenantDetail() {
               )}
             </div>
           </div>
+          <div className="text-xs text-slate-600">
+            {/* Without this there is no way to tell a working digest from a
+                silently failing one until the client asks where it is. */}
+            {tenant.digestEnabled ? (
+              tenant.lastDigestSentAt ? (
+                <>Last digest sent {new Date(tenant.lastDigestSentAt).toLocaleString()}. Sends weekly.</>
+              ) : (
+                <span className="text-amber-700">
+                  Enabled, but none sent yet. The first goes out within the hour.
+                </span>
+              )
+            ) : (
+              <>Off. When enabled, one digest is sent within the hour and weekly after that.</>
+            )}
+          </div>
         </div>
       </Card>
 
@@ -391,7 +531,169 @@ function TenantDetail() {
               {tenant.seatLimit != null ? `of ${tenant.seatLimit} seats` : 'seats (unlimited)'}.
             </p>
           )}
+
+          <div className="space-y-3 border-t border-slate-200 pt-4">
+            <div>
+              <p className="text-[13px] font-semibold text-slate-800">License key</p>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Issues a key for the tier and seats above. Send it to the client admin — redeeming
+                it activates their account, so they go live when they are ready rather than when
+                you happen to click Save.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Valid for (days)">
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={keyValidDays}
+                  onChange={(e) => setKeyValidDays(e.target.value)}
+                />
+              </Field>
+              <Button onClick={issueKey} disabled={busy}>
+                Generate license key
+              </Button>
+            </div>
+
+            {issuedKey && (
+              <div className="rounded-lg border border-brand-200 bg-brand-50 p-3">
+                <p className="text-xs font-semibold text-brand-900">
+                  Copy this now — it is shown once and cannot be retrieved.
+                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <code className="rounded bg-white px-2.5 py-1.5 font-mono text-sm tracking-wider text-slate-900 ring-1 ring-inset ring-brand-200">
+                    {issuedKey}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(issuedKey);
+                        setKeyCopied(true);
+                      } catch {
+                        /* clipboard unavailable */
+                      }
+                    }}
+                  >
+                    {keyCopied ? 'Copied' : 'Copy'}
+                  </Button>
+                </div>
+                <p className="mt-2 text-[11px] text-brand-800">
+                  Only the hash is stored. If it is lost, revoke it and issue another.
+                </p>
+              </div>
+            )}
+
+            {keys.length > 0 && (
+              <Table head={['Key', 'Tier', 'Seats', 'Expires', 'Status', '']}>
+                {keys.map((k) => {
+                  const expired = !k.redeemedAt && new Date(k.expiresAt).getTime() < Date.now();
+                  const status = k.redeemedAt
+                    ? `redeemed ${new Date(k.redeemedAt).toLocaleDateString()}`
+                    : k.revokedAt
+                      ? 'revoked'
+                      : expired
+                        ? 'expired'
+                        : 'unused';
+                  return (
+                    <tr key={k.id} className="border-b border-slate-100 last:border-0">
+                      <td className="px-2 py-2 font-mono text-xs text-slate-500">…{k.displayHint}</td>
+                      <td className="px-2 py-2">{k.licenseTier}</td>
+                      <td className="px-2 py-2">{k.seatLimit ?? '—'}</td>
+                      <td className="px-2 py-2">{new Date(k.expiresAt).toLocaleDateString()}</td>
+                      <td className="px-2 py-2">
+                        <span
+                          className={
+                            k.redeemedAt
+                              ? 'text-brand-700'
+                              : k.revokedAt || expired
+                                ? 'text-slate-400'
+                                : 'text-amber-700'
+                          }
+                        >
+                          {status}
+                        </span>
+                        {k.redeemedBy && (
+                          <span className="block text-[11px] text-slate-400">{k.redeemedBy}</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right">
+                        {!k.redeemedAt && !k.revokedAt && (
+                          <Button variant="ghost" onClick={() => revokeKey(k.id)} disabled={busy}>
+                            Revoke
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </Table>
+            )}
+          </div>
         </div>
+      </Card>
+
+      <Card
+        title="Delete this client"
+        subtitle="Removes the client and everything belonging to them. There is no undo."
+      >
+        {tenant.status === 'active' ? (
+          <p className="text-xs text-slate-500">
+            An active client cannot be deleted. Suspend or offboard it first — the server enforces
+            this, not just this page.
+          </p>
+        ) : !showDelete ? (
+          <div className="flex items-center gap-3">
+            <Button variant="danger" onClick={() => setShowDelete(true)}>
+              Delete permanently
+            </Button>
+            <span className="text-xs text-slate-500">
+              Frees the name so the same company can be onboarded again.
+            </span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs leading-relaxed text-red-800">
+              <p className="font-semibold">This deletes everything, permanently.</p>
+              <p className="mt-1">
+                Employees, campaigns, sends, scenarios, training modules, quizzes, certificates,
+                verified domains and console users — plus the videos, logos and signed agreements
+                in storage. Issued certificates stop verifying. Only the audit log survives.
+              </p>
+            </div>
+            <Field label={`Type the client's name to confirm: ${tenant.name}`}>
+              <input
+                className={inputClass}
+                value={confirmName}
+                onChange={(e) => setConfirmName(e.target.value)}
+                placeholder={tenant.name}
+                autoComplete="off"
+              />
+            </Field>
+            <div className="flex gap-2">
+              <Button
+                variant="danger"
+                onClick={deleteTenant}
+                disabled={busy || confirmName.trim() !== tenant.name.trim()}
+              >
+                {busy ? 'Deleting…' : 'Delete this client forever'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowDelete(false);
+                  setConfirmName('');
+                }}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
 

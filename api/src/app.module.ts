@@ -23,6 +23,7 @@ import { IntakeModule } from './modules/intake/intake.module';
 import { SharedModulesModule } from './modules/shared-modules/shared-modules.module';
 import { SharedQuizzesModule } from './modules/shared-quizzes/shared-quizzes.module';
 import { DomainsModule } from './modules/domains/domains.module';
+import { LicensesModule } from './modules/licenses/licenses.module';
 import { SignupModule } from './modules/signup/signup.module';
 
 import { HealthController } from './health.controller';
@@ -48,6 +49,7 @@ import { HealthController } from './health.controller';
     SharedQuizzesModule,
     DomainsModule,
     SignupModule,
+    LicensesModule,
     ReportsModule,
   ],
   controllers: [HealthController],

@@ -1,6 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { runAsSystem, runInTenant } from '../../common/prisma/tenant-context';
+import { allowlistGuidance } from '../../common/config/allowlist';
+import { AGREEMENT_VERSION } from '../../common/config/agreement';
 import { AuthService } from '../../common/auth/auth.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { TrialService } from '../../common/trial/trial.service';
@@ -12,6 +14,8 @@ const AGREEMENT_MIME = new Set(['application/pdf', 'image/png', 'image/jpeg']);
 
 @Injectable()
 export class TenantsService {
+  private readonly logger = new Logger(TenantsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -57,7 +61,12 @@ export class TenantsService {
     const docUrl = await this.storage.put(`agreements/${tenantId}`, file.buffer, file.mimetype);
     return this.prisma.db.tenant.update({
       where: { id: tenantId },
-      data: { ndpaAgreementSignedAt: signedAt, ndpaAgreementDocUrl: docUrl },
+      data: {
+        ndpaAgreementSignedAt: signedAt,
+        ndpaAgreementDocUrl: docUrl,
+        agreementMethod: 'signed_document',
+        agreementVersion: AGREEMENT_VERSION,
+      },
     });
   }
 
@@ -282,6 +291,136 @@ export class TenantsService {
         orderBy: { createdAt: 'asc' },
       }),
     );
+  }
+
+  /**
+   * The gateway allow-list details plus this tenant's confirmation state.
+   * Deliberately a narrow projection rather than the whole tenant row: this is
+   * the only tenants read a client_viewer can reach.
+   */
+  async allowlist(tenantId: string) {
+    const tenant = await runAsSystem('read tenant for allowlist guidance', () =>
+      this.prisma.db.tenant.findUnique({
+        where: { id: tenantId },
+        select: { sendingDomain: true, allowlistConfirmedAt: true },
+      }),
+    );
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return {
+      ...allowlistGuidance(tenant.sendingDomain),
+      confirmedAt: tenant.allowlistConfirmedAt,
+    };
+  }
+
+  /**
+   * Permanently removes a client and everything belonging to them.
+   *
+   * Only a suspended or offboarded tenant can be deleted. An active client is
+   * refused: offboarding first is a deliberate speed bump on an operation with
+   * no undo, and it gives anyone watching the account a visible state change
+   * before the data goes.
+   *
+   * Rows are removed child-first in an explicit order rather than leaning on
+   * the tenant cascade, because two foreign keys are ON DELETE RESTRICT:
+   * campaign_scenarios -> scenarios and training_routing_rules ->
+   * training_modules (verified against pg_constraint, not just the schema).
+   *
+   * A plain tenant.delete() does currently succeed, because Postgres happens
+   * to cascade the referencing rows away before it reaches the referenced
+   * ones. That ordering is trigger-firing order, not a guarantee, and it is
+   * not worth betting an irreversible operation on it holding after the next
+   * migration. Deleting explicitly makes the order ours.
+   *
+   * The final tenant.delete() still cascades anything not listed here, so a
+   * model added later is removed even if nobody updates this list.
+   *
+   * Audit rows deliberately survive: audit_logs.tenant_id is a plain column
+   * with no foreign key, so the record that this client existed and was
+   * deleted outlives the client.
+   */
+  async remove(tenantId: string, confirmName: string) {
+    const tenant = await this.findOne(tenantId);
+
+    if (tenant.status === 'active') {
+      throw new BadRequestException(
+        'An active client cannot be deleted. Suspend or offboard it first.',
+      );
+    }
+    // Typed confirmation, not a checkbox: the operation is irreversible and
+    // the tenant id in the URL is not something a human recognises.
+    if (confirmName.trim() !== tenant.name.trim()) {
+      throw new BadRequestException(
+        `Confirmation does not match. Type the client's name exactly: "${tenant.name}"`,
+      );
+    }
+
+    // Collected before the rows go, so the objects can be removed afterwards.
+    const modules = await runAsSystem('delete tenant: collect stored objects', () =>
+      this.prisma.db.trainingModule.findMany({
+        where: { tenantId, videoSource: 'upload' },
+        select: { videoUrl: true },
+      }),
+    );
+    // Hosted links (videoSource 'link') point at somebody else's server, so
+    // only objects we put in our own storage are removed.
+    const storedObjects = [
+      ...modules.map((m) => m.videoUrl),
+      tenant.ndpaAgreementDocUrl,
+      tenant.brandLogoUrl,
+    ].filter((u): u is string => !!u && !/^https?:/i.test(u));
+
+    const counts = await runAsSystem('delete tenant: remove all rows', () =>
+      this.prisma.db.$transaction(async (tx) => {
+        const where = { tenantId };
+        const n: Record<string, number> = {};
+        // Child-first. Order matters for the two RESTRICT edges above.
+        n.quizAttempts = (await tx.quizAttempt.deleteMany({ where })).count;
+        n.quizQuestions = (await tx.quizQuestion.deleteMany({ where })).count;
+        n.certificates = (await tx.certificate.deleteMany({ where })).count;
+        n.credentialSubmissions = (await tx.credentialSubmission.deleteMany({ where })).count;
+        n.trainingAssignments = (await tx.trainingAssignment.deleteMany({ where })).count;
+        n.routingRules = (await tx.trainingRoutingRule.deleteMany({ where })).count;
+        n.phishReports = (await tx.phishReport.deleteMany({ where })).count;
+        n.reports = (await tx.report.deleteMany({ where })).count;
+        n.sends = (await tx.send.deleteMany({ where })).count;
+        n.campaignScenarios = (await tx.campaignScenario.deleteMany({ where })).count;
+        n.quizzes = (await tx.quiz.deleteMany({ where })).count;
+        n.campaigns = (await tx.campaign.deleteMany({ where })).count;
+        n.trainingModules = (await tx.trainingModule.deleteMany({ where })).count;
+        n.scenarios = (await tx.scenario.deleteMany({ where })).count;
+        n.employees = (await tx.employee.deleteMany({ where })).count;
+        n.domains = (await tx.verifiedDomain.deleteMany({ where })).count;
+        n.users = (await tx.tenantUser.deleteMany({ where })).count;
+        await tx.tenant.delete({ where: { id: tenantId } });
+        return n;
+      }),
+    );
+
+    // Best effort, and after the rows are gone. A bucket that is unreachable
+    // must not leave the account half-deleted, so failures are counted and
+    // reported rather than thrown.
+    let filesDeleted = 0;
+    const filesFailed: string[] = [];
+    for (const uri of storedObjects) {
+      if (await this.storage.remove(uri)) filesDeleted += 1;
+      else filesFailed.push(uri);
+    }
+
+    const rows = Object.values(counts).reduce((a, b) => a + b, 0);
+    await this.audit.record(
+      'tenant.delete',
+      `permanently deleted "${tenant.name}" (${tenant.status}): ${rows} rows, ` +
+        `${filesDeleted} stored files` +
+        (filesFailed.length ? `, ${filesFailed.length} files could NOT be removed` : ''),
+      tenantId,
+    );
+    if (filesFailed.length) {
+      this.logger.warn(
+        `Tenant ${tenantId} deleted but ${filesFailed.length} stored objects remain: ${filesFailed.join(', ')}`,
+      );
+    }
+
+    return { deleted: true, name: tenant.name, rows, counts, filesDeleted, filesFailed };
   }
 
   /** Enables/disables the periodic email digest for a tenant. */

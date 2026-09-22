@@ -88,7 +88,9 @@ export class QueueModule implements OnModuleInit {
       { every: tickMs },
       { name: 'tick', opts: { removeOnComplete: true } },
     );
-    // Digest tick runs hourly and decides per-tenant whether a digest is due.
+    // Polls hourly; DigestProcessor decides per tenant whether one is due
+    // from last_digest_sent_at, so this interval is only the poll rate and
+    // changing it does not change how often a client is emailed.
     await this.digest.upsertJobScheduler(
       'digest-tick',
       { every: Number(process.env.DIGEST_TICK_MS ?? 3_600_000) },

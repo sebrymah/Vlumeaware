@@ -37,7 +37,7 @@ export class ConsentGuard implements CanActivate {
     }
     if (!tenant.ndpaAgreementSignedAt) {
       throw new ForbiddenException(
-        'Blocked: no signed NDPA authorization agreement on file for this tenant.',
+        'Blocked: this tenant has not accepted the authorization agreement.',
       );
     }
     return true;

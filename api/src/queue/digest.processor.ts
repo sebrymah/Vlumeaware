@@ -6,12 +6,26 @@ import { runAsSystem, runInTenant } from '../common/prisma/tenant-context';
 import { MAILER } from '../providers/mailer/mailer.interface';
 import type { Mailer } from '../providers/mailer/mailer.interface';
 import { ReportsService } from '../modules/reports/reports.service';
+import { digestFromAddress } from '../providers/mailer/from-addresses';
 import { DIGEST_QUEUE } from './queue.constants';
 
+/** Seven days, overridable so dev and tests do not wait a week. */
+function digestIntervalMs(): number {
+  const raw = Number(process.env.DIGEST_INTERVAL_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : 7 * 24 * 60 * 60 * 1000;
+}
+
 /**
- * Emails a periodic summary to each tenant that has enabled digests. Runs on a
- * repeatable tick; sends at most one digest per tenant per run. In dev the
- * mailer only logs, so this is safe to exercise without real delivery.
+ * Emails a periodic summary to each tenant that has enabled digests.
+ *
+ * The tick is deliberately more frequent than the digest interval: it fires
+ * hourly and each run asks which tenants are actually due, rather than the
+ * tick itself being the schedule. That way the cadence is a property of the
+ * data (last_digest_sent_at) and not of how often the worker happens to wake,
+ * so a restart, a redeploy or a changed tick cannot double-send.
+ *
+ * In dev the mailer only logs, so this is safe to exercise without real
+ * delivery, and DIGEST_INTERVAL_MS can be shortened to demo it.
  */
 @Processor(DIGEST_QUEUE)
 export class DigestProcessor extends WorkerHost {
@@ -26,9 +40,19 @@ export class DigestProcessor extends WorkerHost {
   }
 
   async process(_job: Job) {
-    const tenants = await runAsSystem('digest: tenants opted in', () =>
+    const now = new Date();
+    const dueBefore = new Date(now.getTime() - digestIntervalMs());
+
+    const tenants = await runAsSystem('digest: tenants due a digest', () =>
       this.prisma.db.tenant.findMany({
-        where: { digestEnabled: true, digestEmail: { not: null }, status: 'active' },
+        where: {
+          digestEnabled: true,
+          digestEmail: { not: null },
+          status: 'active',
+          // Never sent means due now, so opting in produces a digest on the
+          // next tick and the client can see immediately that it works.
+          OR: [{ lastDigestSentAt: null }, { lastDigestSentAt: { lte: dueBefore } }],
+        },
         select: { id: true, name: true, digestEmail: true },
       }),
     );
@@ -40,17 +64,29 @@ export class DigestProcessor extends WorkerHost {
         await this.mailer.send({
           to: tenant.digestEmail as string,
           fromName: 'Vlumeaware',
-          fromAddress: process.env.DIGEST_FROM_ADDRESS ?? 'reports@vlumeaware-trk.io',
+          fromAddress: digestFromAddress(),
           subject: `Security awareness summary — ${tenant.name}`,
           html,
-          sendId: `digest-${tenant.id}`,
+          // Distinct per send, not per tenant. Resend treats this as
+          // X-Entity-Ref-ID, an idempotency key, so the previous fixed
+          // `digest-<tenantId>` risked suppressing every digest after the first.
+          sendId: `digest-${tenant.id}-${now.toISOString().slice(0, 10)}`,
         });
+        // Stamped only after the send is accepted. A failure therefore leaves
+        // the tenant due and it is retried on the next tick, rather than
+        // silently losing a whole interval's digest.
+        await runAsSystem('digest: record send', () =>
+          this.prisma.db.tenant.update({
+            where: { id: tenant.id },
+            data: { lastDigestSentAt: now },
+          }),
+        );
         sent += 1;
       } catch (err) {
         this.logger.error(`Digest failed for ${tenant.id}: ${(err as Error).message}`);
       }
     }
-    return { tenants: tenants.length, sent };
+    return { due: tenants.length, sent };
   }
 
   private async buildDigest(tenantName: string): Promise<string> {

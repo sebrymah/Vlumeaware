@@ -11,6 +11,14 @@ interface DnsRecord {
   type: string;
   value: string;
 }
+interface Allowlist {
+  ips: string[];
+  sendingDomain: string | null;
+  trackingDomain: string | null;
+  configured: boolean;
+  confirmedAt: string | null;
+}
+
 interface Domain {
   id: string;
   domain: string;
@@ -62,11 +70,17 @@ function Domains() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [allowlist, setAllowlist] = useState<Allowlist | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      setList(await api.get<Domain[]>(`/tenants/${tenantId}/domains`));
+      const [domains, guidance] = await Promise.all([
+        api.get<Domain[]>(`/tenants/${tenantId}/domains`),
+        api.get<Allowlist>(`/tenants/${tenantId}/allowlist`),
+      ]);
+      setList(domains);
+      setAllowlist(guidance);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -137,6 +151,74 @@ function Domains() {
 
       {error && <Notice kind="error">{error}</Notice>}
       {ok && <Notice kind="ok">{ok}</Notice>}
+
+      <Card
+        title="Mail gateway allow-list"
+        subtitle="Give these to your IT team. Without them your own filters quarantine the simulation."
+      >
+        {!allowlist?.configured ? (
+          <p className="text-xs text-slate-500">
+            Vlumetech has not published the allow-list details for this deployment yet. Contact
+            your account manager before scheduling a campaign.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            <p className="text-xs leading-relaxed text-slate-600">
+              A simulated phish has to reach the inbox to measure anything. If your gateway
+              quarantines it, the campaign reports a clean result that is not real. Allow the
+              following, and <strong>only</strong> for the sending domain below — not globally.
+            </p>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {allowlist.sendingDomain && (
+                <Copyable label="Sending domain" value={allowlist.sendingDomain} />
+              )}
+              {allowlist.trackingDomain && (
+                <Copyable label="Link / tracking domain" value={allowlist.trackingDomain} />
+              )}
+              {allowlist.ips.length > 0 && (
+                <Copyable label="Sending IPs" value={allowlist.ips.join(', ')} />
+              )}
+            </div>
+
+            <div className="rounded-lg bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
+              <p className="font-semibold text-slate-700">Where to put them</p>
+              <p className="mt-1">
+                <strong>Microsoft 365:</strong> Security portal → Policies → Advanced delivery →
+                Phishing simulation. It asks for the sending domain and the IP together; both are
+                required. Add the link domain under third-party phishing simulation URLs.
+              </p>
+              <p className="mt-1">
+                <strong>Google Workspace:</strong> Admin console → Apps → Gmail → Spam, phishing
+                and malware. Add the IPs to an inbound gateway or email allow-list, and skip
+                spam filtering for those senders.
+              </p>
+              <p className="mt-2 text-slate-500">
+                Use the phishing-simulation setting rather than a blanket allow rule, so only this
+                traffic is exempted and your real protection is untouched.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 border-t border-slate-200 pt-3 text-xs">
+              <span className="text-slate-600">Status:</span>
+              {allowlist.confirmedAt ? (
+                <span className="text-brand-700">
+                  confirmed {new Date(allowlist.confirmedAt).toLocaleDateString()}
+                </span>
+              ) : (
+                <>
+                  <span className="text-amber-700">not confirmed</span>
+                  {/* The client cannot tick this themselves: it is one of the
+                      six preflight gates, and a self-attested gate is no gate. */}
+                  <span className="text-slate-500">
+                    Tell your account manager once IT has applied it, and they will record it.
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
 
       <Card title="Add a domain">
         <form onSubmit={add} className="flex items-end gap-3">

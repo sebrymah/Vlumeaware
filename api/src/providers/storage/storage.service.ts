@@ -1,8 +1,8 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { BadGatewayException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /**
@@ -220,6 +220,60 @@ export class StorageService {
    * links (videoSource "link") and unresolved dev file:// paths pass through
    * unchanged; supabase:// and s3:// references are signed with a short TTL.
    */
+  /**
+   * Deletes a stored object. Used when a tenant is removed: the database rows
+   * go, and the videos, logos and signed agreements they pointed at have to go
+   * with them or the client's data outlives the account that held it.
+   *
+   * Returns false rather than throwing when the object cannot be removed. A
+   * tenant deletion is often an erasure request, and an unreachable bucket
+   * must not leave the account half-deleted — the caller reports what was left
+   * behind instead.
+   */
+  async remove(uri: string): Promise<boolean> {
+    try {
+      if (!uri) return false;
+
+      if (uri.startsWith('supabase://')) {
+        if (!this.supabaseUrl || !this.supabaseKey) return false;
+        const withoutScheme = uri.slice('supabase://'.length);
+        const slash = withoutScheme.indexOf('/');
+        if (slash < 1) return false;
+        const bucket = withoutScheme.slice(0, slash);
+        const objectPath = withoutScheme.slice(slash + 1);
+        const res = await fetch(`${this.supabaseUrl}/storage/v1/object/${bucket}/${objectPath}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${this.supabaseKey}` },
+        });
+        // A 404 means it is already gone, which is the state we wanted.
+        return res.ok || res.status === 404;
+      }
+
+      if (uri.startsWith('s3://') && this.client) {
+        const withoutScheme = uri.slice('s3://'.length);
+        const slash = withoutScheme.indexOf('/');
+        if (slash < 1) return false;
+        await this.client.send(
+          new DeleteObjectCommand({
+            Bucket: withoutScheme.slice(0, slash),
+            Key: withoutScheme.slice(slash + 1),
+          }),
+        );
+        return true;
+      }
+
+      if (uri.startsWith('file://')) {
+        await rm(uri.slice('file://'.length), { force: true });
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      this.logger.warn(`Could not delete ${uri}: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
   async signedUrl(uri: string, ttlSeconds = 3600): Promise<string> {
     if (!uri) return uri;
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, uploadWithProgress } from '@/lib/api';
+import { formatDuration, readVideoDuration } from '@/lib/video-duration';
 import { Guard } from '@/components/guard';
 import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
@@ -11,7 +12,7 @@ interface SharedModule {
   id: string;
   title: string;
   description: string | null;
-  category: string | null;
+  category: string;
   videoUrl: string;
   videoSource: 'upload' | 'link';
   durationSeconds: number | null;
@@ -55,6 +56,12 @@ function Library() {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [fileCount, setFileCount] = useState(0);
   const [queue, setQueue] = useState<QueuedUpload[]>([]);
+  const [probing, setProbing] = useState(false);
+
+  // Categories already in use, offered as completions on the input.
+  const categorySuggestions = Array.from(
+    new Set(list.map((m) => m.category).filter(Boolean)),
+  ).sort();
 
   const load = useCallback(async () => {
     try {
@@ -77,6 +84,7 @@ function Library() {
     setDuration('');
     setFilePreview(null);
     setFileCount(0);
+    setProbing(false);
     setQueue([]);
     if (fileRef.current) fileRef.current.value = '';
   }
@@ -90,7 +98,7 @@ function Library() {
       if (mode === 'link') {
         await api.post('/shared-training-modules/link', {
           title,
-          category: category || undefined,
+          category,
           description: description || undefined,
           videoUrl,
           durationSeconds: duration ? Number(duration) : undefined,
@@ -117,9 +125,13 @@ function Library() {
           // With several files the typed title cannot apply to all of them, so
           // each is named after its file.
           form.append('title', files.length > 1 ? titleFromFilename(file.name) : title);
-          if (category) form.append('category', category);
+          form.append('category', category);
           if (description) form.append('description', description);
-          if (duration) form.append('durationSeconds', duration);
+          // A batch has no single duration, so each file is measured as it
+          // goes. A typed value still wins for a lone file.
+          const secs =
+            files.length === 1 && duration ? Number(duration) : await readVideoDuration(file);
+          if (secs) form.append('durationSeconds', String(secs));
 
           const single = files.length === 1;
           const mark = (patch: Partial<QueuedUpload>) =>
@@ -217,11 +229,42 @@ function Library() {
                 minLength={2}
               />
             </Field>
-            <Field label="Category (optional)">
-              <input className={inputClass} value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Phishing" />
+            <Field label="Category" hint="Clients browse the library by this.">
+              <input
+                className={inputClass}
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Phishing"
+                list="shared-category-suggestions"
+                required
+                minLength={2}
+              />
+              {/* Whatever is already in the library, so categories converge
+                  instead of drifting into near-duplicates. */}
+              <datalist id="shared-category-suggestions">
+                {categorySuggestions.map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
             </Field>
-            <Field label="Duration (seconds, optional)">
-              <input className={inputClass} type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} />
+            <Field
+              label="Duration (seconds)"
+              hint={
+                mode === 'upload'
+                  ? probing
+                    ? 'Reading from the file…'
+                    : 'Read from the file. Override if you need to.'
+                  : 'Optional for a hosted link.'
+              }
+            >
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                placeholder={probing ? '…' : undefined}
+              />
             </Field>
           </div>
           <Field label="Description (optional)">
@@ -253,6 +296,15 @@ function Library() {
                   setQueue([]);
                   // Previewing only makes sense for a single pick.
                   setFilePreview(files.length === 1 ? URL.createObjectURL(files[0]) : null);
+                  // One file fills the box; a batch is measured per file at
+                  // upload time, since they will not share a duration.
+                  setDuration('');
+                  if (files.length === 1) {
+                    setProbing(true);
+                    void readVideoDuration(files[0])
+                      .then((secs) => setDuration(secs ? String(secs) : ''))
+                      .finally(() => setProbing(false));
+                  }
                 }}
               />
               {fileCount > 1 && (
@@ -328,7 +380,7 @@ function Library() {
               </td>
               <td className="px-2 py-2 text-slate-500">{m.category ?? '—'}</td>
               <td className="px-2 py-2"><Badge>{m.videoSource}</Badge></td>
-              <td className="px-2 py-2">{m.durationSeconds ? `${m.durationSeconds}s` : '—'}</td>
+              <td className="px-2 py-2">{formatDuration(m.durationSeconds)}</td>
               <td className="px-2 py-2">
                 <div className="flex items-center justify-end gap-2">
                   <VideoPreviewButton url={m.videoUrl} title={m.title} />
