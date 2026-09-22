@@ -585,6 +585,14 @@ model SendingDomain {
   dnsRecords  Json?               @map("dns_records")
   verifiedAt  DateTime?           @map("verified_at")
   createdAt   DateTime            @default(now()) @map("created_at")
+  /// A Vlumeaware-provided shared sending domain, enabled with one click and
+  /// already verified with the provider — no DNS for the client to publish.
+  /// The client owns their own domains; managed rows are the platform's, so
+  /// they carry no providerId and are never re-verified or provider-deleted.
+  managed     Boolean             @default(false)
+  /// Optional display name ("title") the From shows, e.g. "IT Service Desk".
+  /// Overrides the scenario's sender name; the domain and address are unchanged.
+  senderName  String?             @map("sender_name")
 
   tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaigns Campaign[]

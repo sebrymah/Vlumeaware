@@ -63,9 +63,14 @@ export class SendProcessor extends WorkerHost {
           ? `${send.campaign.fromLocalPart?.trim() || 'no-reply'}@${send.campaign.sendingDomain.domain}`
           : (process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumesec.com');
 
+      // The sending domain may carry a custom display name ("title"). It
+      // overrides the scenario's sender name and changes nothing about the
+      // address the mail is sent from.
+      const fromName = send.campaign.sendingDomain?.senderName?.trim() || scenario.senderSpoofName;
+
       await this.mailer.send({
         to: send.employee.email,
-        fromName: scenario.senderSpoofName,
+        fromName,
         fromAddress,
         subject: scenario.subjectLine,
         html,

@@ -3,6 +3,7 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import { currentTenantId } from '../../common/prisma/tenant-context';
 import { EMAIL_DOMAINS } from '../../providers/email-domains/email-domains.interface';
 import type { EmailDomainsProvider, ProviderDomain } from '../../providers/email-domains/email-domains.interface';
+import { isSharedSendingDomain, sharedSendingDomains } from './shared-sending-domains';
 
 const DOMAIN_RE = /^(?=.{1,253}$)(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
 
@@ -65,9 +66,84 @@ export class SendingDomainsService {
    * This is the "did my DNS take effect yet" action, on demand from the client
    * and also called when the list is loaded.
    */
+  /**
+   * The Vlumeaware shared sending domains, and whether each is already enabled
+   * for this tenant. Drives the "second method" card: a client can turn one on
+   * with no DNS setup and send from it immediately.
+   */
+  async sharedOptions() {
+    const enabled = await this.prisma.db.sendingDomain.findMany({
+      where: { managed: true },
+      select: { id: true, domain: true, senderName: true },
+    });
+    const enabledByDomain = new Map(enabled.map((row) => [row.domain, row]));
+    return sharedSendingDomains().map((domain) => {
+      const row = enabledByDomain.get(domain);
+      return {
+        domain,
+        enabled: Boolean(row),
+        id: row?.id ?? null,
+        senderName: row?.senderName ?? null,
+      };
+    });
+  }
+
+  /**
+   * Enables a shared domain for this tenant: a verified, managed row the client
+   * did not have to prove ownership of. Idempotent — enabling one already on is
+   * a no-op that returns the existing row.
+   */
+  async enableShared(rawDomain: string) {
+    const domain = rawDomain.trim().toLowerCase();
+    if (!isSharedSendingDomain(domain)) {
+      throw new BadRequestException('That is not a Vlumeaware shared sending domain.');
+    }
+
+    const existing = await this.prisma.db.sendingDomain.findFirst({ where: { domain } });
+    if (existing) {
+      // If a client had earlier added this as their own (unverified) domain,
+      // enabling the shared method promotes it to the managed, verified row.
+      if (existing.managed) return existing;
+      return this.prisma.db.sendingDomain.update({
+        where: { id: existing.id },
+        data: { managed: true, status: 'verified', providerId: null, dnsRecords: undefined, verifiedAt: new Date() },
+      });
+    }
+
+    return this.prisma.db.sendingDomain.create({
+      data: {
+        tenantId: currentTenantId(),
+        domain,
+        providerId: null,
+        managed: true,
+        status: 'verified',
+        verifiedAt: new Date(),
+      },
+    });
+  }
+
+  /**
+   * Sets the display name ("title") the From shows for a domain — own or
+   * shared. It changes only the name beside the address, never the address or
+   * domain the mail is sent from. Blank clears it, falling back to the
+   * scenario's own sender name at send time.
+   */
+  async setSenderName(id: string, senderName: string | null) {
+    const row = await this.prisma.db.sendingDomain.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Sending domain not found');
+    const trimmed = senderName?.trim();
+    return this.prisma.db.sendingDomain.update({
+      where: { id },
+      data: { senderName: trimmed ? trimmed : null },
+    });
+  }
+
   async refresh(id: string) {
     const row = await this.prisma.db.sendingDomain.findUnique({ where: { id } });
     if (!row) throw new NotFoundException('Sending domain not found');
+    // Managed shared domains are verified by the platform, not by DNS the
+    // client publishes, so there is nothing to re-check.
+    if (row.managed) return row;
     if (!row.providerId) return row;
     if (row.status === 'verified') return row;
 

@@ -16,6 +16,7 @@ interface Scenario {
 interface SendingDomain {
   id: string;
   domain: string;
+  managed?: boolean;
 }
 
 interface Employee {
@@ -368,8 +369,9 @@ function Campaigns() {
             >
               {sendingDomains.length === 0 ? (
                 <Notice kind="info">
-                  No verified sending domain yet. Add and verify one under People → Sending domains
-                  before you can launch. You can still save this campaign as a draft.
+                  No sending domain yet. Under People → Sending domains, enable the Vlumeaware shared
+                  domain (no setup) or verify one you own, then it appears here. You can still save
+                  this campaign as a draft.
                 </Notice>
               ) : (
                 <div className="flex flex-wrap items-end gap-2">
@@ -393,6 +395,7 @@ function Campaigns() {
                       {sendingDomains.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.domain}
+                          {d.managed ? ' (Vlumeaware shared)' : ''}
                         </option>
                       ))}
                     </select>

@@ -107,6 +107,45 @@ describe('sending domains', () => {
     expect(bList.find((x) => x.id === da.id)).toBeUndefined();
   });
 
+  it('enables a Vlumeaware shared domain as verified with no provider call, idempotently', async () => {
+    process.env.SHARED_SENDING_DOMAINS = 'vlumeshared.test';
+    const id = await tenant();
+
+    const opts = await inT(id, () => service.sharedOptions());
+    expect(opts.map((o) => o.domain)).toContain('vlumeshared.test');
+    expect(opts.find((o) => o.domain === 'vlumeshared.test')?.enabled).toBe(false);
+
+    const enabled = await inT(id, () => service.enableShared('vlumeshared.test'));
+    expect(enabled.managed).toBe(true);
+    expect(enabled.status).toBe('verified');
+    expect(enabled.providerId).toBeNull();
+
+    // It is immediately choosable per campaign, and re-enabling is a no-op.
+    const verified = await inT(id, () => service.verifiedList());
+    expect(verified.map((v) => v.id)).toContain(enabled.id);
+    const again = await inT(id, () => service.enableShared('vlumeshared.test'));
+    expect(again.id).toBe(enabled.id);
+  });
+
+  it('rejects enabling a domain that is not on the shared list', async () => {
+    process.env.SHARED_SENDING_DOMAINS = 'vlumeshared.test';
+    const id = await tenant();
+    await expect(inT(id, () => service.enableShared('not-shared.test'))).rejects.toThrow(/not a Vlumeaware shared/i);
+  });
+
+  it('sets and clears a sender display name without touching the domain', async () => {
+    process.env.SHARED_SENDING_DOMAINS = 'vlumeshared.test';
+    const id = await tenant();
+    const d = await inT(id, () => service.enableShared('vlumeshared.test'));
+
+    const named = await inT(id, () => service.setSenderName(d.id, '  IT Service Desk  '));
+    expect(named.senderName).toBe('IT Service Desk');
+    expect(named.domain).toBe('vlumeshared.test');
+
+    const cleared = await inT(id, () => service.setSenderName(d.id, '   '));
+    expect(cleared.senderName).toBeNull();
+  });
+
   it('refuses removal while a draft campaign uses it, and deletes provider-side otherwise', async () => {
     const id = await tenant();
     provider.verifyStatus = 'verified';
