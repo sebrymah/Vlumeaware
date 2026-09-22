@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { runAsSystem } from '../../common/prisma/tenant-context';
 import { StorageService } from '../../providers/storage/storage.service';
@@ -30,6 +30,33 @@ export class SharedModulesService {
     return Promise.all(
       rows.map(async (r) => ({ ...r, videoUrl: await this.storage.signedUrl(r.videoUrl) })),
     );
+  }
+
+  /**
+   * Reports which library entries point at an object storage cannot read.
+   *
+   * Opt-in rather than folded into list(): it costs one storage round trip per
+   * row, and browsing the library should not pay for that. Exists because two
+   * entries were broken for two days and the only symptom was a learner
+   * reporting that a video would not play.
+   */
+  async integrity() {
+    const rows = await runAsSystem('library integrity check', () =>
+      this.prisma.db.sharedTrainingModule.findMany({
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, title: true, videoUrl: true, videoSource: true },
+      }),
+    );
+    const checked = await Promise.all(
+      rows.map(async (r) => ({
+        id: r.id,
+        title: r.title,
+        videoSource: r.videoSource,
+        available: await this.storage.exists(r.videoUrl),
+      })),
+    );
+    const broken = checked.filter((c) => !c.available);
+    return { total: checked.length, broken: broken.length, modules: checked };
   }
 
   async findOne(id: string) {
@@ -68,6 +95,16 @@ export class SharedModulesService {
     }
     // Stored under a shared prefix, not a tenant's.
     const storedUrl = await this.storage.put('shared-training-videos', file.buffer, file.mimetype);
+
+    // Read it back before creating the row. A put() that reports success
+    // without the bytes landing leaves a library entry pointing at nothing,
+    // and the first person to find out is a learner staring at a dead player.
+    if (!(await this.storage.exists(storedUrl))) {
+      throw new BadGatewayException(
+        'The video did not survive the upload — storage accepted it but cannot read it back. ' +
+          'Nothing was added to the library. Check the storage configuration and try again.',
+      );
+    }
     return runAsSystem('create shared module (upload)', () =>
       this.prisma.db.sharedTrainingModule.create({
         data: {

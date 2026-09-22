@@ -82,6 +82,16 @@ model Tenant {
   status                TenantStatus @default(active)
   sendingDomain         String?      @map("sending_domain")
   allowlistConfirmedAt  DateTime?    @map("allowlist_confirmed_at")
+  /// How the allow-list was confirmed: "probe" when a test message we sent
+  /// through the real sending path was opened from inside the client's mail
+  /// system, or "manual" when Vlumetech recorded it out of band.
+  allowlistConfirmedBy  String?      @map("allowlist_confirmed_by")
+  /// One-time token carried by the outstanding probe message. Cleared once
+  /// used, so a forwarded old test cannot re-confirm a gateway that has since
+  /// been changed.
+  allowlistProbeToken   String?      @unique @map("allowlist_probe_token")
+  allowlistProbeEmail   String?      @map("allowlist_probe_email")
+  allowlistProbeSentAt  DateTime?    @map("allowlist_probe_sent_at")
   digestEmail           String?      @map("digest_email")
   digestEnabled         Boolean      @default(false) @map("digest_enabled")
   /// When the last digest actually went out. Null means one has never been

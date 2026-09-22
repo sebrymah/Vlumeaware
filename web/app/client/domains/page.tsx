@@ -17,6 +17,9 @@ interface Allowlist {
   trackingDomain: string | null;
   configured: boolean;
   confirmedAt: string | null;
+  confirmedBy: string | null;
+  probeEmail: string | null;
+  probeSentAt: string | null;
 }
 
 interface Domain {
@@ -71,6 +74,7 @@ function Domains() {
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [allowlist, setAllowlist] = useState<Allowlist | null>(null);
+  const [probeEmail, setProbeEmail] = useState('');
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -90,6 +94,32 @@ function Domains() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Sends a real message down the simulation path. The gate opens when the
+   * recipient clicks the link inside, which can only happen if it reached an
+   * inbox rather than a quarantine.
+   */
+  async function sendProbe(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy('probe');
+    setError(null);
+    setOk(null);
+    try {
+      const res = await api.post<{ to: string }>(`/tenants/${tenantId}/allowlist/probe`, {
+        email: probeEmail,
+      });
+      setOk(
+        `Test sent to ${res.to}. Open it and click the link inside — if it is not there, ` +
+          'check quarantine, and that is your answer.',
+      );
+      setProbeEmail('');
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -199,21 +229,47 @@ function Domains() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2 border-t border-slate-200 pt-3 text-xs">
-              <span className="text-slate-600">Status:</span>
-              {allowlist.confirmedAt ? (
-                <span className="text-brand-700">
-                  confirmed {new Date(allowlist.confirmedAt).toLocaleDateString()}
-                </span>
-              ) : (
-                <>
-                  <span className="text-amber-700">not confirmed</span>
-                  {/* The client cannot tick this themselves: it is one of the
-                      six preflight gates, and a self-attested gate is no gate. */}
-                  <span className="text-slate-500">
-                    Tell your account manager once IT has applied it, and they will record it.
+            <div className="space-y-3 border-t border-slate-200 pt-4">
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="text-slate-600">Status:</span>
+                {allowlist.confirmedAt ? (
+                  <span className="text-brand-700">
+                    confirmed {new Date(allowlist.confirmedAt).toLocaleDateString()}
+                    {allowlist.confirmedBy === 'probe' ? ' by delivery test' : ' by Vlumetech'}
                   </span>
-                </>
+                ) : (
+                  <span className="text-amber-700">not confirmed</span>
+                )}
+              </div>
+
+              {/* Proving delivery beats attesting to it: the gate exists because
+                  a gateway can silently quarantine, and only a message that
+                  arrives disproves that. */}
+              <form onSubmit={sendProbe} className="flex flex-wrap items-end gap-3">
+                <Field
+                  label="Send a delivery test"
+                  hint="An address on one of your verified domains. Open it and click the link inside."
+                >
+                  <input
+                    className={inputClass}
+                    type="email"
+                    value={probeEmail}
+                    onChange={(e) => setProbeEmail(e.target.value)}
+                    placeholder="you@yourcompany.com"
+                    required
+                  />
+                </Field>
+                <Button type="submit" disabled={busy === 'probe' || !probeEmail.trim()}>
+                  {busy === 'probe' ? 'Sending…' : 'Send test'}
+                </Button>
+              </form>
+
+              {allowlist.probeSentAt && !allowlist.confirmedAt && (
+                <p className="text-[11px] text-slate-500">
+                  Last test sent to {allowlist.probeEmail} on{' '}
+                  {new Date(allowlist.probeSentAt).toLocaleString()}. Not yet opened — if it never
+                  arrived, your gateway is still filtering us.
+                </p>
               )}
             </div>
           </div>

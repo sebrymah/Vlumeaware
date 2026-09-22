@@ -2,7 +2,8 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { notificationFromAddress } from '../../providers/mailer/from-addresses';
-import { publicBaseUrl } from '../tracking/render';
+import { publicBaseUrl, trackingBaseUrl } from '../tracking/render';
+import { randomBytes } from 'node:crypto';
 import { escapeHtml as esc } from '../../common/html/escape';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { runAsSystem, runInTenant } from '../../common/prisma/tenant-context';
@@ -384,6 +385,115 @@ export class TenantsService {
   }
 
   /**
+   * Sends a probe down the real simulation path to prove the client's mail
+   * gateway will actually let a campaign through.
+   *
+   * Deliberately uses SIMULATION_FROM_ADDRESS rather than the notification
+   * address: the gate exists because a client's filters quarantine mail from
+   * the simulation domain and IPs, so a probe sent from anywhere else proves
+   * nothing about the thing being tested.
+   *
+   * The recipient must be on a domain the client has verified, otherwise this
+   * endpoint would send attacker-chosen mail from the phishing domain to any
+   * address on the internet.
+   */
+  async sendAllowlistProbe(tenantId: string, email: string, requestedBy: string) {
+    const address = email.trim().toLowerCase();
+    const domain = address.slice(address.lastIndexOf('@') + 1);
+    if (!address.includes('@') || !domain) {
+      throw new BadRequestException('Enter a valid email address.');
+    }
+
+    const verified = await runAsSystem('probe: verified domains', () =>
+      this.prisma.db.verifiedDomain.count({
+        where: { tenantId, domain, status: 'verified' },
+      }),
+    );
+    if (!verified) {
+      throw new BadRequestException(
+        `${domain} is not one of your verified domains. Verify it under People → Domains ` +
+          'first, then send the test to an address on it.',
+      );
+    }
+
+    const token = randomBytes(24).toString('base64url');
+    await runAsSystem('probe: store token', () =>
+      this.prisma.db.tenant.update({
+        where: { id: tenantId },
+        data: {
+          allowlistProbeToken: token,
+          allowlistProbeEmail: address,
+          allowlistProbeSentAt: new Date(),
+        },
+      }),
+    );
+
+    const link = `${trackingBaseUrl()}/track/allowlist/${token}`;
+    await this.mailer.send({
+      to: address,
+      fromName: 'Vlumeaware Delivery Test',
+      fromAddress: process.env.SIMULATION_FROM_ADDRESS ?? 'no-reply@vlumesec.com',
+      subject: 'Vlumeaware delivery test — please click the link inside',
+      html: `
+        <p>This is a delivery test from Vlumeaware.</p>
+        <p>
+          It was sent down exactly the same path a simulated phishing email uses. If you are
+          reading it in your inbox rather than a quarantine, your mail gateway is letting our
+          messages through.
+        </p>
+        <p><a href="${esc(link)}">Click here to confirm it arrived</a></p>
+        <p>
+          Nothing is installed and nothing is collected. The link records that this message
+          reached a real mailbox, which is the one thing we cannot check from our side.
+        </p>
+        <p>Vlumeaware</p>
+      `,
+      sendId: `allowlist-probe-${tenantId}-${Date.now()}`,
+    });
+
+    await this.audit.record(
+      'allowlist.probe.sent',
+      `${requestedBy} sent a gateway delivery test to ${address}`,
+      tenantId,
+    );
+    return { sent: true, to: address };
+  }
+
+  /**
+   * Opened from the probe message. Public by necessity — whoever receives the
+   * test is an employee, not a console user — so the token is the only
+   * authority and is single-use.
+   */
+  async confirmAllowlistProbe(token: string) {
+    const tenant = await runAsSystem('probe: look up token', () =>
+      this.prisma.db.tenant.findUnique({
+        where: { allowlistProbeToken: token },
+        select: { id: true, name: true, allowlistProbeEmail: true },
+      }),
+    );
+    if (!tenant) return null;
+
+    await runAsSystem('probe: confirm', () =>
+      this.prisma.db.tenant.update({
+        where: { id: tenant.id },
+        data: {
+          allowlistConfirmedAt: new Date(),
+          allowlistConfirmedBy: 'probe',
+          // Cleared so a forwarded copy of an old test cannot re-confirm a
+          // gateway whose rules have changed since.
+          allowlistProbeToken: null,
+        },
+      }),
+    );
+    await this.audit.record(
+      'allowlist.probe.confirmed',
+      `delivery test opened from ${tenant.allowlistProbeEmail ?? 'unknown'}; gateway allow-list confirmed`,
+      tenant.id,
+    );
+    return tenant;
+  }
+
+  /**
    * Whether this client is set up enough to run a campaign, as a checklist.
    *
    * The same gates campaign preflight applies, minus the two that belong to a
@@ -462,13 +572,22 @@ export class TenantsService {
     const tenant = await runAsSystem('read tenant for allowlist guidance', () =>
       this.prisma.db.tenant.findUnique({
         where: { id: tenantId },
-        select: { sendingDomain: true, allowlistConfirmedAt: true },
+        select: {
+          sendingDomain: true,
+          allowlistConfirmedAt: true,
+          allowlistConfirmedBy: true,
+          allowlistProbeEmail: true,
+          allowlistProbeSentAt: true,
+        },
       }),
     );
     if (!tenant) throw new NotFoundException('Tenant not found');
     return {
       ...allowlistGuidance(tenant.sendingDomain),
       confirmedAt: tenant.allowlistConfirmedAt,
+      confirmedBy: tenant.allowlistConfirmedBy,
+      probeEmail: tenant.allowlistProbeEmail,
+      probeSentAt: tenant.allowlistProbeSentAt,
     };
   }
 

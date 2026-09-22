@@ -52,6 +52,12 @@ export class SharedModulesController {
   }
 
   // Only Vlumetech staff curate the shared library.
+  /** Which library videos are actually readable in storage. */
+  @Get('integrity')
+  integrity() {
+    return this.shared.integrity();
+  }
+
   @Post('link')
   @Roles(ROLES.superadmin)
   link(@Body() dto: LinkDto) {
