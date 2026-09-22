@@ -45,19 +45,15 @@ export class CampaignsService {
       }
     }
 
+    // Scenario approval was removed: a client's own scenarios, and the ones
+    // they take from the shared library, are usable as soon as they exist.
+    // Attachment now only checks the scenarios are real and belong here.
     const scenarios = await this.prisma.db.scenario.findMany({
       where: { id: { in: input.scenarioIds } },
-      select: { id: true, approvedAt: true, title: true },
+      select: { id: true },
     });
-
     if (scenarios.length !== input.scenarioIds.length) {
       throw new BadRequestException('One or more scenarios do not exist in this tenant');
-    }
-    const unapproved = scenarios.filter((s) => !s.approvedAt);
-    if (unapproved.length) {
-      throw new BadRequestException(
-        `Not approved for use: ${unapproved.map((s) => s.title).join(', ')}`,
-      );
     }
 
     const tenantId = currentTenantId();
@@ -118,22 +114,15 @@ export class CampaignsService {
       }),
     );
 
-    const [employeeCount, scenarioCount, approvedCount] = await Promise.all([
+    const [employeeCount, scenarioCount] = await Promise.all([
       this.prisma.db.employee.count(),
       this.prisma.db.campaignScenario.count({ where: { campaignId } }),
-      this.prisma.db.scenario.count({
-        where: {
-          approvedAt: { not: null },
-          campaignScenarios: { some: { campaignId } },
-        },
-      }),
     ]);
 
     const checks = [
       { key: 'agreementSigned', label: 'NDPA authorization agreement signed', ok: !!tenant?.ndpaAgreementSignedAt },
       { key: 'employeesUploaded', label: 'Employees uploaded', ok: employeeCount > 0, detail: `${employeeCount} employees` },
       { key: 'scenariosAttached', label: 'At least one scenario attached', ok: scenarioCount > 0 },
-      { key: 'scenariosApproved', label: 'All attached scenarios approved', ok: scenarioCount > 0 && approvedCount === scenarioCount, detail: `${approvedCount}/${scenarioCount} approved` },
       { key: 'sendingDomain', label: 'Sending / tracking domain configured', ok: !!(tenant?.sendingDomain || process.env.TRACKING_BASE_URL) },
       { key: 'gatewayAllowlist', label: "Client IT confirmed our IPs are allow-listed", ok: !!tenant?.allowlistConfirmedAt },
     ];

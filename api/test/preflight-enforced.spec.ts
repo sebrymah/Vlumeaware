@@ -101,12 +101,6 @@ describe('preflight is enforced at launch, not merely reported', () => {
     await expect(launch(tenantId, campaignId)).rejects.toThrow(/Not ready to launch/i);
   });
 
-  it('refuses when an attached scenario is unapproved', async () => {
-    const { tenantId, campaignId, scenarioId } = await readyTenant();
-    await sys(() => db.scenario.update({ where: { id: scenarioId }, data: { approvedAt: null } }));
-    await expect(launch(tenantId, campaignId)).rejects.toThrow(/approved/i);
-  });
-
   it('refuses when no scenario is attached', async () => {
     const { tenantId } = await readyTenant();
     const bare = await sys(() => db.campaign.create({ data: { tenantId, name: 'bare' } }));

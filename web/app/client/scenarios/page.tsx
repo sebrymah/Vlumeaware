@@ -16,7 +16,6 @@ interface Scenario {
   senderSpoofName: string;
   redFlags: string[];
   createdByClaude: boolean;
-  approvedAt: string | null;
 }
 
 interface Draft {
@@ -50,13 +49,11 @@ function Scenarios() {
   // Set when the draft in the editor is an existing saved scenario rather
   // than a new one, so Save updates it instead of creating a duplicate.
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingApproved, setEditingApproved] = useState(false);
 
   /** Loads a saved scenario back into the editor. */
   function startEdit(scenario: Scenario) {
     setMode('compose');
     setEditingId(scenario.id);
-    setEditingApproved(Boolean(scenario.approvedAt));
     setOk(null);
     setError(null);
     setDraft({
@@ -71,7 +68,6 @@ function Scenarios() {
   function discardDraft() {
     setDraft(null);
     setEditingId(null);
-    setEditingApproved(false);
   }
 
   async function remove(scenario: Scenario) {
@@ -93,7 +89,6 @@ function Scenarios() {
   function startBlankDraft() {
     setMode('compose');
     setEditingId(null);
-    setEditingApproved(false);
     setDraft({
       title: '',
       subjectLine: '',
@@ -143,11 +138,7 @@ function Scenarios() {
     try {
       if (editingId) {
         await api.patch(`/tenants/${tenantId}/scenarios/${editingId}`, { ...draft });
-        setOk(
-          editingApproved
-            ? 'Updated. Because the content changed, it has returned to Vlumetech for approval before it can be sent again.'
-            : 'Updated. It still needs Vlumetech approval before use.',
-        );
+        setOk('Updated.');
       } else {
         await api.post(`/tenants/${tenantId}/scenarios`, {
           ...draft,
@@ -155,7 +146,7 @@ function Scenarios() {
           industryTag: industry,
           createdByClaude: mode === 'generate',
         });
-        setOk('Saved to your template library. It needs Vlumetech approval before use.');
+        setOk('Saved to your scenario library. Attach it to a campaign when you are ready.');
       }
       discardDraft();
       await load();
@@ -171,8 +162,7 @@ function Scenarios() {
       <div>
         <h1 className="text-lg font-semibold text-slate-900">Scenario library</h1>
         <p className="mt-1 text-xs text-slate-500">
-          Pretexts grounded in Nigerian business patterns. Drafts are reviewed and edited before
-          they are saved, and approved before they can be sent.
+          Build the pretext and edit anything before saving, then attach it to a campaign.
         </p>
       </div>
 
@@ -231,11 +221,7 @@ function Scenarios() {
       {draft && (
         <Card
           title={editingId ? 'Edit scenario' : 'Review draft'}
-          subtitle={
-            editingId && editingApproved
-              ? 'This scenario is approved. Saving a change returns it to Vlumetech for review before it can be sent again.'
-              : 'Edit anything before saving. Keep {{TRACKING_URL}} in the body — it becomes the tracked link.'
-          }
+          subtitle="Edit anything before saving. Keep the tracking placeholder in the body — it becomes the tracked link."
           actions={
             <div className="flex gap-2">
               <Button variant="ghost" onClick={discardDraft}>
@@ -304,7 +290,7 @@ function Scenarios() {
       )}
 
       <Card title="Saved scenarios">
-        <Table head={['Title', 'Tier', 'Subject', 'Source', 'Approved', '']}>
+        <Table head={['Title', 'Tier', 'Subject', 'Source', '']}>
           {list.map((s) => (
             <tr key={s.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{s.title}</td>
@@ -313,9 +299,6 @@ function Scenarios() {
               </td>
               <td className="px-2 py-2 text-slate-500">{s.subjectLine}</td>
               <td className="px-2 py-2 text-slate-500">{s.createdByClaude ? 'AI draft' : 'manual'}</td>
-              <td className="px-2 py-2">
-                <Badge>{s.approvedAt ? 'yes' : 'no'}</Badge>
-              </td>
               <td className="px-2 py-2">
                 <div className="flex justify-end gap-2">
                   <Button variant="ghost" onClick={() => startEdit(s)} disabled={busy}>

@@ -11,7 +11,6 @@ interface Scenario {
   id: string;
   title: string;
   difficultyTier: string;
-  approvedAt: string | null;
 }
 
 interface Employee {
@@ -168,8 +167,6 @@ function Campaigns() {
     }
   }
 
-  const approved = scenarios.filter((s) => s.approvedAt);
-
   return (
     <div className="space-y-6">
       <div>
@@ -254,12 +251,11 @@ function Campaigns() {
 
       <Card
         title="Create a campaign"
-        subtitle="Only approved scenarios can be attached. Vlumetech approves scenarios on your behalf."
+        subtitle="Attach one or more scenarios, choose who receives them, and launch when ready."
       >
-        {!approved.length ? (
+        {!scenarios.length ? (
           <Notice kind="info">
-            No approved scenarios yet. Generate and save one under Scenarios, then ask Vlumetech to
-            approve it.
+            No scenarios yet. Create one under Scenarios, or add one from the shared library.
           </Notice>
         ) : (
           <form onSubmit={create} className="space-y-4">
@@ -277,7 +273,7 @@ function Campaigns() {
             </div>
             <Field label="Scenarios">
               <div className="space-y-1">
-                {approved.map((s) => (
+                {scenarios.map((s) => (
                   <label key={s.id} className="flex items-center gap-2 text-xs text-slate-600">
                     <input
                       type="checkbox"

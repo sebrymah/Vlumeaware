@@ -66,11 +66,6 @@ export class ScenariosController {
     return this.scenarios.update(scenarioId, dto);
   }
 
-  @Post(':scenarioId/approve')
-  @Roles(ROLES.superadmin)
-  approve(@Param('scenarioId', ParseUUIDPipe) scenarioId: string) {
-    return this.scenarios.approve(scenarioId);
-  }
 
   @Delete(':scenarioId')
   remove(@Param('scenarioId', ParseUUIDPipe) scenarioId: string) {
