@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
-import { ArrayNotEmpty, IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min, MinLength } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { ROLES } from '../../common/auth/roles';
 import { Roles } from '../../common/auth/roles.decorator';
 import { RequiresSignedAgreement } from '../../common/consent/consent.decorator';
@@ -20,6 +20,8 @@ class CreateCampaignDto {
   @IsOptional() @IsUUID('4') sendingDomainId?: string;
   /** From local part, e.g. "it-support" -> it-support@<domain>. */
   @IsOptional() @IsString() @MinLength(1) fromLocalPart?: string;
+  /** Display name the From shows, e.g. "IT Service Desk". Blank = per scenario. */
+  @IsOptional() @IsString() @MaxLength(120) senderName?: string;
 }
 
 class ScheduleDto {
@@ -45,6 +47,7 @@ export class CampaignsController {
       recurrenceDays: dto.recurrenceDays,
       sendingDomainId: dto.sendingDomainId,
       fromLocalPart: dto.fromLocalPart,
+      senderName: dto.senderName,
     });
   }
 

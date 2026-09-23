@@ -60,6 +60,7 @@ function Campaigns() {
   const [sendingDomains, setSendingDomains] = useState<SendingDomain[]>([]);
   const [sendingDomainId, setSendingDomainId] = useState('');
   const [fromLocalPart, setFromLocalPart] = useState('no-reply');
+  const [senderName, setSenderName] = useState('');
   const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
@@ -159,6 +160,7 @@ function Campaigns() {
         recurrenceDays: recurrenceDays ? Number(recurrenceDays) : undefined,
         sendingDomainId: sendingDomainId || undefined,
         fromLocalPart: fromLocalPart.trim() || undefined,
+        senderName: senderName.trim() || undefined,
       });
       setName('');
       setSelected([]);
@@ -169,6 +171,7 @@ function Campaigns() {
       setRecurrenceDays('');
       setSendingDomainId('');
       setFromLocalPart('no-reply');
+      setSenderName('');
       setOk(
         scheduledSendAt
           ? 'Campaign scheduled. It will auto-launch at the set time.'
@@ -402,14 +405,36 @@ function Campaigns() {
                   </div>
                 </div>
               )}
+
+              {sendingDomains.length > 0 && (
+                <div className="mt-2">
+                  <label className="text-[11px] font-medium text-slate-500">
+                    Sender name (optional)
+                  </label>
+                  <input
+                    className={`${inputClass} mt-1 max-w-xs`}
+                    value={senderName}
+                    onChange={(e) => setSenderName(e.target.value)}
+                    placeholder="e.g. IT Service Desk"
+                    aria-label="Sender display name"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    The name staff see in their inbox. Set a convincing title so the sending address
+                    is not the first thing they notice. Leave blank to use each scenario&rsquo;s own
+                    sender name.
+                  </p>
+                </div>
+              )}
+
               {sendingDomainId && (
-                <p className="mt-1 text-[11px] text-slate-500">
-                  Mail will come from{' '}
+                <p className="mt-2 text-[11px] text-slate-500">
+                  Mail will show as{' '}
                   <span className="font-mono text-slate-700">
+                    {senderName.trim() || 'each scenario’s sender'} &lt;
                     {(fromLocalPart.trim() || 'no-reply')}@
-                    {sendingDomains.find((d) => d.id === sendingDomainId)?.domain}
+                    {sendingDomains.find((d) => d.id === sendingDomainId)?.domain}&gt;
                   </span>
-                  . The display name is each scenario&rsquo;s sender name.
+                  .
                 </p>
               )}
             </Field>

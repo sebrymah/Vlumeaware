@@ -244,8 +244,11 @@ model Campaign {
   /// per campaign. Required to launch — enforced in preflight.
   sendingDomainId   String?        @map("sending_domain_id") @db.Uuid
   /// Local part of the From address, e.g. "it-support" → it-support@<domain>.
-  /// The display name is the scenario's senderSpoofName.
   fromLocalPart     String?        @map("from_local_part")
+  /// Display name ("title") the From shows for this campaign, e.g. "IT Service
+  /// Desk". Overrides each scenario's sender name so staff see a convincing
+  /// title, not the raw address. Blank falls back to the scenario's own name.
+  senderName        String?        @map("sender_name")
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaignScenarios CampaignScenario[]

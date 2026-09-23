@@ -31,6 +31,7 @@ export class CampaignsService {
     recurrenceDays?: number;
     sendingDomainId?: string;
     fromLocalPart?: string;
+    senderName?: string;
   }) {
     if (!input.scenarioIds.length) {
       throw new BadRequestException('A campaign needs at least one scenario');
@@ -82,6 +83,7 @@ export class CampaignsService {
         targetEmployeeIds,
         sendingDomainId: input.sendingDomainId ?? null,
         fromLocalPart: input.fromLocalPart?.trim() || null,
+        senderName: input.senderName?.trim() || null,
         campaignScenarios: {
           create: scenarios.map((s) => ({ scenarioId: s.id, tenantId })),
         },
