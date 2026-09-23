@@ -1,5 +1,8 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post } from '@nestjs/common';
-import { ArrayNotEmpty, IsArray, IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+
+/** The login-page looks a campaign can wear. */
+export const LANDING_TEMPLATES = ['generic', 'microsoft', 'google', 'okta'] as const;
 import { ROLES } from '../../common/auth/roles';
 import { Roles } from '../../common/auth/roles.decorator';
 import { RequiresSignedAgreement } from '../../common/consent/consent.decorator';
@@ -22,6 +25,8 @@ class CreateCampaignDto {
   @IsOptional() @IsString() @MinLength(1) fromLocalPart?: string;
   /** Display name the From shows, e.g. "IT Service Desk". Blank = per scenario. */
   @IsOptional() @IsString() @MaxLength(120) senderName?: string;
+  /** Which look the simulated login page wears. */
+  @IsOptional() @IsIn(LANDING_TEMPLATES) landingTemplate?: string;
 }
 
 class ScheduleDto {
@@ -48,6 +53,7 @@ export class CampaignsController {
       sendingDomainId: dto.sendingDomainId,
       fromLocalPart: dto.fromLocalPart,
       senderName: dto.senderName,
+      landingTemplate: dto.landingTemplate,
     });
   }
 

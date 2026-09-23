@@ -249,6 +249,10 @@ model Campaign {
   /// Desk". Overrides each scenario's sender name so staff see a convincing
   /// title, not the raw address. Blank falls back to the scenario's own name.
   senderName        String?        @map("sender_name")
+  /// Which look the simulated login page wears: "generic" (the tenant's own
+  /// brand), or a recognisable provider — "microsoft", "google", "okta". Lets
+  /// the landing page match the portal staff actually sign in to.
+  landingTemplate   String         @default("generic") @map("landing_template")
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaignScenarios CampaignScenario[]

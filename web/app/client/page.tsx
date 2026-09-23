@@ -61,6 +61,7 @@ function Campaigns() {
   const [sendingDomainId, setSendingDomainId] = useState('');
   const [fromLocalPart, setFromLocalPart] = useState('no-reply');
   const [senderName, setSenderName] = useState('');
+  const [landingTemplate, setLandingTemplate] = useState('generic');
   const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
@@ -161,6 +162,7 @@ function Campaigns() {
         sendingDomainId: sendingDomainId || undefined,
         fromLocalPart: fromLocalPart.trim() || undefined,
         senderName: senderName.trim() || undefined,
+        landingTemplate,
       });
       setName('');
       setSelected([]);
@@ -172,6 +174,7 @@ function Campaigns() {
       setSendingDomainId('');
       setFromLocalPart('no-reply');
       setSenderName('');
+      setLandingTemplate('generic');
       setOk(
         scheduledSendAt
           ? 'Campaign scheduled. It will auto-launch at the set time.'
@@ -437,6 +440,22 @@ function Campaigns() {
                   .
                 </p>
               )}
+            </Field>
+
+            <Field
+              label="Landing page"
+              hint="The page staff see if they click the link. Pick the portal they normally sign in to — it never captures real passwords, only whether someone submitted."
+            >
+              <select
+                className={inputClass}
+                value={landingTemplate}
+                onChange={(e) => setLandingTemplate(e.target.value)}
+              >
+                <option value="generic">Your brand (logo &amp; colours)</option>
+                <option value="microsoft">Microsoft 365 sign-in</option>
+                <option value="google">Google Workspace sign-in</option>
+                <option value="okta">Okta sign-in</option>
+              </select>
             </Field>
 
             <div className="grid gap-3 sm:grid-cols-3">

@@ -12,7 +12,15 @@ const EMAIL_SHAPED = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * navigation. There is intentionally no field in the request that could carry
  * the secret.
  */
-export function LoginForm({ token, accent }: { token: string; accent: string }) {
+export function LoginForm({
+  token,
+  accent,
+  emailLabel = 'Work email',
+}: {
+  token: string;
+  accent: string;
+  emailLabel?: string;
+}) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,7 +52,7 @@ export function LoginForm({ token, accent }: { token: string; accent: string }) 
   return (
     <form onSubmit={submit} className="mt-5 space-y-3">
       <label className="block">
-        <span className="text-xs font-medium text-slate-600">Work email</span>
+        <span className="text-xs font-medium text-slate-600">{emailLabel}</span>
         <input
           type="text"
           autoComplete="username"

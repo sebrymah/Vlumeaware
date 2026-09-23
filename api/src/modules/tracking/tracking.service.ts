@@ -75,10 +75,13 @@ export class TrackingService {
         data: { clickedAt: new Date() },
       });
 
-      const assignment = await this.training.assignFromClick({
-        employeeId: ref.employeeId,
-        scenarioId: ref.scenarioId,
-        sendId: ref.id,
+      // The course is assigned when someone actually submits credentials, not
+      // on a click alone — so here we only READ whether an assignment already
+      // exists for this send (it will, if they submitted before reaching the
+      // reveal), to show it on the teachable-moment page.
+      const assignment = await this.prisma.db.trainingAssignment.findFirst({
+        where: { sourceSendId: ref.id },
+        select: { trainingModuleId: true },
       });
 
       const [tenant, employee, scenario] = await Promise.all([
@@ -102,7 +105,7 @@ export class TrackingService {
 
       // Resolve the assigned module to a playable link for the reveal page.
       let assignedModule: TeachableMoment['assignedModule'] = null;
-      if (assignment) {
+      if (assignment?.trainingModuleId) {
         const module = await this.prisma.db.trainingModule.findUnique({
           where: { id: assignment.trainingModuleId },
           select: { id: true, title: true, videoUrl: true, videoSource: true },
@@ -193,6 +196,15 @@ export class TrackingService {
         where: { id: ref.id },
         data: { credentialsSubmitted: true },
       });
+
+      // Submitting credentials is the real failure, so this is where the course
+      // is auto-assigned (idempotent per send). A click alone does not — it only
+      // earns the teachable-moment reveal. Needs a scenario→module routing rule.
+      await this.training.assignFromClick({
+        employeeId: ref.employeeId,
+        scenarioId: ref.scenarioId,
+        sendId: ref.id,
+      });
     });
   }
 
@@ -209,10 +221,11 @@ export class TrackingService {
   async getLoginBranding(token: string): Promise<{
     tenant: { name: string; brandLogoUrl: string | null; brandPrimaryColor: string | null };
     senderSpoofName: string;
+    landingTemplate: string;
   }> {
     const ref = await this.resolveToken(token);
     return runInTenant(ref.tenantId, async () => {
-      const [tenant, scenario] = await Promise.all([
+      const [tenant, scenario, campaign] = await Promise.all([
         runAsSystem('tracking: login-page branding', () =>
           this.prisma.db.tenant.findUnique({
             where: { id: ref.tenantId },
@@ -223,9 +236,17 @@ export class TrackingService {
           where: { id: ref.scenarioId },
           select: { senderSpoofName: true },
         }),
+        this.prisma.db.campaign.findUnique({
+          where: { id: ref.campaignId },
+          select: { landingTemplate: true },
+        }),
       ]);
       if (!tenant || !scenario) throw new NotFoundException('Simulation data missing');
-      return { tenant, senderSpoofName: scenario.senderSpoofName };
+      return {
+        tenant,
+        senderSpoofName: scenario.senderSpoofName,
+        landingTemplate: campaign?.landingTemplate ?? 'generic',
+      };
     });
   }
 

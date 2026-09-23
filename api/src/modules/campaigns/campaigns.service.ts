@@ -32,6 +32,7 @@ export class CampaignsService {
     sendingDomainId?: string;
     fromLocalPart?: string;
     senderName?: string;
+    landingTemplate?: string;
   }) {
     if (!input.scenarioIds.length) {
       throw new BadRequestException('A campaign needs at least one scenario');
@@ -84,6 +85,7 @@ export class CampaignsService {
         sendingDomainId: input.sendingDomainId ?? null,
         fromLocalPart: input.fromLocalPart?.trim() || null,
         senderName: input.senderName?.trim() || null,
+        landingTemplate: input.landingTemplate?.trim() || 'generic',
         campaignScenarios: {
           create: scenarios.map((s) => ({ scenarioId: s.id, tenantId })),
         },
