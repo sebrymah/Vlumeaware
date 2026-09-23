@@ -3,6 +3,8 @@ import { notificationFromAddress, notificationFromIsConfigured } from './provide
 import { ROLES } from './common/auth/roles';
 import { Public, Roles } from './common/auth/roles.decorator';
 import { cleanEnv } from './providers/storage/storage.service';
+import { checkDeliverability } from './providers/mailer/deliverability';
+import { sharedSendingDomains } from './modules/sending-domains/shared-sending-domains';
 
 /**
  * Deployment health and configuration diagnostics.
@@ -29,9 +31,14 @@ export class HealthController {
    */
   @Get('mailer')
   @Roles(ROLES.superadmin)
-  mailer() {
+  async mailer() {
     const selected = (process.env.MAILER ?? '').toLowerCase();
     const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+    // Live email-authentication state of the shared sending domains, read from
+    // DNS. Missing SPF/DKIM/DMARC is the first cause of simulations landing in
+    // spam, so it belongs beside the mailer config it depends on.
+    const shared = sharedSendingDomains();
+    const deliverability = await checkDeliverability(shared).catch(() => []);
     return {
       mailer: selected === 'resend' || selected === 'ses' ? selected : 'log (default — no real email)',
       resendKeyPresent: Boolean(process.env.RESEND_API_KEY),
@@ -58,6 +65,13 @@ export class HealthController {
       aiProvider: aiBackend().provider,
       aiModel: aiBackend().model,
       aiAssistantConfigured: aiBackend().configured,
+      // Deliverability: the shared sending domains and their live SPF/DKIM/DMARC
+      // state, plus whether the egress IPs clients need for their mail-gateway
+      // allow-list are published. `authenticated: false` on a domain is the
+      // most likely reason its simulations are being junked.
+      sharedSendingDomains: shared,
+      deliverability,
+      allowlistIpsConfigured: Boolean(process.env.ALLOWLIST_IPS),
       deployedCommit: process.env.RENDER_GIT_COMMIT ?? process.env.GIT_COMMIT ?? null,
       ts: new Date().toISOString(),
     };

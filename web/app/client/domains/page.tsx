@@ -211,21 +211,52 @@ function Domains() {
               )}
             </div>
 
-            <div className="rounded-lg bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
-              <p className="font-semibold text-slate-700">Where to put them</p>
-              <p className="mt-1">
-                <strong>Microsoft 365:</strong> Security portal → Policies → Advanced delivery →
-                Phishing simulation. It asks for the sending domain and the IP together; both are
-                required. Add the link domain under third-party phishing simulation URLs.
-              </p>
-              <p className="mt-1">
-                <strong>Google Workspace:</strong> Admin console → Apps → Gmail → Spam, phishing
-                and malware. Add the IPs to an inbound gateway or email allow-list, and skip
-                spam filtering for those senders.
-              </p>
-              <p className="mt-2 text-slate-500">
-                Use the phishing-simulation setting rather than a blanket allow rule, so only this
-                traffic is exempted and your real protection is untouched.
+            <div className="space-y-3 rounded-lg bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
+              <p className="font-semibold text-slate-700">Where to put them — exact steps</p>
+
+              <div>
+                <p className="font-semibold text-slate-700">Microsoft 365 (Defender)</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                  <li>
+                    Go to <span className="font-mono">security.microsoft.com</span> → Email &amp;
+                    collaboration → Policies &amp; rules → Threat policies → <strong>Advanced delivery</strong>.
+                  </li>
+                  <li>Open the <strong>Phishing simulation</strong> tab → Add (or Edit).</li>
+                  <li>
+                    <strong>Sending domain:</strong> add the sending domain above.{' '}
+                    <strong>Sending IP:</strong> add the sending IPs above — Microsoft requires both together.
+                  </li>
+                  <li>
+                    <strong>Simulation URLs:</strong> add the link / tracking domain above so its
+                    links are not detonated or rewritten.
+                  </li>
+                  <li>Save. Allow a few minutes for the policy to take effect.</li>
+                </ol>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700">Google Workspace</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                  <li>
+                    Go to <span className="font-mono">admin.google.com</span> → Apps → Google
+                    Workspace → Gmail → <strong>Spam, phishing and malware</strong> (pick the right OU).
+                  </li>
+                  <li>
+                    Add the sending IPs to an <strong>Inbound gateway</strong> (or the Email
+                    allowlist), and tick <em>skip spam filtering</em> for them.
+                  </li>
+                  <li>
+                    Add a <strong>Content compliance</strong> rule that bypasses attachment/link
+                    protection for mail from the sending domain, so Safe Links does not rewrite the tracking URL.
+                  </li>
+                </ol>
+              </div>
+
+              <p className="text-slate-500">
+                Use the phishing-simulation / allow settings above rather than a blanket rule, so
+                only this traffic is exempted and your real protection is untouched. The sending
+                domain is fully authenticated (SPF, DKIM and DMARC), so this gateway step is all
+                that is needed for staff on Microsoft 365 or Google.
               </p>
             </div>
 
