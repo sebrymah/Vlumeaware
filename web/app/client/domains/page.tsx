@@ -15,6 +15,7 @@ interface Allowlist {
   ips: string[];
   sendingDomain: string | null;
   trackingDomain: string | null;
+  landingDomain: string | null;
   configured: boolean;
   confirmedAt: string | null;
   confirmedBy: string | null;
@@ -196,20 +197,30 @@ function Domains() {
             <p className="text-xs leading-relaxed text-slate-600">
               A simulated phish has to reach the inbox to measure anything. If your gateway
               quarantines it, the campaign reports a clean result that is not real. Allow the
-              following, and <strong>only</strong> for the sending domain below — not globally.
+              domains and IPs below, and <strong>only</strong> those — not globally.
             </p>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               {allowlist.sendingDomain && (
                 <Copyable label="Sending domain" value={allowlist.sendingDomain} />
               )}
               {allowlist.trackingDomain && (
                 <Copyable label="Link / tracking domain" value={allowlist.trackingDomain} />
               )}
+              {allowlist.landingDomain && (
+                <Copyable label="Training / landing domain" value={allowlist.landingDomain} />
+              )}
               {allowlist.ips.length > 0 && (
                 <Copyable label="Sending IPs" value={allowlist.ips.join(', ')} />
               )}
             </div>
+            {allowlist.landingDomain && (
+              <p className="text-[11px] leading-relaxed text-amber-700">
+                Allow-list the <strong>training / landing domain</strong> as well — it is the link
+                inside awareness-training invites, and a different host from the sending domain, so
+                if it is left out those emails are the ones that land in spam.
+              </p>
+            )}
 
             <div className="space-y-3 rounded-lg bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
               <p className="font-semibold text-slate-700">Where to put them — exact steps</p>
@@ -248,6 +259,33 @@ function Domains() {
                   <li>
                     Add a <strong>Content compliance</strong> rule that bypasses attachment/link
                     protection for mail from the sending domain, so Safe Links does not rewrite the tracking URL.
+                  </li>
+                </ol>
+              </div>
+
+              <div>
+                <p className="font-semibold text-slate-700">Zoho Mail</p>
+                <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                  <li>
+                    In the admin console <span className="font-mono">mailadmin.zoho.com</span> → go to{' '}
+                    <strong>Security &amp; Compliance → Spam Control → Allowed List</strong> (the
+                    organisation list, not a personal one).
+                  </li>
+                  <li>
+                    Add the <strong>sending domain</strong> and the <strong>sending IPs</strong>
+                    above, and turn on the option that lets allowed senders{' '}
+                    <em>bypass spam checks</em> — in Zoho an allowed sender is not spam-exempt unless this is set.
+                  </li>
+                  <li>
+                    <strong>Important:</strong> the simulation spoofs a sender name on purpose, and
+                    Zoho&rsquo;s anti-spoofing / phishing engine is <em>separate</em> from the spam
+                    list. Under <strong>Security &amp; Compliance</strong>, exempt the sending domain
+                    from the spoofing / fraudulent-email action too, or those messages stay in
+                    quarantine even when allowed for spam.
+                  </li>
+                  <li>
+                    Check <strong>Quarantine</strong> settings — Zoho may hold flagged mail there
+                    rather than in the spam folder.
                   </li>
                 </ol>
               </div>

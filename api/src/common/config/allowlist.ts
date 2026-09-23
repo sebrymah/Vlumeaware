@@ -27,8 +27,16 @@ export interface AllowlistGuidance {
   ips: string[];
   /** Domain the simulated mail is sent from. */
   sendingDomain: string | null;
-  /** Domain the tracking and landing-page links resolve to. */
+  /** Domain the click / open tracking links resolve to (simulation infra). */
   trackingDomain: string | null;
+  /**
+   * Domain of the training and teachable-moment pages (PUBLIC_WEB_URL). It is a
+   * different host from the tracking domain, and it is the link inside genuine
+   * awareness-training emails — so if it is not allow-listed those land in
+   * spam even when the sending domain is allowed. Null when it is the same host
+   * as the tracking domain, so the UI does not list a duplicate.
+   */
+  landingDomain: string | null;
   /**
    * False when nothing has been configured, so the UI can say "not published
    * yet" instead of rendering an empty list that looks like "nothing to do".
@@ -48,18 +56,25 @@ export function allowlistGuidance(tenantSendingDomain?: string | null): Allowlis
   const sendingDomain =
     tenantSendingDomain?.trim() || domainOf(process.env.SIMULATION_FROM_ADDRESS) || null;
 
-  let trackingDomain: string | null = null;
-  try {
-    const base = process.env.TRACKING_BASE_URL;
-    if (base) trackingDomain = new URL(base).hostname;
-  } catch {
-    trackingDomain = null;
-  }
+  const trackingDomain = hostnameOf(process.env.TRACKING_BASE_URL);
+  const landingHost = hostnameOf(process.env.PUBLIC_WEB_URL);
+  // Only surface the landing domain when it is genuinely a different host from
+  // the tracking one — otherwise it is the same allow-list entry twice.
+  const landingDomain = landingHost && landingHost !== trackingDomain ? landingHost : null;
 
   return {
     ips,
     sendingDomain,
     trackingDomain,
+    landingDomain,
     configured: ips.length > 0 || sendingDomain !== null,
   };
+}
+
+function hostnameOf(url: string | undefined): string | null {
+  try {
+    return url ? new URL(url).hostname : null;
+  } catch {
+    return null;
+  }
 }
