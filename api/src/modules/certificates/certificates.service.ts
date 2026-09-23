@@ -124,6 +124,21 @@ export class CertificatesService {
   }
 
   /**
+   * Renders a certificate PDF addressed by its public serial, with no tenant
+   * context — so the employee portal and an auditor can download it from a
+   * public link. The serial is the unguessable public key that already gates
+   * verification.
+   */
+  async renderPdfBySerial(serial: string): Promise<{ pdf: Buffer; serial: string }> {
+    const cert = await runAsSystem('certificate: resolve serial for pdf', () =>
+      this.prisma.db.certificate.findUnique({ where: { serial }, select: { id: true, serial: true } }),
+    );
+    if (!cert) throw new NotFoundException('Certificate not found');
+    const pdf = await runAsSystem('certificate: render pdf by serial', () => this.renderPdf(cert.id));
+    return { pdf, serial: cert.serial };
+  }
+
+  /**
    * Emails the certificate PDF to the employee who earned it.
    *
    * Sent from the notification address, never SIMULATION_FROM_ADDRESS: that

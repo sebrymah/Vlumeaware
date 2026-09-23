@@ -1,23 +1,22 @@
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
+interface TrainingItem {
+  id: string;
+  title: string;
+  assignedAt: string;
+  completedAt: string | null;
+  estimatedMinutes: number | null;
+  passingScorePct: number | null;
+  personalBest: number | null;
+  videoUrl: string | null;
+}
+
 interface Summary {
   employee: { name: string; email: string; department: string | null; tenant: string };
-  training: Array<{
-    id: string;
-    title: string;
-    assignedAt: string;
-    completedAt: string | null;
-    durationSeconds: number | null;
-    videoUrl: string | null;
-  }>;
-  certificates: Array<{
-    serial: string;
-    moduleTitle: string;
-    quizTitle: string | null;
-    scorePct: number;
-    issuedAt: string;
-    verifyUrl: string;
-  }>;
+  stats: { averageScore: number | null; assigned: number; completed: number; badges: number };
+  badges: Array<{ key: string; label: string }>;
+  training: TrainingItem[];
+  certificates: Array<{ serial: string; moduleTitle: string; scorePct: number; issuedAt: string; verifyUrl: string }>;
   history: Array<{ id: string; subject: string; sender: string; sentAt: string; outcome: string }>;
 }
 
@@ -35,7 +34,19 @@ const OUTCOME: Record<string, { label: string; cls: string }> = {
 };
 
 function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString();
+  return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: '2-digit' });
+}
+function scoreCls(v: number) {
+  return v >= 100 ? 'text-brand-700' : v >= 80 ? 'text-emerald-600' : 'text-amber-600';
+}
+
+function StatCard({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div className="text-xl font-semibold text-slate-900">{value}</div>
+      <div className="mt-0.5 text-[11px] text-slate-500">{label}</div>
+    </div>
+  );
 }
 
 export default async function PortalDashboard({ params }: { params: Promise<{ token: string }> }) {
@@ -47,106 +58,146 @@ export default async function PortalDashboard({ params }: { params: Promise<{ to
       <div className="flex min-h-screen items-center justify-center bg-slate-100 px-6 text-center">
         <div className="max-w-sm">
           <h1 className="text-lg font-semibold text-slate-900">This link is invalid or expired</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Request a new one from your training dashboard sign-in page.
-          </p>
-          <a href="/portal" className="mt-3 inline-block text-sm font-medium text-brand-700 underline">
-            Get a new link
-          </a>
+          <p className="mt-2 text-sm text-slate-600">Request a new one from your sign-in page.</p>
+          <a href="/portal" className="mt-3 inline-block text-sm font-medium text-brand-700 underline">Get a new link</a>
         </div>
       </div>
     );
   }
 
-  const { employee, training, certificates, history } = data;
-  const done = training.filter((t) => t.completedAt).length;
+  const { employee, stats, badges, training, certificates, history } = data;
+  const assigned = training.filter((t) => !t.completedAt);
+  const completed = training.filter((t) => t.completedAt);
+  const certByTitle = new Map(certificates.map((c) => [c.moduleTitle.toLowerCase(), c]));
 
   return (
     <div className="min-h-screen bg-slate-100 px-4 py-8">
-      <div className="mx-auto max-w-3xl space-y-6">
-        <header>
-          <h1 className="text-xl font-semibold text-slate-900">Hi {employee.name.split(' ')[0]}</h1>
-          <p className="mt-1 text-xs text-slate-500">
-            {employee.tenant} security awareness · {employee.email}
-            {employee.department ? ` · ${employee.department}` : ''}
-          </p>
+      <div className="mx-auto max-w-4xl space-y-6">
+        <header className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-semibold text-slate-900">Learner dashboard</h1>
+            <p className="mt-1 text-xs text-slate-500">
+              {employee.name} · {employee.tenant}
+              {employee.department ? ` · ${employee.department}` : ''}
+            </p>
+          </div>
         </header>
 
-        {/* Training */}
-        <section className="rounded-xl bg-white p-5 shadow-sm">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Your training</h2>
-            <span className="text-[11px] text-slate-400">{done}/{training.length} completed</span>
-          </div>
-          {training.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">No training assigned yet.</p>
-          ) : (
-            <div className="mt-3 space-y-4">
-              {training.map((t) => (
-                <div key={t.id} className="rounded-lg border border-slate-200 p-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-slate-900">{t.title}</span>
-                    {t.completedAt ? (
-                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-medium text-brand-700">
-                        completed {fmtDate(t.completedAt)}
-                      </span>
-                    ) : (
-                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                        not yet completed
-                      </span>
-                    )}
-                    <span className="ml-auto text-[11px] text-slate-400">assigned {fmtDate(t.assignedAt)}</span>
-                  </div>
-                  {t.videoUrl && (
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-xs font-medium text-brand-700">
-                        {t.completedAt ? 'Rewatch' : 'Watch'} the video
-                      </summary>
-                      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                      <video controls preload="none" className="mt-2 w-full rounded-lg" src={t.videoUrl} />
-                    </details>
-                  )}
-                </div>
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Average score" value={stats.averageScore != null ? `${stats.averageScore}%` : '—'} />
+          <StatCard label="Assigned trainings" value={stats.assigned} />
+          <StatCard label="Completed trainings" value={stats.completed} />
+          <StatCard label="Badges earned" value={stats.badges} />
+        </div>
+
+        {/* Badges */}
+        {badges.length > 0 && (
+          <section className="rounded-xl bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-slate-900">Badges achieved</h2>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {badges.map((b) => (
+                <span key={b.key} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-3 py-1 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-100">
+                  ★ {b.label}
+                </span>
               ))}
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
-        {/* Certificates */}
+        {/* Assigned training */}
         <section className="rounded-xl bg-white p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">Your certificates</h2>
-          {certificates.length === 0 ? (
-            <p className="mt-3 text-sm text-slate-500">
-              Complete a course and pass its quiz to earn a certificate.
-            </p>
-          ) : (
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
-                    <th className="py-1 pr-3">Course</th>
-                    <th className="py-1 pr-3">Score</th>
-                    <th className="py-1 pr-3">Issued</th>
-                    <th className="py-1">Verify</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {certificates.map((c) => (
-                    <tr key={c.serial} className="border-b border-slate-100">
-                      <td className="py-2 pr-3">{c.moduleTitle}</td>
-                      <td className="py-2 pr-3">{c.scorePct}%</td>
-                      <td className="py-2 pr-3 text-slate-500">{fmtDate(c.issuedAt)}</td>
-                      <td className="py-2">
-                        <a href={c.verifyUrl} className="text-brand-700 underline" target="_blank" rel="noopener noreferrer">
-                          {c.serial}
-                        </a>
+          <h2 className="text-sm font-semibold text-slate-900">Assigned training</h2>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
+                  <th className="py-1 pr-3">Training module</th>
+                  <th className="py-1 pr-3">Estimated time</th>
+                  <th className="py-1 pr-3">Passing score</th>
+                  <th className="py-1">Personal best</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assigned.length === 0 ? (
+                  <tr><td colSpan={4} className="py-6 text-center text-slate-500">No trainings assigned.</td></tr>
+                ) : (
+                  assigned.map((t) => (
+                    <tr key={t.id} className="border-b border-slate-100 align-top">
+                      <td className="py-2 pr-3">
+                        <div className="font-medium text-slate-900">{t.title}</div>
+                        {t.videoUrl && (
+                          <details className="mt-1">
+                            <summary className="cursor-pointer text-[11px] font-medium text-brand-700">Watch the video</summary>
+                            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                            <video controls preload="none" className="mt-2 w-full max-w-md rounded-lg" src={t.videoUrl} />
+                          </details>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3 text-slate-500">{t.estimatedMinutes ? `${t.estimatedMinutes} min` : '—'}</td>
+                      <td className="py-2 pr-3 text-slate-500">{t.passingScorePct != null ? `${t.passingScorePct}%` : '—'}</td>
+                      <td className={`py-2 font-semibold ${t.personalBest != null ? scoreCls(t.personalBest) : 'text-slate-400'}`}>
+                        {t.personalBest != null ? `${t.personalBest}%` : '—'}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Completed training */}
+        <section className="rounded-xl bg-white p-5 shadow-sm">
+          <h2 className="text-sm font-semibold text-slate-900">Completed training</h2>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-[13px]">
+              <thead>
+                <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
+                  <th className="py-1 pr-3">Training module</th>
+                  <th className="py-1 pr-3">Personal best</th>
+                  <th className="py-1 pr-3">Completion date</th>
+                  <th className="py-1">Certificate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completed.length === 0 ? (
+                  <tr><td colSpan={4} className="py-6 text-center text-slate-500">Nothing completed yet.</td></tr>
+                ) : (
+                  completed.map((t) => {
+                    const cert = certByTitle.get(t.title.toLowerCase());
+                    return (
+                      <tr key={t.id} className="border-b border-slate-100">
+                        <td className="py-2 pr-3">
+                          <div className="font-medium text-slate-900">{t.title}</div>
+                          {t.videoUrl && (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-[11px] font-medium text-brand-700">Rewatch</summary>
+                              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                              <video controls preload="none" className="mt-2 w-full max-w-md rounded-lg" src={t.videoUrl} />
+                            </details>
+                          )}
+                        </td>
+                        <td className={`py-2 pr-3 font-semibold ${t.personalBest != null ? scoreCls(t.personalBest) : 'text-slate-400'}`}>
+                          {t.personalBest != null ? `${t.personalBest}%` : '—'}
+                        </td>
+                        <td className="py-2 pr-3 text-slate-500">{t.completedAt ? fmtDate(t.completedAt) : '—'}</td>
+                        <td className="py-2">
+                          {cert ? (
+                            <a href={`${BASE}/verify/${encodeURIComponent(cert.serial)}/pdf`} className="font-medium text-brand-700 underline" target="_blank" rel="noopener noreferrer">
+                              Download Certificate
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </section>
 
         {/* Phishing history */}
@@ -181,9 +232,7 @@ export default async function PortalDashboard({ params }: { params: Promise<{ to
           )}
         </section>
 
-        <p className="pb-6 text-center text-[11px] text-slate-400">
-          This dashboard is private to you. Powered by Vlumeaware.
-        </p>
+        <p className="pb-6 text-center text-[11px] text-slate-400">This dashboard is private to you. Powered by Vlumeaware.</p>
       </div>
     </div>
   );

@@ -36,4 +36,14 @@ export class CertificatesController {
   verify(@Param('serial') serial: string) {
     return this.certificates.verify(serial);
   }
+
+  /** Public certificate PDF by serial — the employee portal's download link. */
+  @Public()
+  @Get('verify/:serial/pdf')
+  async verifyPdf(@Param('serial') serial: string, @Res() res: Response) {
+    const { pdf, serial: s } = await this.certificates.renderPdfBySerial(serial);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="certificate-${s}.pdf"`);
+    res.send(pdf);
+  }
 }

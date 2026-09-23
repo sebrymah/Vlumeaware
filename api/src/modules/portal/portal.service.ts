@@ -142,20 +142,68 @@ export class PortalService {
         : [];
       const scenarioById = new Map(scenarios.map((s) => [s.id, s]));
 
+      // Personal best and passing score per module: the quiz for each assigned
+      // module, and this employee's best attempt on it.
+      const moduleIds = [...new Set(assignments.map((a) => a.module?.id).filter((v): v is string => !!v))];
+      const [quizzes, attempts] = await Promise.all([
+        moduleIds.length
+          ? this.prisma.db.quiz.findMany({
+              where: { trainingModuleId: { in: moduleIds } },
+              select: { id: true, trainingModuleId: true, passingScorePct: true },
+            })
+          : Promise.resolve([] as { id: string; trainingModuleId: string | null; passingScorePct: number }[]),
+        this.prisma.db.quizAttempt.findMany({
+          where: { employeeId: emp.id },
+          select: { quizId: true, score: true, total: true },
+        }),
+      ]);
+      const bestByQuiz = new Map<string, number>();
+      for (const at of attempts) {
+        const pct = at.total > 0 ? Math.round((at.score / at.total) * 100) : 0;
+        bestByQuiz.set(at.quizId, Math.max(bestByQuiz.get(at.quizId) ?? 0, pct));
+      }
+      const quizByModule = new Map(quizzes.filter((q) => q.trainingModuleId).map((q) => [q.trainingModuleId as string, q]));
+
       const training = await Promise.all(
-        assignments.map(async (a) => ({
-          id: a.id,
-          title: a.module?.title ?? a.curriculumModuleId,
-          assignedAt: a.assignedAt,
-          completedAt: a.completedAt,
-          durationSeconds: a.module?.durationSeconds ?? null,
-          // Signed, time-limited URL so the employee can rewatch in place.
-          videoUrl: a.module ? await this.modules.playableUrl(a.module) : null,
-        })),
+        assignments.map(async (a) => {
+          const quiz = a.module?.id ? quizByModule.get(a.module.id) : undefined;
+          const personalBest = quiz ? bestByQuiz.get(quiz.id) ?? null : null;
+          return {
+            id: a.id,
+            title: a.module?.title ?? a.curriculumModuleId,
+            assignedAt: a.assignedAt,
+            completedAt: a.completedAt,
+            estimatedMinutes: a.module?.durationSeconds ? Math.max(1, Math.round(a.module.durationSeconds / 60)) : null,
+            passingScorePct: quiz?.passingScorePct ?? null,
+            personalBest,
+            // Signed, time-limited URL so the employee can rewatch in place.
+            videoUrl: a.module ? await this.modules.playableUrl(a.module) : null,
+          };
+        }),
       );
+
+      // Stats mirror a learner dashboard: average of best scores, and counts.
+      const scored = training.map((t) => t.personalBest).filter((v): v is number => v != null);
+      const averageScore = scored.length ? Math.round(scored.reduce((s, v) => s + v, 0) / scored.length) : null;
+      const completedCount = training.filter((t) => t.completedAt).length;
+      const assignedCount = training.filter((t) => !t.completedAt).length;
+
+      const clicked = sends.some((s) => s.clickedAt || s.credentialsSubmitted);
+      const reportedAny = sends.some((s) => s.reportedAt && !s.clickedAt);
+      const perfect = scored.some((v) => v === 100);
+      // Earned badges — real achievements only, no arbitrary scoring.
+      const badges = [
+        { key: 'starter', label: 'Getting started', earned: completedCount >= 1 },
+        { key: 'committed', label: 'Committed learner', earned: completedCount >= 5 },
+        { key: 'ace', label: 'Perfect score', earned: perfect },
+        { key: 'spotter', label: 'Phish spotter', earned: reportedAny },
+        { key: 'clean', label: 'Clean record', earned: sends.length > 0 && !clicked },
+      ].filter((b) => b.earned);
 
       return {
         employee: { name: emp.name, email: emp.email, department: emp.department, tenant: tenant?.name ?? '' },
+        stats: { averageScore, assigned: assignedCount, completed: completedCount, badges: badges.length },
+        badges,
         training,
         certificates: certificates.map((c) => ({
           ...c,
