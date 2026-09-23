@@ -4,6 +4,7 @@ import { runAsSystem, runInTenant } from '../../common/prisma/tenant-context';
 import { TrainingService } from '../training/training.service';
 import { TrainingModulesService } from '../training-modules/training-modules.service';
 import { CertificatesService } from '../certificates/certificates.service';
+import { sanitizeLandingHtml } from '../../common/security/sanitize-landing-html';
 
 export interface TeachableMoment {
   tenant: { name: string; brandLogoUrl: string | null; brandPrimaryColor: string | null };
@@ -222,6 +223,7 @@ export class TrackingService {
     tenant: { name: string; brandLogoUrl: string | null; brandPrimaryColor: string | null };
     senderSpoofName: string;
     landingTemplate: string;
+    customHtml: string | null;
   }> {
     const ref = await this.resolveToken(token);
     return runInTenant(ref.tenantId, async () => {
@@ -238,14 +240,17 @@ export class TrackingService {
         }),
         this.prisma.db.campaign.findUnique({
           where: { id: ref.campaignId },
-          select: { landingTemplate: true },
+          select: { landingTemplate: true, landingPage: { select: { bodyHtml: true } } },
         }),
       ]);
       if (!tenant || !scenario) throw new NotFoundException('Simulation data missing');
+      const customHtml = campaign?.landingPage?.bodyHtml ?? null;
       return {
         tenant,
         senderSpoofName: scenario.senderSpoofName,
-        landingTemplate: campaign?.landingTemplate ?? 'generic',
+        // A custom page wins over any template.
+        landingTemplate: customHtml ? 'custom' : campaign?.landingTemplate ?? 'generic',
+        customHtml: customHtml ? sanitizeLandingHtml(customHtml) : null,
       };
     });
   }

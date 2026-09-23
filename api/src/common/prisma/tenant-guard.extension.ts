@@ -29,6 +29,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'VerifiedDomain',
   'LicenseToken',
   'SendingDomain',
+  'CustomLandingPage',
 ]);
 
 /** Operations whose `where` must be narrowed to the current tenant. */

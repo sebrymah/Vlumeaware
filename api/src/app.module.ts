@@ -21,6 +21,7 @@ import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
 import { IntakeModule } from './modules/intake/intake.module';
 import { SendingDomainsModule } from './modules/sending-domains/sending-domains.module';
+import { LandingPagesModule } from './modules/landing-pages/landing-pages.module';
 import { SharedModulesModule } from './modules/shared-modules/shared-modules.module';
 import { SharedQuizzesModule } from './modules/shared-quizzes/shared-quizzes.module';
 import { DomainsModule } from './modules/domains/domains.module';
@@ -48,6 +49,7 @@ import { HealthController } from './health.controller';
     IntakeModule,
     SharedModulesModule,
     SendingDomainsModule,
+    LandingPagesModule,
     SharedQuizzesModule,
     DomainsModule,
     SignupModule,

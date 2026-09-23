@@ -138,6 +138,7 @@ model Tenant {
   verifiedDomains       VerifiedDomain[]
   licenseTokens         LicenseToken[]
   sendingDomains        SendingDomain[]
+  customLandingPages    CustomLandingPage[]
 
   @@map("tenants")
 }
@@ -251,8 +252,13 @@ model Campaign {
   senderName        String?        @map("sender_name")
   /// Which look the simulated login page wears: "generic" (the tenant's own
   /// brand), or a recognisable provider — "microsoft", "google", "okta". Lets
-  /// the landing page match the portal staff actually sign in to.
+  /// the landing page match the portal staff actually sign in to. Ignored when
+  /// landingPageId is set (a client-authored custom page takes precedence).
   landingTemplate   String         @default("generic") @map("landing_template")
+  /// A client-authored custom landing page, when they built one instead of
+  /// using a template. Its (sanitized) HTML is the look; the platform still
+  /// injects the metadata-only form, so it never captures a password.
+  landingPageId     String?        @map("landing_page_id") @db.Uuid
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaignScenarios CampaignScenario[]
@@ -262,9 +268,27 @@ model Campaign {
   parent            Campaign?          @relation("CampaignRecurrence", fields: [parentCampaignId], references: [id], onDelete: SetNull)
   children          Campaign[]         @relation("CampaignRecurrence")
   sendingDomain     SendingDomain?     @relation(fields: [sendingDomainId], references: [id], onDelete: SetNull)
+  landingPage       CustomLandingPage? @relation(fields: [landingPageId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@map("campaigns")
+}
+
+/// A client-authored landing page (the simulated login shown after a click).
+/// bodyHtml is stored already sanitized (appearance only — no scripts, no
+/// credential-capturing form; the platform injects its metadata-only form).
+model CustomLandingPage {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  bodyHtml  String   @map("body_html")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+
+  @@index([tenantId])
+  @@map("custom_landing_pages")
 }
 
 model CampaignScenario {

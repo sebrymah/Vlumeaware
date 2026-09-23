@@ -6,7 +6,10 @@ interface Branding {
   tenant: { name: string; brandLogoUrl: string | null; brandPrimaryColor: string | null };
   senderSpoofName: string;
   landingTemplate: string;
+  customHtml: string | null;
 }
+
+const LOGIN_FORM_MARKER = '{{LOGIN_FORM}}';
 
 async function getBranding(token: string): Promise<Branding | null> {
   const res = await fetch(`${BASE}/track/branding/${encodeURIComponent(token)}`, {
@@ -51,6 +54,25 @@ export default async function SimulatedLoginPage({
 
   const template = branding.landingTemplate || 'generic';
   const name = branding.tenant.name;
+
+  // Client-authored custom page: the HTML is already sanitized server-side
+  // (appearance only). We inject the metadata-only form at the marker, or after
+  // the content when there is no marker — so the only working form is ours.
+  if (template === 'custom' && branding.customHtml) {
+    const accent = branding.tenant.brandPrimaryColor ?? '#1F6F43';
+    const idx = branding.customHtml.indexOf(LOGIN_FORM_MARKER);
+    const before = idx >= 0 ? branding.customHtml.slice(0, idx) : branding.customHtml;
+    const after = idx >= 0 ? branding.customHtml.slice(idx + LOGIN_FORM_MARKER.length) : '';
+    return (
+      <div className="min-h-screen bg-white">
+        {before && <div dangerouslySetInnerHTML={{ __html: before }} />}
+        <div className="mx-auto w-full max-w-sm px-6 py-6">
+          <LoginForm token={token} accent={accent} />
+        </div>
+        {after && <div dangerouslySetInnerHTML={{ __html: after }} />}
+      </div>
+    );
+  }
 
   if (template === 'microsoft') {
     return (

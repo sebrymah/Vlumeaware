@@ -62,21 +62,28 @@ function Campaigns() {
   const [fromLocalPart, setFromLocalPart] = useState('no-reply');
   const [senderName, setSenderName] = useState('');
   const [landingTemplate, setLandingTemplate] = useState('generic');
+  const [landingPages, setLandingPages] = useState<{ id: string; name: string }[]>([]);
+  const [landingHtml, setLandingHtml] = useState('');
+  const [landingPageName, setLandingPageName] = useState('');
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
   const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const [c, s, emp, sd] = await Promise.all([
+      const [c, s, emp, sd, lp] = await Promise.all([
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
         api.get<Scenario[]>(`/tenants/${tenantId}/scenarios`),
         api.get<Employee[]>(`/tenants/${tenantId}/employees`),
         api.get<SendingDomain[]>(`/tenants/${tenantId}/sending-domains/verified`),
+        api.get<{ id: string; name: string }[]>(`/tenants/${tenantId}/landing-pages`).catch(() => []),
       ]);
       setCampaigns(c);
       setScenarios(s);
       setEmployees(emp);
       setSendingDomains(sd);
+      setLandingPages(lp);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -147,8 +154,39 @@ function Campaigns() {
     }
   }
 
+  // Turn the single landing-page selector value into the right payload: a
+  // built-in template, an already-saved custom page, or HTML to build one now.
+  function landingPayload(): Record<string, unknown> {
+    if (landingTemplate.startsWith('page:')) return { landingPageId: landingTemplate.slice(5) };
+    if (landingTemplate === 'custom') {
+      return { landingHtml: landingHtml.trim() || undefined, landingPageName: landingPageName.trim() || undefined };
+    }
+    return { landingTemplate };
+  }
+
+  // Sanitize and show the custom page exactly as a target would see it, with
+  // the metadata-only form injected — without saving anything.
+  async function previewLanding() {
+    setPreviewBusy(true);
+    setError(null);
+    try {
+      const res = await api.post<{ html: string }>(`/tenants/${tenantId}/landing-pages/preview`, {
+        html: landingHtml,
+      });
+      setPreviewHtml(res.html);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
+
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    if (landingTemplate === 'custom' && !landingHtml.trim()) {
+      setError('Add some HTML for the custom landing page, or pick a different landing option.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -162,7 +200,7 @@ function Campaigns() {
         sendingDomainId: sendingDomainId || undefined,
         fromLocalPart: fromLocalPart.trim() || undefined,
         senderName: senderName.trim() || undefined,
-        landingTemplate,
+        ...landingPayload(),
       });
       setName('');
       setSelected([]);
@@ -175,6 +213,8 @@ function Campaigns() {
       setFromLocalPart('no-reply');
       setSenderName('');
       setLandingTemplate('generic');
+      setLandingHtml('');
+      setLandingPageName('');
       setOk(
         scheduledSendAt
           ? 'Campaign scheduled. It will auto-launch at the set time.'
@@ -444,18 +484,64 @@ function Campaigns() {
 
             <Field
               label="Landing page"
-              hint="The page staff see if they click the link. Pick the portal they normally sign in to — it never captures real passwords, only whether someone submitted."
+              hint="The page staff see if they click the link. Pick a template, a page you saved, or build one now. It never captures real passwords — only whether someone submitted."
             >
               <select
                 className={inputClass}
                 value={landingTemplate}
                 onChange={(e) => setLandingTemplate(e.target.value)}
               >
-                <option value="generic">Your brand (logo &amp; colours)</option>
-                <option value="microsoft">Microsoft 365 sign-in</option>
-                <option value="google">Google Workspace sign-in</option>
-                <option value="okta">Okta sign-in</option>
+                <optgroup label="Templates">
+                  <option value="generic">Your brand (logo &amp; colours)</option>
+                  <option value="microsoft">Microsoft 365 sign-in</option>
+                  <option value="google">Google Workspace sign-in</option>
+                  <option value="okta">Okta sign-in</option>
+                </optgroup>
+                {landingPages.length > 0 && (
+                  <optgroup label="Your saved pages">
+                    {landingPages.map((p) => (
+                      <option key={p.id} value={`page:${p.id}`}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Build one">
+                  <option value="custom">✎ Custom page — build now</option>
+                </optgroup>
               </select>
+
+              {landingTemplate === 'custom' && (
+                <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <input
+                    className={inputClass}
+                    value={landingPageName}
+                    onChange={(e) => setLandingPageName(e.target.value)}
+                    placeholder="Name (e.g. Acme HR portal) — optional"
+                  />
+                  <textarea
+                    className={`${inputClass} font-mono text-[12px]`}
+                    rows={10}
+                    value={landingHtml}
+                    onChange={(e) => setLandingHtml(e.target.value)}
+                    placeholder={'<div style="max-width:400px;margin:60px auto;text-align:center">\n  <h1>Sign in to Acme</h1>\n  {{LOGIN_FORM}}\n</div>'}
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Paste or write HTML. Put <code className="font-mono">{'{{LOGIN_FORM}}'}</code> where the
+                    sign-in fields should appear (added at the end if you omit it). Scripts, forms and
+                    event handlers are stripped — appearance only; the platform supplies the
+                    metadata-only form. It is saved and reusable after you create the campaign.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={previewLanding}
+                    disabled={previewBusy || !landingHtml.trim()}
+                  >
+                    {previewBusy ? 'Rendering…' : 'Preview what will be shown'}
+                  </Button>
+                </div>
+              )}
             </Field>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -501,6 +587,58 @@ function Campaigns() {
           </form>
         )}
       </Card>
+
+      {previewHtml !== null && (
+        <LandingPreview html={previewHtml} onClose={() => setPreviewHtml(null)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Shows a custom landing page exactly as a target would see it: the sanitized
+ * HTML with a (non-functional) copy of the metadata-only sign-in form injected
+ * at the {{LOGIN_FORM}} marker. This is a preview only — the form does nothing.
+ */
+function LandingPreview({ html, onClose }: { html: string; onClose: () => void }) {
+  const marker = '{{LOGIN_FORM}}';
+  const idx = html.indexOf(marker);
+  const before = idx >= 0 ? html.slice(0, idx) : html;
+  const after = idx >= 0 ? html.slice(idx + marker.length) : '';
+  const mockForm = (
+    <div className="mx-auto w-full max-w-sm px-6 py-6">
+      <div className="space-y-3">
+        <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Work email" disabled />
+        <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Password" type="password" disabled />
+        <button className="w-full rounded bg-slate-800 px-3 py-2 text-sm font-medium text-white" disabled>
+          Sign in
+        </button>
+      </div>
+    </div>
+  );
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
+          <span className="text-xs font-semibold text-slate-600">
+            Preview · what the target sees (form is inert here)
+          </span>
+          <Button variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
+        <div className="overflow-auto bg-white">
+          {before && <div dangerouslySetInnerHTML={{ __html: before }} />}
+          {mockForm}
+          {after && <div dangerouslySetInnerHTML={{ __html: after }} />}
+        </div>
+      </div>
     </div>
   );
 }

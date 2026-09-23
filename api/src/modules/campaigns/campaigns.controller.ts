@@ -27,6 +27,11 @@ class CreateCampaignDto {
   @IsOptional() @IsString() @MaxLength(120) senderName?: string;
   /** Which look the simulated login page wears. */
   @IsOptional() @IsIn(LANDING_TEMPLATES) landingTemplate?: string;
+  /** Use an already-saved custom landing page. */
+  @IsOptional() @IsUUID('4') landingPageId?: string;
+  /** Or build one on the fly: raw HTML (sanitized server-side) to save and use. */
+  @IsOptional() @IsString() @MaxLength(200_000) landingHtml?: string;
+  @IsOptional() @IsString() @MaxLength(120) landingPageName?: string;
 }
 
 class ScheduleDto {
@@ -54,6 +59,9 @@ export class CampaignsController {
       fromLocalPart: dto.fromLocalPart,
       senderName: dto.senderName,
       landingTemplate: dto.landingTemplate,
+      landingPageId: dto.landingPageId,
+      landingHtml: dto.landingHtml,
+      landingPageName: dto.landingPageName,
     });
   }
 

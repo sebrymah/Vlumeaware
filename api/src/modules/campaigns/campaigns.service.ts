@@ -8,6 +8,7 @@ import { AuditService } from '../../common/audit/audit.service';
 import { DomainsService } from '../domains/domains.service';
 import { SEND_QUEUE } from '../../queue/queue.constants';
 import type { SendJob } from '../../queue/queue.constants';
+import { sanitizeLandingHtml } from '../../common/security/sanitize-landing-html';
 
 @Injectable()
 export class CampaignsService {
@@ -33,6 +34,11 @@ export class CampaignsService {
     fromLocalPart?: string;
     senderName?: string;
     landingTemplate?: string;
+    /** An existing custom landing page to use. */
+    landingPageId?: string;
+    /** Raw HTML to build a custom landing page on the fly and use it. */
+    landingHtml?: string;
+    landingPageName?: string;
   }) {
     if (!input.scenarioIds.length) {
       throw new BadRequestException('A campaign needs at least one scenario');
@@ -74,6 +80,30 @@ export class CampaignsService {
     }
 
     const tenantId = currentTenantId();
+
+    // Landing page: build one on the fly from raw HTML, or use one already
+    // saved. Inline HTML is sanitized before storage — appearance only, never a
+    // credential-capturing form.
+    let landingPageId: string | null = null;
+    if (input.landingHtml && input.landingHtml.trim()) {
+      const bodyHtml = sanitizeLandingHtml(input.landingHtml);
+      if (!bodyHtml.trim()) {
+        throw new BadRequestException('The custom landing page is empty after sanitizing.');
+      }
+      const page = await this.prisma.db.customLandingPage.create({
+        data: { tenantId, name: input.landingPageName?.trim() || `${input.name} landing page`, bodyHtml },
+        select: { id: true },
+      });
+      landingPageId = page.id;
+    } else if (input.landingPageId) {
+      const page = await this.prisma.db.customLandingPage.findUnique({
+        where: { id: input.landingPageId },
+        select: { id: true },
+      });
+      if (!page) throw new BadRequestException('Selected landing page does not exist in this tenant');
+      landingPageId = page.id;
+    }
+
     const campaign = await this.prisma.db.campaign.create({
       data: {
         tenantId,
@@ -86,6 +116,7 @@ export class CampaignsService {
         fromLocalPart: input.fromLocalPart?.trim() || null,
         senderName: input.senderName?.trim() || null,
         landingTemplate: input.landingTemplate?.trim() || 'generic',
+        landingPageId,
         campaignScenarios: {
           create: scenarios.map((s) => ({ scenarioId: s.id, tenantId })),
         },
