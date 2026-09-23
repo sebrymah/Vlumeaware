@@ -100,6 +100,11 @@ export default function SignupPage() {
         >
           {busy ? 'Creating your workspace…' : 'Start free trial'}
         </button>
+        {busy && (
+          <div className="progress-track h-1 w-full rounded-full bg-slate-200" role="progressbar" aria-label="Creating your workspace">
+            <div className="bar rounded-full bg-brand-600" />
+          </div>
+        )}
         <p className="text-[11px] text-slate-600">
           Already have an account?{' '}
           <Link href="/login" className="underline">

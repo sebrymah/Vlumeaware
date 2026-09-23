@@ -12,3 +12,12 @@ body {
 
 /* thin, tasteful scrollbars for the light UI */
 * { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+
+/* Indeterminate progress bar (e.g. account creation) */
+@keyframes indeterminate {
+  0%   { left: -40%; width: 40%; }
+  50%  { left: 30%;  width: 55%; }
+  100% { left: 100%; width: 40%; }
+}
+.progress-track { position: relative; overflow: hidden; }
+.progress-track > .bar { position: absolute; top: 0; bottom: 0; animation: indeterminate 1.2s infinite ease-in-out; }

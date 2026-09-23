@@ -17,6 +17,8 @@ export interface EmployeeRisk {
   riskScore: number; // 0 (safe) .. 100 (high risk)
   riskLevel: 'low' | 'moderate' | 'high' | 'critical';
   repeatClicker: boolean;
+  /** Exactly how the score was reached — every factor, signed, as shown to the client. */
+  breakdown: Array<{ factor: string; detail: string; points: number }>;
 }
 
 /**
@@ -58,14 +60,26 @@ export class RiskService {
     const reportRate = sends ? reports / sends : 0;
 
     // Weighted score. Clicks and especially credential submissions raise risk;
-    // reports and quiz passes lower it. Clamped to 0..100.
-    let score = 0;
-    score += clickRate * 60;
-    score += (sends ? creds / sends : 0) * 40;
-    score += Math.min(clicks, 5) * 4; // repeated clicks compound
-    score -= reportRate * 25;
-    score -= Math.min(quizPasses, 5) * 3;
+    // reports and quiz passes lower it. Clamped to 0..100. Every term is also
+    // captured in `breakdown` so the client sees exactly how the number formed.
+    const submitRate = sends ? creds / sends : 0;
+    const parts = {
+      click: clickRate * 60,
+      submit: submitRate * 40,
+      repeat: Math.min(clicks, 5) * 4, // repeated clicks compound
+      report: -(reportRate * 25),
+      quiz: -(Math.min(quizPasses, 5) * 3),
+    };
+    const score = parts.click + parts.submit + parts.repeat + parts.report + parts.quiz;
     const riskScore = Math.max(0, Math.min(100, Math.round(score)));
+
+    const breakdown: EmployeeRisk['breakdown'] = [
+      { factor: 'Click rate', detail: `${clicks}/${sends} clicked × 60`, points: Math.round(parts.click) },
+      { factor: 'Credentials submitted', detail: `${creds}/${sends} submitted × 40`, points: Math.round(parts.submit) },
+      { factor: 'Repeat clicks', detail: `${Math.min(clicks, 5)} × 4 (capped at 5)`, points: Math.round(parts.repeat) },
+      { factor: 'Reported the phish', detail: `${reports}/${sends} reported × −25`, points: Math.round(parts.report) },
+      { factor: 'Quiz passes', detail: `${Math.min(quizPasses, 5)} × 3 (capped at 5)`, points: Math.round(parts.quiz) },
+    ];
 
     const riskLevel: EmployeeRisk['riskLevel'] =
       riskScore >= 75 ? 'critical' : riskScore >= 50 ? 'high' : riskScore >= 25 ? 'moderate' : 'low';
@@ -85,6 +99,7 @@ export class RiskService {
       riskScore,
       riskLevel,
       repeatClicker: clicks >= RiskService.REPEAT_CLICKER_THRESHOLD,
+      breakdown,
     };
   }
 

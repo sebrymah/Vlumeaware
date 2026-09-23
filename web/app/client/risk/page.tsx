@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { Badge, Button, Card, Field, Notice, Table, inputClass, pct } from '@/components/ui';
@@ -21,6 +21,7 @@ interface EmployeeRisk {
   riskScore: number;
   riskLevel: 'low' | 'moderate' | 'high' | 'critical';
   repeatClicker: boolean;
+  breakdown: Array<{ factor: string; detail: string; points: number }>;
 }
 interface TrainingModule { id: string; title: string }
 
@@ -61,6 +62,7 @@ function Risk() {
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [advice, setAdvice] = useState<RiskAdvice | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
   const [advising, setAdvising] = useState(false);
   // The advice endpoint is client_admin only — a viewer must not be offered a
   // button that spends the tenant's AI budget and then returns 403.
@@ -287,22 +289,80 @@ function Risk() {
         </div>
       </Card>
 
+      <Card
+        title="How the score is calculated"
+        subtitle="A transparent 0–100 score from each person's whole simulation history. Risk goes up for clicking and submitting, down for reporting and passing quizzes."
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[12px]">
+            <thead>
+              <tr className="border-b border-slate-200 text-[10px] uppercase tracking-wide text-slate-400">
+                <th className="py-1 pr-3">Factor</th>
+                <th className="py-1 pr-3">Weight</th>
+                <th className="py-1">Effect</th>
+              </tr>
+            </thead>
+            <tbody className="text-slate-600">
+              <tr><td className="py-1 pr-3">Click rate</td><td className="py-1 pr-3 font-mono">clicks ÷ sends × 60</td><td className="py-1 text-red-600">raises</td></tr>
+              <tr><td className="py-1 pr-3">Credentials submitted</td><td className="py-1 pr-3 font-mono">submits ÷ sends × 40</td><td className="py-1 text-red-600">raises</td></tr>
+              <tr><td className="py-1 pr-3">Repeat clicks</td><td className="py-1 pr-3 font-mono">min(clicks, 5) × 4</td><td className="py-1 text-red-600">raises</td></tr>
+              <tr><td className="py-1 pr-3">Reported the phish</td><td className="py-1 pr-3 font-mono">reports ÷ sends × 25</td><td className="py-1 text-brand-700">lowers</td></tr>
+              <tr><td className="py-1 pr-3">Quiz passes</td><td className="py-1 pr-3 font-mono">min(passes, 5) × 3</td><td className="py-1 text-brand-700">lowers</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-2 text-[11px] text-slate-500">
+          Total is clamped to 0–100. Bands: <strong>0–24 low · 25–49 moderate · 50–74 high · 75–100 critical</strong>.
+          Click any employee&rsquo;s score below to see their exact points.
+        </p>
+      </Card>
+
       <Card title="All employees by risk">
         <Table head={['Employee', 'Dept', 'Score', 'Level', 'Sends', 'Clicks', 'Reports', 'Quiz passes']}>
           {rows.map((e) => (
-            <tr key={e.employeeId} className="border-b border-slate-100">
-              <td className="px-2 py-2">
-                {e.name}
-                {e.repeatClicker && <span className="ml-2 text-[10px] text-red-600">repeat clicker</span>}
-              </td>
-              <td className="px-2 py-2 text-slate-500">{e.department ?? '—'}</td>
-              <td className="px-2 py-2 font-semibold">{e.riskScore}</td>
-              <td className={`px-2 py-2 font-medium ${levelColor[e.riskLevel]}`}>{e.riskLevel}</td>
-              <td className="px-2 py-2">{e.sends}</td>
-              <td className="px-2 py-2">{e.clicks}</td>
-              <td className="px-2 py-2">{e.reports}</td>
-              <td className="px-2 py-2">{e.quizPasses}</td>
-            </tr>
+            <Fragment key={e.employeeId}>
+              <tr
+                className="cursor-pointer border-b border-slate-100 hover:bg-slate-50"
+                onClick={() => setExpanded(expanded === e.employeeId ? null : e.employeeId)}
+              >
+                <td className="px-2 py-2">
+                  {e.name}
+                  {e.repeatClicker && <span className="ml-2 text-[10px] text-red-600">repeat clicker</span>}
+                </td>
+                <td className="px-2 py-2 text-slate-500">{e.department ?? '—'}</td>
+                <td className="px-2 py-2 font-semibold underline decoration-dotted">{e.riskScore}</td>
+                <td className={`px-2 py-2 font-medium ${levelColor[e.riskLevel]}`}>{e.riskLevel}</td>
+                <td className="px-2 py-2">{e.sends}</td>
+                <td className="px-2 py-2">{e.clicks}</td>
+                <td className="px-2 py-2">{e.reports}</td>
+                <td className="px-2 py-2">{e.quizPasses}</td>
+              </tr>
+              {expanded === e.employeeId && (
+                <tr className="border-b border-slate-100 bg-slate-50">
+                  <td colSpan={8} className="px-4 py-3">
+                    <div className="text-[11px] font-semibold text-slate-600">How {e.name}&rsquo;s {e.riskScore} was reached</div>
+                    <table className="mt-1 w-full max-w-lg text-left text-[12px]">
+                      <tbody>
+                        {e.breakdown.map((b) => (
+                          <tr key={b.factor}>
+                            <td className="py-0.5 pr-3 text-slate-600">{b.factor}</td>
+                            <td className="py-0.5 pr-3 font-mono text-slate-400">{b.detail}</td>
+                            <td className={`py-0.5 text-right font-semibold ${b.points > 0 ? 'text-red-600' : b.points < 0 ? 'text-brand-700' : 'text-slate-400'}`}>
+                              {b.points > 0 ? '+' : ''}{b.points}
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="border-t border-slate-200">
+                          <td className="py-1 pr-3 font-semibold text-slate-700">Total (clamped 0–100)</td>
+                          <td />
+                          <td className="py-1 text-right font-semibold text-slate-900">{e.riskScore}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                </tr>
+              )}
+            </Fragment>
           ))}
           {!rows.length && (
             <tr>
