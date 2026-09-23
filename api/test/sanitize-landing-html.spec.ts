@@ -56,6 +56,23 @@ describe('sanitizeLandingHtml', () => {
     expect(out).toContain('<section>');
   });
 
+  it('rejects hex- and named-entity-encoded javascript: schemes on href', () => {
+    const hex = sanitizeLandingHtml('<a href="&#x6a;avascript:alert(1)">x</a>');
+    const named = sanitizeLandingHtml('<a href="java&Tab;script:alert(1)">x</a>');
+    const dec = sanitizeLandingHtml('<a href="&#106;avascript:alert(1)">x</a>');
+    for (const out of [hex, named, dec]) {
+      expect(out).not.toMatch(/javascript/i);
+      expect(out).not.toContain('alert');
+    }
+  });
+
+  it('scrubs CSS inside an UNCLOSED <style> block and force-closes it', () => {
+    const out = sanitizeLandingHtml('<style>@import url(//evil);a{x:expression(alert(1))}');
+    expect(out).not.toMatch(/@import/i);
+    expect(out).not.toMatch(/expression\s*\(/i);
+    expect(out).toContain('</style>'); // force-closed
+  });
+
   it('unwraps unknown tags but keeps their text', () => {
     const out = sanitizeLandingHtml('<marquee>scroll</marquee>');
     expect(out).not.toMatch(/marquee/i);
