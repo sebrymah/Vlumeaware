@@ -191,6 +191,12 @@ model Employee {
   name       String
   department String?
   createdAt  DateTime @default(now()) @map("created_at")
+  /// Opaque token for the employee's self-service portal (their courses,
+  /// certificates and simulation history). Issued when they request a sign-in
+  /// link by email; time-limited by portalTokenExpiresAt. Employees have no
+  /// password — this magic link is how they reach their own dashboard.
+  portalToken          String?   @unique @map("portal_token")
+  portalTokenExpiresAt DateTime? @map("portal_token_expires_at")
 
   tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   sends               Send[]

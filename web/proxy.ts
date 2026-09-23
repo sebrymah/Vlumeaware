@@ -27,7 +27,7 @@ export function proxy(request: NextRequest) {
   const dev = process.env.NODE_ENV !== 'production';
   const api = apiOrigin();
   const p = request.nextUrl.pathname;
-  const isPublic = p.startsWith('/t/') || p.startsWith('/learn/');
+  const isPublic = p.startsWith('/t/') || p.startsWith('/learn/') || p.startsWith('/portal');
   const nonce = btoa(crypto.randomUUID());
 
   const common = [
