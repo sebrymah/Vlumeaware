@@ -159,7 +159,7 @@ const STEPS: Step[] = [
     why: 'This is the one that actually trains your people.',
     do: [
       'Create a campaign, attach the scenario, choose the sending domain and the sender title, and pick the landing page your targets will see.',
-      'Work through the preflight checklist on the campaign page. It will not let you launch until every line is green: the agreement signed, employees uploaded, at least one scenario attached, a verified sending domain chosen, the tracking domain configured, and your IT allow-list confirmed.',
+      'Work through the preflight checklist on the campaign page. It will not let you launch until every line is green: the agreement signed, employees uploaded, at least one scenario attached, a verified sending domain chosen, the tracking domain configured, and your IT allow-list confirmed. Everything except the tracking domain is yours to do — that one is set on the Vlumeaware side, so if it is the only line showing red, tell your Vlumetech contact rather than hunting for a setting.',
       'Choose "Launch", or "Schedule send" to set a date and an optional repeat. A send window spreads deliveries out instead of firing them all at once.',
       'Keep the kill switch in mind: pausing or killing a campaign stops queued mail immediately, not just future mail.',
     ],
