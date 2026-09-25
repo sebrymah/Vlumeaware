@@ -387,8 +387,18 @@ async function main() {
   await runAsSystem('seed', async () => {
     await db.user.upsert({
       where: { email: 'it@vlumetech.com.ng' },
-      create: { email: 'it@vlumetech.com.ng', passwordHash, role: 'vlumetech_superadmin' },
-      update: { passwordHash },
+      // Seeded accounts are development credentials by design, and they exist
+      // only in non-production (see the DEV_PASSWORD guard above), so they are
+      // explicitly exempt from the MFA enrolment that new staff accounts must
+      // complete. Without this the demo superadmin would be locked out of the
+      // API the moment MFA enforcement shipped.
+      create: {
+        email: 'it@vlumetech.com.ng',
+        passwordHash,
+        role: 'vlumetech_superadmin',
+        mfaRequired: false,
+      },
+      update: { passwordHash, mfaRequired: false },
     });
 
     await seedTemplates();

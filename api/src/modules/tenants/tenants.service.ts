@@ -77,16 +77,22 @@ export class TenantsService {
     });
   }
 
-  /**
-   * The client's own security posture: the policy they set, and the state of
-   * each of their console users. Deliberately narrow, like getBranding.
-   */
-  async getSecurity(tenantId: string) {
+  /** The policy booleans alone — cheaper than getSecurity, which also lists users. */
+  private async getSecurityPolicy(tenantId: string) {
     const tenant = await this.prisma.db.tenant.findUnique({
       where: { id: tenantId },
       select: { passwordMinLength: true, sessionTimeoutMinutes: true, requireMfa: true },
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
+    return tenant;
+  }
+
+  /**
+   * The client's own security posture: the policy they set, and the state of
+   * each of their console users. Deliberately narrow, like getBranding.
+   */
+  async getSecurity(tenantId: string) {
+    const tenant = await this.getSecurityPolicy(tenantId);
     const users = await this.prisma.db.tenantUser.findMany({
       where: { tenantId },
       select: { id: true, email: true, role: true, mfaEnabledAt: true, lockedUntil: true, createdAt: true },
@@ -295,9 +301,20 @@ export class TenantsService {
   async createTenantUser(tenantId: string, input: { email: string; password: string; role: TenantRole }) {
     await this.findOne(tenantId);
     const passwordHash = await AuthService.hash(input.password);
+    // Client MFA is the tenant's own opt-in policy, so a new account inherits
+    // it: a client that requires MFA gets users who must enrol before they can
+    // use the API, and a client that does not is unaffected. Existing accounts
+    // are grandfathered, so switching this on never locks a team out.
+    const { requireMfa } = await this.getSecurityPolicy(tenantId);
     return runInTenant(tenantId, () =>
       this.prisma.db.tenantUser.create({
-        data: { tenantId, email: input.email, passwordHash, role: input.role },
+        data: {
+          tenantId,
+          email: input.email,
+          passwordHash,
+          role: input.role,
+          mfaRequired: requireMfa,
+        },
         select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
       }),
     );

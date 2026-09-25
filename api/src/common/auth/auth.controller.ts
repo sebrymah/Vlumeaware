@@ -3,6 +3,7 @@ import { IsEmail, IsString, Length, Matches, MinLength } from 'class-validator';
 import { Throttle } from '../ratelimit/rate-limit.decorator';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
+import { AllowUnenrolledMfa } from './mfa-enforced.guard';
 import { Public } from './roles.decorator';
 import { Roles } from './roles.decorator';
 import { ROLES } from './roles';
@@ -49,15 +50,23 @@ export class AuthController {
     return this.auth.verifyMfa(dto.challenge, dto.code);
   }
 
-  /** Begin enrolment for whoever is signed in, staff or client user. */
+  /**
+   * Begin enrolment for whoever is signed in, staff or client user. Exempt from
+   * MfaEnforcedGuard: this is the route that satisfies it.
+   */
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  @AllowUnenrolledMfa()
   @Post('mfa/setup')
   setupMfa(@CurrentUser() user: JwtPayload) {
     return this.auth.setupMfa(user.sub);
   }
 
-  /** Finish enrolment by confirming a code from the authenticator app. */
+  /**
+   * Finish enrolment by confirming a code from the authenticator app. Exempt
+   * for the same reason as setup.
+   */
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  @AllowUnenrolledMfa()
   @HttpCode(200)
   @Post('mfa/activate')
   activateMfa(@CurrentUser() user: JwtPayload, @Body() dto: MfaCodeDto) {

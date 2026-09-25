@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { ROLES } from '../../common/auth/roles';
@@ -32,10 +33,23 @@ class SaveScenarioDto {
   @IsOptional() @IsBoolean() createdByClaude?: boolean;
 }
 
+class PreviewScenarioDto {
+  @IsString() @MaxLength(200_000) bodyHtml!: string;
+}
+
 @Controller('tenants/:tenantId/scenarios')
 @Roles(ROLES.superadmin, ROLES.clientAdmin)
 export class ScenariosController {
   constructor(private readonly scenarios: ScenariosService) {}
+
+  /**
+   * Sanitize-only, for the composer's live preview. Declared before the
+   * `:scenarioId` routes so "preview" is never read as an id.
+   */
+  @Post('preview')
+  preview(@Body() dto: PreviewScenarioDto) {
+    return this.scenarios.preview(dto.bodyHtml);
+  }
 
   @Post('generate')
   @RequiresWritableTenant()

@@ -155,6 +155,12 @@ model User {
   /// active once mfaEnabledAt is set. Mandatory for Vlumetech staff (review R8).
   mfaSecret        String?   @map("mfa_secret")
   mfaEnabledAt     DateTime? @map("mfa_enabled_at")
+  /// Whether this account MUST enrol before it can use the API. Default true so
+  /// every account created from here on is covered; accounts that existed
+  /// before enforcement shipped were backfilled to false, which is how they are
+  /// grandfathered. Enforced by MfaEnforcedGuard — the login response's
+  /// mfaEnrollmentRequired flag alone is only a nudge for the console.
+  mfaRequired      Boolean   @default(true) @map("mfa_required")
   /// Sign-in lockout after repeated failures (review R8).
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")
@@ -173,6 +179,11 @@ model TenantUser {
   /// once mfaEnabledAt is set. Mirrors the staff User model.
   mfaSecret        String?   @map("mfa_secret")
   mfaEnabledAt     DateTime? @map("mfa_enabled_at")
+  /// Whether this account MUST enrol before it can use the API. Client MFA is
+  /// an opt-in per-tenant policy (Tenant.requireMfa), so the default is false
+  /// and creation sets it from the tenant's policy — unlike staff, who are
+  /// required by default. Enforced by MfaEnforcedGuard.
+  mfaRequired      Boolean   @default(false) @map("mfa_required")
   /// Brute-force protection, which client logins previously had none of.
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")

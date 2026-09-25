@@ -22,6 +22,8 @@
  * Appearance in, no behaviour. Runs at storage time and again before render.
  */
 
+import { normalizeForSchemeCheck } from './entities';
+
 const ALLOWED_TAGS = new Set([
   'p', 'br', 'hr', 'div', 'span', 'strong', 'b', 'em', 'i', 'u', 's', 'small', 'sub', 'sup',
   'a', 'ul', 'ol', 'li', 'blockquote', 'pre', 'code', 'label',
@@ -74,24 +76,6 @@ function stripDangerousBlocks(html: string): string {
 }
 
 /**
- * Decodes the HTML entity forms a scheme can hide behind — decimal (&#106;),
- * hex (&#x6a;) and the handful of named entities that matter for URLs — so the
- * scheme check below cannot be fooled by `&#x6a;avascript:`.
- */
-function decodeEntities(s: string): string {
-  return s
-    .replace(/&#x([0-9a-f]+);?/gi, (_, h) => safeFromCodePoint(parseInt(h, 16)))
-    .replace(/&#(\d+);?/g, (_, d) => safeFromCodePoint(Number(d)))
-    .replace(/&colon;/gi, ':')
-    .replace(/&tab;/gi, '\t')
-    .replace(/&newline;/gi, '\n');
-}
-
-function safeFromCodePoint(code: number): string {
-  return Number.isFinite(code) && code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : '';
-}
-
-/**
  * URL allow-list (fail closed). After decoding entities and stripping control
  * characters and whitespace, a value that declares a scheme must be one we
  * permit — http(s), mailto, or an inline image data: URI. Anchors, root- and
@@ -101,10 +85,10 @@ function safeFromCodePoint(code: number): string {
 function safeUrl(raw: string): string | null {
   const v = raw.trim();
   if (v === LOGIN_FORM_MARKER) return v;
-  // Strip C0 controls (incl. tab/newline), space and DEL after decoding, so a
-  // scheme cannot be split or hidden by them.
-  // eslint-disable-next-line no-control-regex
-  const decoded = decodeEntities(v).replace(/[\u0000-\u0020\u007f]+/g, '').toLowerCase();
+  // Shared with the scenario-body sanitizer so the two cannot drift apart; it
+  // decodes hex/named entities and strips C0 controls, space and DEL, so a
+  // scheme cannot be hidden by them.
+  const decoded = normalizeForSchemeCheck(v);
 
   if (decoded.startsWith('#') || decoded.startsWith('/') || decoded.startsWith('{{')) return v;
 

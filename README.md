@@ -256,6 +256,31 @@ entrypoint:
 cd api && npm run start:worker
 ```
 
+### Migrations in production
+
+**Migrations run automatically when the app starts.** There is nothing to
+configure and no manual step: on boot the process applies pending migrations,
+then verifies the schema matches the code before opening the port.
+
+This is safe behind more than one instance. Prisma's schema engine takes a
+Postgres advisory lock (`SELECT pg_advisory_lock(72707369)`) before applying
+anything, so concurrent starts queue behind one another instead of colliding —
+which is why boot migration is the right default on a hosting tier with no
+pre-deploy hook.
+
+Two escape hatches, for completeness:
+
+- `MIGRATE_ON_BOOT=0` — leave migrations to a deploy step instead, if you have a
+  pre-deploy command, or if the app's database role has no DDL rights. Apply them
+  yourself with `npm run prisma:deploy` (or the `migrate` build stage in the
+  Dockerfile).
+- `SKIP_SCHEMA_CHECK=1` — skip the post-migration verification. Only for a
+  deliberately staged rollout; the check exists so a deploy that did not migrate
+  fails loudly instead of 500ing on first use.
+
+A migration that cannot be applied stops the process with the reason, so the
+deploy fails and the previous version keeps serving.
+
 ---
 
 ## How tenant isolation works
