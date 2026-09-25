@@ -21,3 +21,25 @@ body {
 }
 .progress-track { position: relative; overflow: hidden; }
 .progress-track > .bar { position: absolute; top: 0; bottom: 0; animation: indeterminate 1.2s infinite ease-in-out; }
+
+/* Printing the setup guide (and its forwardable IT checklist) should produce
+   the content, not the application chrome. */
+@media print {
+  header,
+  nav,
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  pre {
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    background: transparent !important;
+  }
+}
