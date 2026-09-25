@@ -1,0 +1,126 @@
+name: CI
+
+# There was no test or build pipeline at all: the only other workflow pings a
+# production URL to keep a free instance awake, and it is not even tracked by
+# git. Every "fails the build" guarantee in the README — the tenant-guard
+# coverage check, the credential-capture guard, the sanitizer suites — was
+# therefore unenforced. This runs them on every push and pull request.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    name: API — typecheck, migrate, test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: vlumeaware
+          POSTGRES_PASSWORD: vlumeaware
+          POSTGRES_DB: vlumeaware_test
+        ports: ['5433:5432']
+        options: >-
+          --health-cmd "pg_isready -U vlumeaware"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      # The rate-limit counter lives in Redis when Redis is configured, and the
+      # queue cannot work without it at all. REQUIRE_REDIS_TESTS turns the
+      # suite's "no Redis, skip those cases" allowance into a failure here, so
+      # the Redis-backed path cannot rot unnoticed.
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # test/setup-env.ts defaults to this, but being explicit means a change to
+      # the service block cannot silently point the suite at nothing.
+      DATABASE_URL: postgresql://vlumeaware:vlumeaware@localhost:5433/vlumeaware_test?schema=public
+      JWT_SECRET: ci-secret-that-is-at-least-32-characters-long
+      REQUIRE_REDIS_TESTS: '1'
+
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24.9+ is a hard requirement of the *test* tooling, not the app:
+      # Jest can only require @nestjs/common (ESM) through require(esm) there.
+      # scripts/require-node.mjs refuses to start on anything older.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply migrations to the test database
+        run: npx prisma migrate deploy
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        # `npm test` and not `npx jest`: npx strips NODE_OPTIONS, and without
+        # --experimental-vm-modules every suite that imports @nestjs/common
+        # fails with a misleading "Must use import to load ES Module" error.
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  web:
+    name: Web — typecheck, build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        # NEXT_PUBLIC_API_URL is inlined at build time and falls back to
+        # localhost, so a real deployment supplies it. CI only needs the build
+        # to succeed.
+        env:
+          NEXT_PUBLIC_API_URL: https://api.example.invalid
+        run: npm run build

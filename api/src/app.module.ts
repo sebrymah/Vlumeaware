@@ -9,6 +9,7 @@ import { AuditModule } from './common/audit/audit.module';
 import { TrialModule } from './common/trial/trial.module';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { RateLimitGuard } from './common/ratelimit/rate-limit.guard';
+import { RATE_LIMIT_STORE, rateLimitStore } from './common/ratelimit/rate-limit.store';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { ReportsModule } from './modules/reports/reports.module';
@@ -70,6 +71,8 @@ import { HealthController } from './health.controller';
     { provide: APP_GUARD, useClass: MfaEnforcedGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantScopeInterceptor },
+    // Redis when configured, in-process otherwise. See rate-limit.store.ts.
+    { provide: RATE_LIMIT_STORE, useFactory: rateLimitStore },
   ],
 })
 export class AppModule {}
