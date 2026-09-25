@@ -49,6 +49,11 @@ function Scenarios() {
   // Set when the draft in the editor is an existing saved scenario rather
   // than a new one, so Save updates it instead of creating a duplicate.
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The preview is injected as HTML, so it must be the server's sanitized
+  // output rather than the raw draft: a pasted or AI-generated body has not
+  // been through the sanitizer yet, and the console's CSP allows inline
+  // handlers. Nothing is rendered until the server has cleaned it.
+  const [previewHtml, setPreviewHtml] = useState('');
 
   /** Loads a saved scenario back into the editor. */
   function startEdit(scenario: Scenario) {
@@ -112,6 +117,34 @@ function Scenarios() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Ask the server to sanitize the draft for preview. Debounced so typing does
+   * not fire a request per keystroke, and cleared on failure so a preview that
+   * could not be checked is never shown.
+   */
+  useEffect(() => {
+    const body = draft?.bodyHtml;
+    if (!body) {
+      setPreviewHtml('');
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      api
+        .post<{ html: string }>(`/tenants/${tenantId}/scenarios/preview`, { bodyHtml: body })
+        .then((res) => {
+          if (!cancelled) setPreviewHtml(res.html);
+        })
+        .catch(() => {
+          if (!cancelled) setPreviewHtml('');
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [draft?.bodyHtml, tenantId]);
 
   async function generate() {
     setBusy(true);
@@ -277,7 +310,7 @@ function Scenarios() {
               <div
                 className="rounded border border-slate-300 bg-white p-3 text-black"
                 dangerouslySetInnerHTML={{
-                  __html: draft.bodyHtml
+                  __html: previewHtml
                     .split('{{TRACKING_URL}}')
                     .join('#')
                     .split('{{EMPLOYEE_NAME}}')

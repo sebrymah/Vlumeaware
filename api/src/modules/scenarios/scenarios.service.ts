@@ -40,13 +40,33 @@ export class ScenariosService {
   }
 
   list() {
-    return this.prisma.db.scenario.findMany({ orderBy: { createdAt: 'desc' } });
+    return this.prisma.db.scenario
+      .findMany({ orderBy: { createdAt: 'desc' } })
+      .then((rows) => rows.map(ScenariosService.clean));
   }
 
   async findOne(id: string) {
     const scenario = await this.prisma.db.scenario.findUnique({ where: { id } });
     if (!scenario) throw new NotFoundException('Scenario not found');
-    return scenario;
+    return ScenariosService.clean(scenario);
+  }
+
+  /**
+   * Sanitize-only, for the composer's live preview: an admin typing or pasting
+   * a body sees exactly what will be stored. Saves nothing.
+   */
+  preview(bodyHtml: string): { html: string } {
+    return { html: sanitizeHtml(bodyHtml) };
+  }
+
+  /**
+   * A body is sanitized on read as well as on write. Sanitizing on write is not
+   * enough on its own: a row persisted before a sanitizer fix keeps whatever
+   * the old sanitizer let through, and the console renders these bodies as
+   * HTML. Re-sanitizing on read is what neutralises already-stored rows.
+   */
+  private static clean<T extends { bodyHtml: string }>(row: T): T {
+    return { ...row, bodyHtml: sanitizeHtml(row.bodyHtml) };
   }
 
   /** The body is re-sanitized on the way in. */

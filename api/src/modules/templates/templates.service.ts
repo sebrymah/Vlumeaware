@@ -12,9 +12,9 @@ import { sanitizeHtml } from '../../common/security/sanitize-html';
 export class TemplatesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(filter: { category?: string; difficultyTier?: 'low' | 'medium' | 'high'; industryTag?: string }) {
+  async list(filter: { category?: string; difficultyTier?: 'low' | 'medium' | 'high'; industryTag?: string }) {
     // Global content: read outside tenant scope on purpose.
-    return runAsSystem('browse global phishing template catalogue', () =>
+    const rows = await runAsSystem('browse global phishing template catalogue', () =>
       this.prisma.db.phishingTemplate.findMany({
         where: {
           category: filter.category,
@@ -24,6 +24,7 @@ export class TemplatesService {
         orderBy: [{ category: 'asc' }, { title: 'asc' }],
       }),
     );
+    return rows.map(TemplatesService.clean);
   }
 
   categories() {
@@ -54,7 +55,17 @@ export class TemplatesService {
       this.prisma.db.phishingTemplate.findUnique({ where: { id } }),
     );
     if (!template) throw new NotFoundException('Template not found');
-    return template;
+    return TemplatesService.clean(template);
+  }
+
+  /**
+   * Sanitized on read as well as on write. The catalogue is global and its
+   * bodies are rendered as HTML in every client's console, so a row persisted
+   * before a sanitizer fix has to be neutralised when it is served, not only
+   * when it is saved.
+   */
+  private static clean<T extends { bodyHtml: string }>(row: T): T {
+    return { ...row, bodyHtml: sanitizeHtml(row.bodyHtml) };
   }
 
   // --- Vlumetech staff authoring (global catalogue) -----------------------

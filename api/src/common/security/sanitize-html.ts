@@ -3,13 +3,16 @@
  * bodies (Security review R2/R3). Default-deny: unknown tags are unwrapped,
  * unknown attributes dropped, dangerous URL schemes rejected, and whole
  * script-bearing elements removed with their content. Runs at storage time so
- * nothing malicious is ever persisted, and again is cheap to call before render.
+ * nothing malicious is ever persisted, and again on read before it is served
+ * to a console that renders it as HTML.
  *
  * This is deliberately conservative, not a full HTML5 parser. The scenario
  * bodies it guards are simple marketing-style email HTML, so a strict allowlist
  * is both safe and sufficient. The {{TRACKING_URL}} / {{EMPLOYEE_NAME}}
  * placeholders survive untouched.
  */
+
+import { normalizeForSchemeCheck } from './entities';
 
 const ALLOWED_TAGS = new Set([
   'p', 'br', 'hr', 'div', 'span', 'strong', 'b', 'em', 'i', 'u', 's', 'small',
@@ -48,18 +51,31 @@ function stripDangerousBlocks(html: string): string {
   return out;
 }
 
+/**
+ * URL allow-list (fail closed). The value is normalised through the shared
+ * decoder first, so an entity-encoded or control-character-split scheme cannot
+ * slip past: `&#x6a;avascript:`, `java&Tab;script:` and `javascript&colon;` all
+ * normalise to `javascript:` and are rejected.
+ *
+ * A value that declares a scheme must be one we permit — http(s) or mailto.
+ * Anchors, root- and bare-relative paths and the tracking placeholder are
+ * allowed; everything else, including javascript:, vbscript:, file: and data:,
+ * is rejected.
+ */
 function safeUrl(raw: string): string | null {
   const v = raw.trim();
   // Preserve the platform placeholder verbatim.
   if (v === '{{TRACKING_URL}}') return v;
-  // Decode entities that could hide a scheme, then test.
-  const decoded = v.replace(/&#(\d+);?/g, (_, d) => String.fromCharCode(Number(d))).replace(/\s+/g, '');
-  if (/^(javascript|data|vbscript|file):/i.test(decoded)) return null;
-  // Allow http(s), mailto, protocol-relative, root/relative, and anchors.
-  if (/^(https?:\/\/|mailto:|\/|#|\{\{)/i.test(v)) return v;
-  // A bare relative path with no scheme is fine; anything with a ":" before a "/" is a scheme — reject.
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(v)) return v;
-  return null;
+
+  const decoded = normalizeForSchemeCheck(v);
+
+  if (decoded.startsWith('#') || decoded.startsWith('/') || decoded.startsWith('{{')) return v;
+
+  const scheme = decoded.match(/^([a-z][a-z0-9+.-]*):/);
+  if (scheme) {
+    return scheme[1] === 'http' || scheme[1] === 'https' || scheme[1] === 'mailto' ? v : null;
+  }
+  return v; // no scheme — a bare relative path/filename
 }
 
 function sanitizeAttributes(tag: string, attrString: string): string {
