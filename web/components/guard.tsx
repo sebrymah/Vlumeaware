@@ -23,6 +23,8 @@ const NAV: Record<Role, NavEntry[]> = {
     { kind: 'link', href: '/super-admin/security', label: 'Security', icon: 'shield' },
   ],
   client_admin: [
+    // First, because a new admin needs it before anything else in this list.
+    { kind: 'link', href: '/client/getting-started', label: 'Setup guide', icon: 'list' },
     {
       kind: 'group',
       label: 'Phishing',
@@ -68,6 +70,7 @@ const NAV: Record<Role, NavEntry[]> = {
     { kind: 'link', href: '/client/security', label: 'Security', icon: 'shield' },
   ],
   client_viewer: [
+    { kind: 'link', href: '/client/getting-started', label: 'Setup guide', icon: 'list' },
     { kind: 'link', href: '/dashboard', label: 'Reporting', icon: 'chart' },
     { kind: 'link', href: '/client/risk', label: 'Risk', icon: 'shield' },
     { kind: 'link', href: '/client/certificates', label: 'Certificates', icon: 'award' },

@@ -13,10 +13,38 @@ export interface ReadinessCheck {
   href: string | null;
 }
 
+export interface ReadinessPhase {
+  key: string;
+  label: string;
+  blurb: string;
+  checks: ReadinessCheck[];
+}
+
 export interface Readiness {
   ready: boolean;
   outstanding: number;
+  phases: ReadinessPhase[];
   checks: ReadinessCheck[];
+}
+
+/**
+ * The phases, with a fallback for an API that predates them.
+ *
+ * The console and the API deploy separately, so there is always a window where
+ * a new console talks to an older API. Without this, `phases` would be
+ * undefined and both this card and the setup guide would throw on render —
+ * taking out the dashboard of every client mid-deploy.
+ */
+export function phasesOf(state: Readiness): ReadinessPhase[] {
+  if (state.phases?.length) return state.phases;
+  return [
+    {
+      key: 'all',
+      label: 'Finish setting up',
+      blurb: '',
+      checks: state.checks ?? [],
+    },
+  ];
 }
 
 /**
@@ -26,6 +54,9 @@ export interface Readiness {
  * becoming furniture. The gateway allow-list is the reason this exists: it
  * needs the client's own IT team and has a lead time measured in days, and
  * before this the only place it appeared was a page nobody was pointed at.
+ *
+ * It shows one phase at a time. The first covers what has to be true before a
+ * simulation can be sent; the second is the training programme built on top.
  */
 export function ReadinessChecklist({ tenantId }: { tenantId: string | null }) {
   const [state, setState] = useState<Readiness | null>(null);
@@ -46,13 +77,32 @@ export function ReadinessChecklist({ tenantId }: { tenantId: string | null }) {
 
   if (!state || state.ready) return null;
 
+  // Two phases, and only the one being worked on is shown in full: the
+  // enablement prerequisites have to be true before a campaign can be sent at
+  // all, and the training steps are what turn a working account into a running
+  // programme. Showing all nine at once made the card read as a wall.
+  const allPhases = phasesOf(state);
+  const activePhase = allPhases.find((p) => p.checks.some((c) => !c.ok)) ?? allPhases[0];
+  if (!activePhase) return null;
+
+  const phaseIndex = allPhases.indexOf(activePhase);
+  const done = activePhase.checks.filter((c) => c.ok).length;
+
   return (
     <Card
-      title="Finish setting up"
-      subtitle={`${state.outstanding} thing${state.outstanding === 1 ? '' : 's'} left before you can launch a campaign.`}
+      title={`Finish setting up — ${activePhase.label}`}
+      subtitle={`${done} of ${activePhase.checks.length} done. ${activePhase.blurb}`}
+      actions={
+        <Link
+          href="/client/getting-started"
+          className="text-xs font-medium text-brand-700 hover:underline"
+        >
+          Setup guide
+        </Link>
+      }
     >
       <ul className="space-y-3">
-        {state.checks.map((c) => (
+        {activePhase.checks.map((c) => (
           <li key={c.key} className="flex items-start gap-3">
             <span
               className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full text-[11px] font-bold ${
@@ -83,6 +133,13 @@ export function ReadinessChecklist({ tenantId }: { tenantId: string | null }) {
           </li>
         ))}
       </ul>
+      {phaseIndex < allPhases.length - 1 && (
+        <p className="mt-4 text-[11px] text-slate-500">
+          {allPhases.length - 1 - phaseIndex} more phase
+          {allPhases.length - 1 - phaseIndex === 1 ? '' : 's'} after this one. The setup guide
+          walks through all of it.
+        </p>
+      )}
     </Card>
   );
 }

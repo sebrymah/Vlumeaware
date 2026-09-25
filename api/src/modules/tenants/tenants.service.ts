@@ -544,11 +544,25 @@ export class TenantsService {
     );
     if (!tenant) throw new NotFoundException('Tenant not found');
 
-    const [employees, verifiedDomains, sendingDomains] = await runAsSystem('readiness: counts', () =>
+    const [
+      employees,
+      verifiedDomains,
+      sendingDomains,
+      trainingModules,
+      scenarios,
+      routingRules,
+      launchedCampaigns,
+    ] = await runAsSystem('readiness: counts', () =>
       Promise.all([
         this.prisma.db.employee.count({ where: { tenantId } }),
         this.prisma.db.verifiedDomain.count({ where: { tenantId, status: 'verified' } }),
         this.prisma.db.sendingDomain.count({ where: { tenantId, status: 'verified' } }),
+        this.prisma.db.trainingModule.count({ where: { tenantId } }),
+        this.prisma.db.scenario.count({ where: { tenantId } }),
+        this.prisma.db.trainingRoutingRule.count({ where: { tenantId } }),
+        // draft means never launched; every other status means it went out at
+        // least once, which is the milestone worth celebrating.
+        this.prisma.db.campaign.count({ where: { tenantId, status: { not: 'draft' } } }),
       ]),
     );
 
@@ -595,10 +609,69 @@ export class TenantsService {
       },
     ];
 
+    // The second half of onboarding. The first five checks are what has to be
+    // true before a simulation can be sent at all; these four are what turns a
+    // working account into a running programme, and they are the steps the
+    // setup guide walks through.
+    const trainingChecks = [
+      {
+        key: 'contentAdded',
+        label: 'Awareness content in your library',
+        ok: trainingModules > 0,
+        hint:
+          'Upload or link a video, or add one from the shared library. This is what the ' +
+          'teachable-moment page plays after someone clicks.',
+        href: '/client/content',
+      },
+      {
+        key: 'scenarioAdded',
+        label: 'A simulation in your library',
+        ok: scenarios > 0,
+        hint: 'Clone one from the template catalogue, generate one, or write your own.',
+        href: '/client/scenarios',
+      },
+      {
+        key: 'routingConfigured',
+        label: 'Training assigned when someone clicks',
+        ok: routingRules > 0,
+        hint:
+          'A routing rule picks the module an employee is given after they click. Without ' +
+          'one, a click is recorded but nobody is taught anything.',
+        href: '/client/routing',
+      },
+      {
+        key: 'firstCampaignLaunched',
+        label: 'First campaign launched',
+        ok: launchedCampaigns > 0,
+        hint: 'Everything above is preparation. This is the one that trains your people.',
+        href: '/client',
+      },
+    ];
+
+    const phases = [
+      {
+        key: 'enabled',
+        label: 'Get enabled',
+        blurb: 'The prerequisites for sending a simulation. Two of these need other people.',
+        checks,
+      },
+      {
+        key: 'training',
+        label: 'Start training',
+        blurb: 'Turn a working account into a running programme.',
+        checks: trainingChecks,
+      },
+    ];
+
+    const all = [...checks, ...trainingChecks];
+
     return {
-      ready: checks.every((c) => c.ok),
-      outstanding: checks.filter((c) => !c.ok).length,
-      checks,
+      ready: all.every((c) => c.ok),
+      outstanding: all.filter((c) => !c.ok).length,
+      phases,
+      // Kept flat as well: the dashboard card renders this list, and the phase
+      // grouping is a presentation choice made by whoever is reading it.
+      checks: all,
     };
   }
 
