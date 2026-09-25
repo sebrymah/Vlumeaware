@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { phasesOf } from '@/components/readiness';
 import type { Readiness } from '@/components/readiness';
-import { Badge, Button, Card, Notice } from '@/components/ui';
+import { Button, Card, Notice } from '@/components/ui';
 
 interface Step {
   /** Console area, as it appears in the navigation. */
@@ -274,10 +274,12 @@ function Guide() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-2xl space-y-10">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Setting up Vlumeaware</h1>
-        <p className="mt-2 text-sm leading-relaxed text-slate-600">
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          Setting up Vlumeaware
+        </h1>
+        <p className="mt-3 text-base leading-relaxed text-slate-600">
           Everything needed to get from an empty account to your first simulation, in the order that
           works. Steps 3 and 6 need other people — your DNS administrator and your IT team — so start
           those early.
@@ -285,59 +287,88 @@ function Guide() {
       </div>
 
       {readiness && !readiness.ready && (readiness.checks?.length ?? 0) > 0 && (
-        <Card title={`Your progress — ${readiness.checks.length - readiness.outstanding} of ${readiness.checks.length} done`}>
-          <div className="space-y-4">
+        <Card
+          size="roomy"
+          title={`Your progress — ${readiness.checks.length - readiness.outstanding} of ${readiness.checks.length} done`}
+        >
+          <div className="space-y-6">
             {phasesOf(readiness).map((phase) => {
-              const done = phase.checks.filter((c) => c.ok).length;
+              const outstanding = phase.checks.filter((c) => !c.ok);
+              const done = phase.checks.length - outstanding.length;
+              const complete = outstanding.length === 0;
               return (
                 <div key={phase.key}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-700">{phase.label}</span>
-                    <Badge>{`${done}/${phase.checks.length}`}</Badge>
+                  <div className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="text-sm font-semibold text-slate-800">{phase.label}</span>
+                    {complete ? (
+                      <span className="text-sm text-emerald-600">
+                        ✓ all {phase.checks.length} done
+                      </span>
+                    ) : (
+                      <span className="text-sm text-slate-500">
+                        {done} of {phase.checks.length} done
+                      </span>
+                    )}
                   </div>
-                  <p className="mt-0.5 text-[11px] text-slate-500">{phase.blurb}</p>
-                  <ul className="mt-2 space-y-1">
-                    {phase.checks.map((check) => (
-                      <li key={check.key} className="flex items-start gap-2 text-xs">
-                        <span className={check.ok ? 'text-emerald-600' : 'text-slate-300'}>
-                          {check.ok ? '✓' : '○'}
-                        </span>
-                        <span className={check.ok ? 'text-slate-400 line-through' : 'text-slate-700'}>
-                          {check.label}
-                        </span>
-                        {!check.ok && check.href && (
-                          <Link href={check.href} className="ml-auto shrink-0 text-brand-700 hover:underline">
-                            Open
-                          </Link>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+
+                  {!complete && (
+                    <>
+                      <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{phase.blurb}</p>
+                      {/* Only what is left. Listing finished items struck through
+                          made a nine-line wall out of a two-item job. */}
+                      <ul className="mt-4 space-y-4">
+                        {outstanding.map((check) => (
+                          <li key={check.key} className="flex items-start gap-2.5">
+                            <span className="mt-0.5 text-slate-300" aria-hidden>
+                              ○
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-slate-800">{check.label}</p>
+                              {check.hint && (
+                                <p className="mt-0.5 text-sm leading-relaxed text-slate-500">
+                                  {check.hint}
+                                  {check.href && (
+                                    <>
+                                      {' '}
+                                      <Link
+                                        href={check.href}
+                                        className="whitespace-nowrap font-medium text-brand-700 hover:underline"
+                                      >
+                                        Open
+                                      </Link>
+                                    </>
+                                  )}
+                                </p>
+                              )}
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </div>
               );
             })}
           </div>
-          <p className="mt-4 text-[11px] text-slate-500">
+          <p className="mt-6 text-sm leading-relaxed text-slate-500">
             This is the same checklist that appears on your dashboard. It disappears once everything
             is green.
           </p>
         </Card>
       )}
 
-      <Card title="On a free trial">
-        <ul className="space-y-1.5 text-xs leading-relaxed text-slate-600">
-          <li>
-            • You can do everything on this page except run a campaign. Simulations unlock once
-            Vlumetech approves the account and the authorization agreement is on file.
-          </li>
-          <li>• Up to 20 employees while on trial.</li>
-          <li>• After 7 days, if the account is still unapproved, it becomes read-only — you can look, but not add or author — until it is approved.</li>
-        </ul>
+      <Card size="roomy" title="On a free trial">
+        <p className="text-sm leading-relaxed text-slate-600">
+          You can do everything on this page except run a campaign, which unlocks once Vlumetech has
+          approved the account and the authorization agreement is on file. Up to 20 employees while
+          on trial. After 7 days, if the account is still unapproved, it becomes read-only — you can
+          look, but not add or author — until it is approved.
+        </p>
       </Card>
 
-      <nav className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <p className="text-xs font-semibold text-slate-700">Contents</p>
-        <ol className="mt-2 grid gap-1 text-xs sm:grid-cols-2">
+      <nav className="rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <p className="text-sm font-semibold text-slate-700">Contents</p>
+        <ol className="mt-3 grid gap-1.5 text-sm sm:grid-cols-2">
           {STEPS.map((step, i) => (
             <li key={step.title}>
               <a href={`#step-${i + 1}`} className="text-slate-600 hover:text-brand-700 hover:underline">
@@ -348,40 +379,42 @@ function Guide() {
         </ol>
       </nav>
 
-      <ol className="space-y-4">
+      <ol className="space-y-5">
         {STEPS.map((step, i) => (
           <li key={step.title} id={`step-${i + 1}`}>
-            <Card>
-              <div className="flex flex-wrap items-baseline gap-2">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-50 text-[11px] font-semibold text-brand-700">
+            <Card size="roomy">
+              <div className="flex flex-wrap items-baseline gap-2.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-semibold text-brand-700">
                   {i + 1}
                 </span>
-                <h2 className="text-sm font-semibold text-slate-900">{step.title}</h2>
-                <Link href={step.href} className="ml-auto shrink-0 text-[11px] text-brand-700 hover:underline">
+                <h2 className="text-base font-semibold text-slate-900">{step.title}</h2>
+                <Link href={step.href} className="ml-auto shrink-0 text-sm text-brand-700 hover:underline">
                   {step.where} →
                 </Link>
               </div>
 
-              <p className="mt-2 text-xs leading-relaxed text-slate-600">{step.why}</p>
+              <p className="mt-3 text-[15px] leading-relaxed text-slate-600">{step.why}</p>
 
-              <ul className="mt-3 space-y-1.5">
+              <ul className="mt-4 space-y-2.5">
                 {step.do.map((line) => (
-                  <li key={line} className="flex gap-2 text-xs leading-relaxed text-slate-700">
-                    <span className="text-slate-300">•</span>
+                  <li key={line} className="flex gap-2.5 text-[15px] leading-relaxed text-slate-700">
+                    <span className="text-slate-300" aria-hidden>
+                      •
+                    </span>
                     <span>{line}</span>
                   </li>
                 ))}
               </ul>
 
               {step.tip && (
-                <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                  <p className="text-[11px] leading-relaxed text-amber-900">{step.tip}</p>
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-sm leading-relaxed text-amber-900">{step.tip}</p>
                 </div>
               )}
 
               {step.trial && (
-                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[11px] leading-relaxed text-slate-600">
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-sm leading-relaxed text-slate-600">
                     <span className="font-medium">On a free trial: </span>
                     {step.trial}
                   </p>
@@ -392,31 +425,33 @@ function Guide() {
         ))}
       </ol>
 
-      <Card title="What your employees will see">
-        <p className="text-xs leading-relaxed text-slate-600">
+      <Card size="roomy" title="What your employees will see">
+        <p className="text-[15px] leading-relaxed text-slate-600">
           Worth sending round before your first campaign, so nobody feels ambushed:
         </p>
-        <ul className="mt-3 space-y-1.5">
+        <ul className="mt-4 space-y-2.5">
           {EMPLOYEE_SUMMARY.map((line) => (
-            <li key={line} className="flex gap-2 text-xs leading-relaxed text-slate-700">
-              <span className="text-slate-300">•</span>
+            <li key={line} className="flex gap-2.5 text-[15px] leading-relaxed text-slate-700">
+              <span className="text-slate-300" aria-hidden>
+                •
+              </span>
               <span>{line}</span>
             </li>
           ))}
         </ul>
-        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        <p className="mt-4 text-sm leading-relaxed text-slate-500">
           One thing to be plain about: we never capture a password. The simulated sign-in reports only
           that something was submitted, plus non-reversible details like field lengths. That is a
           deliberate limit, and it is why no password from a simulation can leak.
         </p>
       </Card>
 
-      <Card title="For your IT team">
-        <p className="text-xs leading-relaxed text-slate-600">
+      <Card size="roomy" title="For your IT team">
+        <p className="text-[15px] leading-relaxed text-slate-600">
           The gateway allow-list is the one step that cannot be done from this console. Copy the block
           below and send it on — it is written to stand on its own.
         </p>
-        <div className="mt-3 flex flex-wrap gap-2" data-print-hide>
+        <div className="mt-4 flex flex-wrap gap-2" data-print-hide>
           <Button variant="ghost" onClick={copyItChecklist}>
             {copied ? 'Copied' : 'Copy for your IT team'}
           </Button>
@@ -424,7 +459,7 @@ function Guide() {
             Print this page
           </Button>
         </div>
-        <pre className="mt-3 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-700">
+        <pre className="mt-4 max-h-96 overflow-auto whitespace-pre-wrap rounded-lg border border-slate-200 bg-slate-50 p-4 text-[13px] leading-relaxed text-slate-700">
           {IT_CHECKLIST}
         </pre>
       </Card>

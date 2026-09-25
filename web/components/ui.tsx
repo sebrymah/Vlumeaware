@@ -7,24 +7,54 @@ export function Card({
   subtitle,
   actions,
   children,
+  size = 'compact',
 }: {
   title?: string;
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
+  /**
+   * 'compact' is the console's data scale — right for a table of campaigns,
+   * wrong for a page someone actually reads. 'roomy' steps the header, padding
+   * and text up; the default leaves every existing caller exactly as it was.
+   */
+  size?: 'compact' | 'roomy';
 }) {
+  const roomy = size === 'roomy';
   return (
     <section className="rounded-xl border border-slate-200 bg-white shadow-card">
       {(title || actions) && (
-        <header className="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4">
+        <header
+          className={`flex items-start justify-between gap-4 border-b border-slate-100 ${
+            roomy ? 'px-6 py-4' : 'px-5 py-4'
+          }`}
+        >
           <div>
-            {title && <h2 className="text-sm font-semibold text-slate-900">{title}</h2>}
-            {subtitle && <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>}
+            {title && (
+              <h2
+                className={
+                  roomy
+                    ? 'text-base font-semibold text-slate-900'
+                    : 'text-sm font-semibold text-slate-900'
+                }
+              >
+                {title}
+              </h2>
+            )}
+            {subtitle && (
+              <p
+                className={`text-slate-500 ${
+                  roomy ? 'mt-1 text-sm leading-relaxed' : 'mt-0.5 text-xs'
+                }`}
+              >
+                {subtitle}
+              </p>
+            )}
           </div>
           {actions}
         </header>
       )}
-      <div className="px-5 py-4">{children}</div>
+      <div className={roomy ? 'px-6 py-5' : 'px-5 py-4'}>{children}</div>
     </section>
   );
 }
