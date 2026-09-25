@@ -27,7 +27,13 @@ export function proxy(request: NextRequest) {
   const dev = process.env.NODE_ENV !== 'production';
   const api = apiOrigin();
   const p = request.nextUrl.pathname;
-  const isPublic = p.startsWith('/t/') || p.startsWith('/learn/') || p.startsWith('/portal');
+  // '/portal/' with the trailing slash is deliberate: the nonce policy below
+  // only works on dynamically rendered pages, and the bare '/portal' request
+  // form is statically prerendered, so a nonce can never be injected into it.
+  // Matching '/portal' here would leave that page's scripts blocked by its own
+  // CSP (with 'strict-dynamic', 'self' is ignored) and the form inert.
+  const isPublic =
+    p.startsWith('/t/') || p.startsWith('/learn/') || p.startsWith('/portal/');
   const nonce = btoa(crypto.randomUUID());
 
   const common = [

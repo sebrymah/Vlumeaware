@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuthModule } from './common/auth/auth.module';
 import { JwtAuthGuard } from './common/auth/jwt-auth.guard';
+import { MfaEnforcedGuard } from './common/auth/mfa-enforced.guard';
 import { RolesGuard } from './common/auth/roles.guard';
 import { TenantScopeInterceptor } from './common/auth/tenant-scope.interceptor';
 import { AuditModule } from './common/audit/audit.module';
@@ -60,10 +61,13 @@ import { HealthController } from './health.controller';
   ],
   controllers: [HealthController],
   providers: [
-    // Order matters: authenticate, then check role, then open the tenant
-    // context from the verified token.
+    // Order matters: authenticate, then check role, then MFA enrolment, then
+    // rate limit. The interceptor below runs last of all — Nest runs guards
+    // before interceptors, which is why MfaEnforcedGuard reads its row
+    // explicitly rather than relying on the tenant context.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: MfaEnforcedGuard },
     { provide: APP_GUARD, useClass: RateLimitGuard },
     { provide: APP_INTERCEPTOR, useClass: TenantScopeInterceptor },
   ],

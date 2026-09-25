@@ -51,9 +51,14 @@ export function PortalLogin({
       return;
     }
     writeSession({ accessToken: res.accessToken as string, role, tenantId: res.tenantId, email });
-    // Staff without MFA must enrol before using the console (mandatory).
+    // An account that must enrol cannot use the API until it has, so it is sent
+    // straight to the enrolment screen — in its OWN portal. Client users were
+    // previously sent to the staff page, which their role cannot open, leaving
+    // them enforced with no way to satisfy it.
     if (res.mfaEnrollmentRequired) {
-      router.replace('/super-admin/security?enroll=1');
+      const securityPath =
+        role === 'vlumetech_superadmin' ? '/super-admin/security' : '/client/security';
+      router.replace(`${securityPath}?enroll=1`);
       return;
     }
     router.replace(homeFor(role));

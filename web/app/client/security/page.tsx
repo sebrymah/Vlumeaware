@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
@@ -137,6 +137,23 @@ function Security() {
       await api.post(`/tenants/${tenantId}/users/${user.id}/unlock`);
       return `${user.email} can sign in again.`;
     });
+
+  /**
+   * Arriving from sign-in with ?enroll=1 means this account must enrol before it
+   * can use the API. The flow is started automatically, rather than leaving the
+   * user to find the button on a console that otherwise refuses their requests.
+   */
+  const autoEnrolStarted = useRef(false);
+  useEffect(() => {
+    if (autoEnrolStarted.current) return;
+    const wantsEnrol =
+      typeof window !== 'undefined' &&
+      new URLSearchParams(window.location.search).get('enroll') === '1';
+    if (!wantsEnrol) return;
+    if (security?.users.find((u) => u.email === me)?.mfaEnabled) return;
+    autoEnrolStarted.current = true;
+    void startMfa();
+  }, [security, me, startMfa]);
 
   if (!security) return <p className="text-sm text-slate-500">{error ?? 'Loading…'}</p>;
 

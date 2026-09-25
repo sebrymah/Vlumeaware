@@ -17,6 +17,7 @@ import { CERTIFICATE_TEMPLATES } from '../certificates/certificate-templates';
 import { IsBoolean, IsDateString, IsEmail, IsHexColor, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { Roles } from '../../common/auth/roles.decorator';
 import { CurrentUser } from '../../common/auth/current-user.decorator';
+import { AllowUnenrolledMfa } from '../../common/auth/mfa-enforced.guard';
 import { Throttle } from '../../common/ratelimit/rate-limit.decorator';
 import type { JwtPayload } from '../../common/auth/roles';
 import { ROLES } from '../../common/auth/roles';
@@ -176,9 +177,15 @@ export class TenantsController {
     return this.tenants.recordAgreement(tenantId, document, new Date(dto.signedAt));
   }
 
-  /** A client admin manages their own console security. */
+  /**
+   * A client admin manages their own console security. Readable while MFA
+   * enrolment is outstanding, because this is the page that carries the
+   * enrolment flow — blocking it would leave an enforced user with no way to
+   * satisfy the requirement.
+   */
   @Get(':tenantId/security')
   @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @AllowUnenrolledMfa()
   getSecurity(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
     return this.tenants.getSecurity(tenantId);
   }
