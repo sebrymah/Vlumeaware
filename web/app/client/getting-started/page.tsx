@@ -53,7 +53,7 @@ const STEPS: Step[] = [
       'If your organisation requires it, switch on "Require multi-factor authentication", then turn MFA on for your own account with "Turn on MFA".',
       'Add a colleague as a second admin, or as a viewer if they only need to read reports. The same page manages both.',
     ],
-    tip: 'Ask Vlumetech for MFA to be required on your account at creation if you would rather not rely on the setting. New accounts are held to it by default.',
+    tip: 'Switching on "Require multi-factor authentication" applies to the console accounts you create from that point on. Anyone who already has an account is asked to enrol the next time they sign in, but is not locked out — so if you need the whole team covered immediately, say so to your Vlumetech contact and they will set it per account.',
   },
   {
     where: 'Branding',
