@@ -4,29 +4,9 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
+import { phasesOf } from '@/components/readiness';
+import type { Readiness } from '@/components/readiness';
 import { Badge, Button, Card, Notice } from '@/components/ui';
-
-interface ReadinessCheck {
-  key: string;
-  label: string;
-  ok: boolean;
-  hint: string;
-  href: string | null;
-}
-
-interface ReadinessPhase {
-  key: string;
-  label: string;
-  blurb: string;
-  checks: ReadinessCheck[];
-}
-
-interface Readiness {
-  ready: boolean;
-  outstanding: number;
-  phases: ReadinessPhase[];
-  checks: ReadinessCheck[];
-}
 
 interface Step {
   /** Console area, as it appears in the navigation. */
@@ -304,10 +284,10 @@ function Guide() {
         </p>
       </div>
 
-      {readiness && !readiness.ready && (
+      {readiness && !readiness.ready && (readiness.checks?.length ?? 0) > 0 && (
         <Card title={`Your progress — ${readiness.checks.length - readiness.outstanding} of ${readiness.checks.length} done`}>
           <div className="space-y-4">
-            {readiness.phases.map((phase) => {
+            {phasesOf(readiness).map((phase) => {
               const done = phase.checks.filter((c) => c.ok).length;
               return (
                 <div key={phase.key}>

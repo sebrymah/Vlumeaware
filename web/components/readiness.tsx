@@ -28,6 +28,26 @@ export interface Readiness {
 }
 
 /**
+ * The phases, with a fallback for an API that predates them.
+ *
+ * The console and the API deploy separately, so there is always a window where
+ * a new console talks to an older API. Without this, `phases` would be
+ * undefined and both this card and the setup guide would throw on render —
+ * taking out the dashboard of every client mid-deploy.
+ */
+export function phasesOf(state: Readiness): ReadinessPhase[] {
+  if (state.phases?.length) return state.phases;
+  return [
+    {
+      key: 'all',
+      label: 'Finish setting up',
+      blurb: '',
+      checks: state.checks ?? [],
+    },
+  ];
+}
+
+/**
  * Setup checklist for a client who has not finished onboarding.
  *
  * Renders nothing once everything is green, so it disappears rather than
@@ -61,10 +81,11 @@ export function ReadinessChecklist({ tenantId }: { tenantId: string | null }) {
   // enablement prerequisites have to be true before a campaign can be sent at
   // all, and the training steps are what turn a working account into a running
   // programme. Showing all nine at once made the card read as a wall.
-  const activePhase = state.phases.find((p) => p.checks.some((c) => !c.ok)) ?? state.phases[0];
+  const allPhases = phasesOf(state);
+  const activePhase = allPhases.find((p) => p.checks.some((c) => !c.ok)) ?? allPhases[0];
   if (!activePhase) return null;
 
-  const phaseIndex = state.phases.indexOf(activePhase);
+  const phaseIndex = allPhases.indexOf(activePhase);
   const done = activePhase.checks.filter((c) => c.ok).length;
 
   return (
@@ -112,10 +133,10 @@ export function ReadinessChecklist({ tenantId }: { tenantId: string | null }) {
           </li>
         ))}
       </ul>
-      {phaseIndex < state.phases.length - 1 && (
+      {phaseIndex < allPhases.length - 1 && (
         <p className="mt-4 text-[11px] text-slate-500">
-          {state.phases.length - 1 - phaseIndex} more phase
-          {state.phases.length - 1 - phaseIndex === 1 ? '' : 's'} after this one. The setup guide
+          {allPhases.length - 1 - phaseIndex} more phase
+          {allPhases.length - 1 - phaseIndex === 1 ? '' : 's'} after this one. The setup guide
           walks through all of it.
         </p>
       )}
