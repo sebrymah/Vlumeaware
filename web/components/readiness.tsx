@@ -94,7 +94,7 @@ export function ReadinessChecklist({ tenantId }: { tenantId: string | null }) {
       subtitle={`${done} of ${activePhase.checks.length} done. ${activePhase.blurb}`}
       actions={
         <Link
-          href="/client/getting-started"
+          href="/docs"
           className="text-xs font-medium text-brand-700 hover:underline"
         >
           Setup guide
