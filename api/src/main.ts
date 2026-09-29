@@ -56,7 +56,13 @@ async function bootstrap() {
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.enableCors({
-    origin: (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(','),
+    // Tolerate whitespace and a trailing slash in the comma list: an origin is
+    // matched exactly by the browser, so " https://x/" would silently never
+    // match and block every call.
+    origin: (process.env.CORS_ORIGINS ?? 'http://localhost:3000')
+      .split(',')
+      .map((o) => o.trim().replace(/\/+$/, ''))
+      .filter(Boolean),
     credentials: true,
   });
   app.useGlobalPipes(
