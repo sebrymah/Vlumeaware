@@ -5,12 +5,34 @@ import { Logger } from '@nestjs/common';
  * Every cross-tenant (system-scope) entry is logged with its reason and actor.
  * This is the audit trail for the one deliberate way to escape tenant scoping
  * (Security review R1). Shipped to the platform's log stream; noisy by design.
+ *
+ * A sink may also be registered so the durable audit table can persist the
+ * security-relevant subset (human superadmin cross-tenant access). The sink is
+ * registered by AuditService at boot; keeping it a callback here avoids a
+ * circular import (tenant-context must not depend on Prisma/AuditService).
  */
 const systemAuditLogger = new Logger('SystemScope');
+
+type SystemAuditSink = (reason: string, actor: Actor) => void;
+let systemAuditSink: SystemAuditSink | null = null;
+
+/** Register (or clear, with null) the durable sink for system-scope entries. */
+export function registerSystemAuditSink(sink: SystemAuditSink | null): void {
+  systemAuditSink = sink;
+}
+
 function auditSystemEntry(reason: string, actor: Actor): void {
   systemAuditLogger.log(
     `runAsSystem reason=${JSON.stringify(reason)} actor=${actor.actorId ?? 'anon'} role=${actor.actorRole ?? 'none'}`,
   );
+  if (systemAuditSink) {
+    // The sink must never break the action it observes.
+    try {
+      systemAuditSink(reason, actor);
+    } catch {
+      /* logged by the sink itself */
+    }
+  }
 }
 
 export interface TenantScope {

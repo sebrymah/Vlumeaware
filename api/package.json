@@ -13,6 +13,7 @@
     "prisma:push": "prisma db push",
     "seed": "ts-node prisma/seed.ts",
     "seed:content": "SEED_CONTENT_ONLY=1 ts-node prisma/seed.ts",
+    "rbac:matrix": "node scripts/rbac-matrix.mjs --out ../docs/soc2/rbac-matrix.md",
     "pretest": "node scripts/require-node.mjs",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand",
     "test:isolation": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand tenant-isolation",

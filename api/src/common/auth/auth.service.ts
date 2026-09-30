@@ -3,8 +3,9 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { runAsSystem } from '../prisma/tenant-context';
+import { AuditService } from '../audit/audit.service';
 import { ROLES } from './roles';
-import type { JwtPayload } from './roles';
+import type { JwtPayload, Role } from './roles';
 import { generateSecret, otpauthUrl, verifyTotp } from './totp';
 
 const MAX_FAILURES = 5;
@@ -26,7 +27,22 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly audit: AuditService,
   ) {}
+
+  /**
+   * Records an authentication event. Login runs before any request scope, so
+   * the subject (who is authenticating) is passed as the actor explicitly.
+   */
+  private authEvent(
+    action: string,
+    subjectId: string,
+    role: Role,
+    tenantId?: string,
+    detail?: string,
+  ) {
+    void this.audit.record(action, detail, tenantId, { actorId: subjectId, actorRole: role });
+  }
 
   async login(email: string, password: string): Promise<LoginResult> {
     const staff = await this.prisma.db.user.findUnique({ where: { email } });
@@ -40,12 +56,14 @@ export class AuthService {
 
       // MFA active → hand back a short-lived challenge instead of an access token.
       if (staff.mfaEnabledAt) {
+        this.authEvent('auth.mfa_challenged', staff.id, ROLES.superadmin);
         return {
           mfaRequired: true,
           mfaChallenge: this.jwt.sign({ sub: staff.id, typ: 'mfa' }, { expiresIn: '5m' }),
         };
       }
       // No MFA yet: staff may sign in, but the console must force enrolment.
+      this.authEvent('auth.login', staff.id, ROLES.superadmin, undefined, 'password, MFA enrolment pending');
       return {
         ...this.issue({ sub: staff.id, email: staff.email, role: ROLES.superadmin }),
         mfaEnrollmentRequired: true,
@@ -60,7 +78,12 @@ export class AuthService {
     if (tenantUser) {
       this.assertNotLocked(tenantUser.lockedUntil);
       if (!(await bcrypt.compare(password, tenantUser.passwordHash))) {
-        await this.recordTenantUserFailure(tenantUser.id, tenantUser.failedLoginCount);
+        await this.recordTenantUserFailure(
+          tenantUser.id,
+          tenantUser.failedLoginCount,
+          tenantUser.tenantId,
+          tenantUser.role,
+        );
         throw new UnauthorizedException('Invalid credentials');
       }
       await this.resetTenantUserFailures(tenantUser.id);
@@ -69,11 +92,13 @@ export class AuthService {
 
       // MFA active → a challenge, exactly as for staff.
       if (tenantUser.mfaEnabledAt) {
+        this.authEvent('auth.mfa_challenged', tenantUser.id, tenantUser.role, tenantUser.tenantId);
         return {
           mfaRequired: true,
           mfaChallenge: this.jwt.sign({ sub: tenantUser.id, typ: 'mfa' }, { expiresIn: '5m' }),
         };
       }
+      this.authEvent('auth.login', tenantUser.id, tenantUser.role, tenantUser.tenantId, 'password');
       // The client can require MFA of its own users. They still get a token,
       // because enrolment happens inside the console, but it is flagged so the
       // console can force them through it before anything else.
@@ -115,6 +140,7 @@ export class AuthService {
         throw new UnauthorizedException('Invalid authentication code');
       }
       await this.resetStaffFailures(staff.id);
+      this.authEvent('auth.login', staff.id, ROLES.superadmin, undefined, 'password + MFA');
       return this.issue({ sub: staff.id, email: staff.email, role: ROLES.superadmin });
     }
 
@@ -126,10 +152,16 @@ export class AuthService {
     }
     this.assertNotLocked(tenantUser.lockedUntil);
     if (!verifyTotp(tenantUser.mfaSecret, code)) {
-      await this.recordTenantUserFailure(tenantUser.id, tenantUser.failedLoginCount);
+      await this.recordTenantUserFailure(
+        tenantUser.id,
+        tenantUser.failedLoginCount,
+        tenantUser.tenantId,
+        tenantUser.role,
+      );
       throw new UnauthorizedException('Invalid authentication code');
     }
     await this.resetTenantUserFailures(tenantUser.id);
+    this.authEvent('auth.login', tenantUser.id, tenantUser.role, tenantUser.tenantId, 'password + MFA');
     const policy = await this.tenantPolicy(tenantUser.tenantId);
     return this.issue(
       {
@@ -177,6 +209,7 @@ export class AuthService {
       if (!staff.mfaSecret) throw new BadRequestException('Start MFA setup first');
       if (!verifyTotp(staff.mfaSecret, code)) throw new BadRequestException(mismatch);
       await this.prisma.db.user.update({ where: { id: userId }, data: { mfaEnabledAt: new Date() } });
+      this.authEvent('auth.mfa_enrolled', userId, ROLES.superadmin);
       return { enabled: true };
     }
 
@@ -188,6 +221,7 @@ export class AuthService {
     await runAsSystem('mfa: activate client', () =>
       this.prisma.db.tenantUser.update({ where: { id: userId }, data: { mfaEnabledAt: new Date() } }),
     );
+    this.authEvent('auth.mfa_enrolled', userId, tenantUser.role, tenantUser.tenantId);
     return { enabled: true };
   }
 
@@ -209,6 +243,7 @@ export class AuthService {
           data: { mfaSecret: null, mfaEnabledAt: null },
         }),
       );
+      this.authEvent('auth.mfa_disabled', userId, ROLES.clientViewer, tenantId);
       return { enabled: false };
     }
     throw new BadRequestException('Vlumetech staff accounts must keep MFA enabled.');
@@ -238,6 +273,7 @@ export class AuthService {
         where: { id: userId },
         data: { passwordHash: await AuthService.hash(newPassword) },
       });
+      this.authEvent('auth.password_changed', userId, ROLES.superadmin);
       return { changed: true };
     }
 
@@ -251,6 +287,7 @@ export class AuthService {
     await runAsSystem('password change: write client user', () =>
       this.prisma.db.tenantUser.update({ where: { id: userId }, data: { passwordHash } }),
     );
+    this.authEvent('auth.password_changed', userId, ROLES.clientViewer, tenantId);
     return { changed: true };
   }
 
@@ -275,17 +312,27 @@ export class AuthService {
     };
   }
 
-  private async recordTenantUserFailure(id: string, current: number) {
+  private async recordTenantUserFailure(
+    id: string,
+    current: number,
+    tenantId?: string,
+    role: Role = ROLES.clientViewer,
+  ) {
     const next = current + 1;
+    const locked = next >= MAX_FAILURES;
     await runAsSystem('login: record failed client attempt', () =>
       this.prisma.db.tenantUser.update({
         where: { id },
         data: {
           failedLoginCount: next,
-          lockedUntil: next >= MAX_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null,
+          lockedUntil: locked ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null,
         },
       }),
     );
+    this.authEvent('auth.login_failed', id, role, tenantId, `attempt ${next}`);
+    if (locked) {
+      this.authEvent('auth.lockout', id, role, tenantId, `locked ${LOCK_MINUTES}m`);
+    }
   }
 
   private async resetTenantUserFailures(id: string) {
@@ -299,13 +346,18 @@ export class AuthService {
 
   private async recordStaffFailure(id: string, current: number) {
     const next = current + 1;
+    const locked = next >= MAX_FAILURES;
     await this.prisma.db.user.update({
       where: { id },
       data: {
         failedLoginCount: next,
-        lockedUntil: next >= MAX_FAILURES ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null,
+        lockedUntil: locked ? new Date(Date.now() + LOCK_MINUTES * 60_000) : null,
       },
     });
+    this.authEvent('auth.login_failed', id, ROLES.superadmin, undefined, `attempt ${next}`);
+    if (locked) {
+      this.authEvent('auth.lockout', id, ROLES.superadmin, undefined, `locked ${LOCK_MINUTES}m`);
+    }
   }
 
   private async resetStaffFailures(id: string) {
