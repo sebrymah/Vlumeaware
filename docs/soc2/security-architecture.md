@@ -72,7 +72,9 @@ least-privilege, reviewed access, not fine-grained ABAC.
 - **Privileged access** (new): `system.cross_tenant_access` — every time a
   super-admin reads or acts across tenants from the console, persisted from the
   tenant-scope escape hatch (previously only in the log stream).
-- **Data export** (new, representative): `report.export_csv`.
+- **Data export / download** (new): `report.export_csv`, `employee.risk_export_csv`,
+  `employee.risk_export_pdf`, `certificate.download` — every route that moves
+  employee-level data off-platform.
 
 ### Assessment
 The authentication and privileged-access gaps that would have failed a SOC 2
@@ -80,11 +82,11 @@ review (CC6.1/CC7.2 — logging security events and privileged use) are now
 closed. Two hardening items remain before the trail is audit-grade:
 
 ### Roadmap
-- **P1 — Finish data-access/export coverage.** Add `*.export`/`*.download`
-  events to the remaining sensitive routes, notably
-  `GET /tenants/:tenantId/employees/risk/export.csv`, certificate PDF downloads,
-  and credential-submission views. The pattern is established
-  (`this.audit.record('report.export_csv', …)`); this is mechanical.
+- **~~P1 — Finish data-access/export coverage.~~ Done.** All routes that move
+  employee-level data off-platform now emit audit events (`report.export_csv`,
+  `employee.risk_export_csv`, `employee.risk_export_pdf`, `certificate.download`).
+  Credential submissions store only metadata (length/shape), not plaintext, so
+  there is no separate credential-view route to audit.
 - **P1 — Tamper-evidence.** "Append-only" is currently by convention only. Add a
   hash chain (`hash = sha256(prevHash || canonicalRow)`) or ship audit rows to
   append-only external storage (e.g. an S3 Object-Lock bucket / log pipeline).

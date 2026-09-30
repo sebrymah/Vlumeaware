@@ -2,11 +2,15 @@ import { Controller, Get, Param, ParseUUIDPipe, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { ROLES } from '../../common/auth/roles';
 import { Public, Roles } from '../../common/auth/roles.decorator';
+import { AuditService } from '../../common/audit/audit.service';
 import { CertificatesService } from './certificates.service';
 
 @Controller()
 export class CertificatesController {
-  constructor(private readonly certificates: CertificatesService) {}
+  constructor(
+    private readonly certificates: CertificatesService,
+    private readonly audit: AuditService,
+  ) {}
 
   @Get('tenants/:tenantId/certificates')
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
@@ -25,6 +29,7 @@ export class CertificatesController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   async pdf(@Param('certId', ParseUUIDPipe) certId: string, @Res() res: Response) {
     const pdf = await this.certificates.renderPdf(certId);
+    await this.audit.record('certificate.download', `certificate ${certId}`);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="certificate-${certId}.pdf"`);
     res.send(pdf);

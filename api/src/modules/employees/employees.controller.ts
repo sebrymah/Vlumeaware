@@ -18,6 +18,7 @@ import { ArrayMaxSize, IsArray, IsEmail, IsOptional, IsString, IsUUID, ValidateN
 import { Type } from 'class-transformer';
 import { ROLES } from '../../common/auth/roles';
 import { Roles } from '../../common/auth/roles.decorator';
+import { AuditService } from '../../common/audit/audit.service';
 import { EmployeesService } from './employees.service';
 import { RiskService } from './risk.service';
 import { RiskAdviceService } from './risk-advice.service';
@@ -49,6 +50,7 @@ export class EmployeesController {
     private readonly employees: EmployeesService,
     private readonly risk: RiskService,
     private readonly riskAdvice: RiskAdviceService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get()
@@ -81,6 +83,8 @@ export class EmployeesController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   async riskCsv(@Res() res: Response) {
     const csv = await this.riskAdvice.csv();
+    // Employee-level risk data leaving the platform — a security-relevant export.
+    await this.audit.record('employee.risk_export_csv');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="employee-risk.csv"');
     res.send(csv);
@@ -97,6 +101,7 @@ export class EmployeesController {
   @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
   async riskPdf(@Body() body: { advice?: RiskReportAdvice | null }, @Res() res: Response) {
     const pdf = await this.riskAdvice.pdf(body?.advice ?? null);
+    await this.audit.record('employee.risk_export_pdf');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="employee-risk-report.pdf"');
     res.send(pdf);
