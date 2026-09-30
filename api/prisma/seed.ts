@@ -8,13 +8,19 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 import { tenantGuardExtension } from '../src/common/prisma/tenant-guard.extension';
 import { runAsSystem, runInTenant } from '../src/common/prisma/tenant-context';
+import { ISO_27001_AWARENESS_PACK } from './content/iso27001-awareness-pack';
 
 const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 
 // Security review R6: the demo password must never ship to production. In a
 // production environment SEED_PASSWORD must be set explicitly, or seeding aborts.
-if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD) {
+//
+// Content-only mode (SEED_CONTENT_ONLY=1) is exempt because it creates no
+// accounts at all — it exists precisely so the shared content library can be
+// loaded into a live database without any demo data.
+const CONTENT_ONLY = process.env.SEED_CONTENT_ONLY === '1';
+if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD && !CONTENT_ONLY) {
   throw new Error(
     'Refusing to seed with the built-in demo password in production. Set SEED_PASSWORD explicitly.',
   );
@@ -381,10 +387,95 @@ async function seedSharedModules() {
   }
 }
 
-async function main() {
-  const passwordHash = await bcrypt.hash(DEV_PASSWORD, 12);
+/**
+ * Loads the ISO/IEC 27001:2022 awareness content pack into the shared library:
+ * 30 quizzes (150 questions), 24 email-runnable lures and 10 training modules.
+ *
+ * The pack is generated from the approved programme document by
+ * `api/scripts/build-iso27001-pack.mjs` — edit that document, not the generated
+ * file. Loading is idempotent: every item is keyed by title, so re-running the
+ * seed never duplicates content.
+ *
+ * Only the email-runnable lures are loaded. The six non-email scenarios in the
+ * document (SMS, voice, QR, chat-app, removable media) stay out of the
+ * catalogue on purpose — the platform sends email only, and a lure a client
+ * cannot send must not look cloneable.
+ */
+async function seedIsoPack() {
+  let modules = 0;
+  let quizzes = 0;
+  let questions = 0;
+  let lures = 0;
 
+  for (const topic of ISO_27001_AWARENESS_PACK) {
+    // The produced video files do not exist yet, so the URL is a placeholder —
+    // the same convention as the example modules above. Swapping in real
+    // files later is an update, not a re-seed.
+    const existingModule = await db.sharedTrainingModule.findFirst({
+      where: { title: topic.module.title },
+    });
+    if (!existingModule) {
+      await db.sharedTrainingModule.create({
+        data: {
+          title: topic.module.title,
+          description: topic.module.description,
+          category: topic.module.category,
+          videoUrl: topic.module.videoUrl,
+          videoSource: 'link',
+          durationSeconds: topic.module.durationSeconds,
+        },
+      });
+      modules++;
+    }
+
+    for (const quiz of topic.quizzes) {
+      const existing = await db.sharedQuiz.findFirst({ where: { title: quiz.title } });
+      if (existing) continue;
+      await db.sharedQuiz.create({
+        data: {
+          title: quiz.title,
+          category: quiz.category,
+          passingScorePct: quiz.passingScorePct,
+          source: 'ISO/IEC 27001:2022 awareness pack',
+          questions: quiz.questions,
+        },
+      });
+      quizzes++;
+      questions += quiz.questions.length;
+    }
+
+    for (const lure of topic.lures) {
+      const existing = await db.phishingTemplate.findFirst({ where: { title: lure.title } });
+      if (existing) continue;
+      await db.phishingTemplate.create({
+        data: { ...lure, source: 'ISO/IEC 27001:2022 awareness pack' },
+      });
+      lures++;
+    }
+  }
+
+  console.log(
+    `  iso pack      ${modules} modules, ${quizzes} quizzes (${questions} questions), ${lures} lures`,
+  );
+}
+
+async function main() {
   await runAsSystem('seed', async () => {
+    if (CONTENT_ONLY) {
+      // Loads the shared content libraries and nothing else. Creates no users,
+      // no tenants, no employees, no campaigns and no sends, which is what makes
+      // this mode safe to point at a live database.
+      console.log(
+        'SEED_CONTENT_ONLY=1 — shared content only. No accounts, tenants or demo data will be created.',
+      );
+      await seedTemplates();
+      await seedSharedModules();
+      await seedIsoPack();
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(DEV_PASSWORD, 12);
+
     await db.user.upsert({
       where: { email: 'it@vlumetech.com.ng' },
       // Seeded accounts are development credentials by design, and they exist
@@ -403,6 +494,7 @@ async function main() {
 
     await seedTemplates();
     await seedSharedModules();
+    await seedIsoPack();
 
     const signed = await db.tenant.upsert({
       where: { id: '00000000-0000-4000-8000-000000000001' },
@@ -613,6 +705,11 @@ async function main() {
       }
     });
   });
+
+  if (CONTENT_ONLY) {
+    console.log('Content load complete. No accounts, tenants or demo data were created.');
+    return;
+  }
 
   console.log('Seed complete.');
   console.log(`  superadmin    it@vlumetech.com.ng / ${DEV_PASSWORD}`);
