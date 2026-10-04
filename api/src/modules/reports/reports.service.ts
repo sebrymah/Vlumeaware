@@ -47,24 +47,19 @@ export class ReportsService {
     const campaign = await this.prisma.db.campaign.findUnique({ where: { id: campaignId } });
     if (!campaign) throw new NotFoundException('Campaign not found');
 
-    const sends = await this.prisma.db.send.findMany({
-      where: { campaignId },
-      select: {
-        sentAt: true,
-        openedAt: true,
-        clickedAt: true,
-        reportedAt: true,
-        credentialsSubmitted: true,
-        employee: { select: { department: true } },
-      },
-    });
-
-    const delivered = sends.filter((s) => s.sentAt !== null);
-    const totalSent = delivered.length;
-    const opened = delivered.filter((s) => s.openedAt).length;
-    const clicked = delivered.filter((s) => s.clickedAt).length;
-    const reported = delivered.filter((s) => s.reportedAt).length;
-    const credentialsSubmitted = delivered.filter((s) => s.credentialsSubmitted).length;
+    // Counts run in the database — no send rows are loaded, so memory stays flat
+    // as a campaign grows. opened/clicked/reported/submitted are over delivered
+    // sends (sentAt set), matching the rates below.
+    const deliveredWhere = { campaignId, sentAt: { not: null } } as const;
+    const [totalRecipients, totalSent, opened, clicked, reported, credentialsSubmitted] =
+      await Promise.all([
+        this.prisma.db.send.count({ where: { campaignId } }),
+        this.prisma.db.send.count({ where: deliveredWhere }),
+        this.prisma.db.send.count({ where: { ...deliveredWhere, openedAt: { not: null } } }),
+        this.prisma.db.send.count({ where: { ...deliveredWhere, clickedAt: { not: null } } }),
+        this.prisma.db.send.count({ where: { ...deliveredWhere, reportedAt: { not: null } } }),
+        this.prisma.db.send.count({ where: { ...deliveredWhere, credentialsSubmitted: true } }),
+      ]);
 
     // Submission analytics from the metadata-only capture. No secret is stored;
     // these are the non-reversible signals a board report can use.
@@ -91,12 +86,25 @@ export class ReportsService {
       medianTimeToSubmitMs: median(times),
     };
 
+    // Per-department breakdown: group delivered sends by employee in the
+    // database, then fold in each employee's department. Bounded by distinct
+    // recipients, not total sends, and both queries stay tenant-scoped.
+    const byEmployee = await this.prisma.db.send.groupBy({
+      by: ['employeeId'],
+      where: deliveredWhere,
+      _count: { _all: true, clickedAt: true },
+    });
+    const recipients = await this.prisma.db.employee.findMany({
+      where: { sends: { some: { campaignId } } },
+      select: { id: true, department: true },
+    });
+    const deptOf = new Map(recipients.map((e) => [e.id, e.department]));
     const departments = new Map<string, { sent: number; clicked: number }>();
-    for (const send of delivered) {
-      const key = send.employee.department?.trim() || 'Unassigned';
+    for (const row of byEmployee) {
+      const key = deptOf.get(row.employeeId)?.trim() || 'Unassigned';
       const bucket = departments.get(key) ?? { sent: 0, clicked: 0 };
-      bucket.sent += 1;
-      if (send.clickedAt) bucket.clicked += 1;
+      bucket.sent += row._count._all;
+      bucket.clicked += row._count.clickedAt;
       departments.set(key, bucket);
     }
 
@@ -128,7 +136,7 @@ export class ReportsService {
       campaignId,
       campaignName: campaign.name,
       status: campaign.status,
-      totalRecipients: sends.length,
+      totalRecipients,
       totalSent,
       opened,
       clicked,
