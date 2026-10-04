@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, uploadWithProgress } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, Field, Notice, inputClass } from '@/components/ui';
+import { Button, Card, Field, Notice, SkeletonRows, inputClass } from '@/components/ui';
 
 interface Branding {
   name: string;
@@ -108,7 +108,11 @@ function Settings() {
   }
 
   if (!tenant) {
-    return <p className="text-sm text-slate-500">{error ?? 'Loading…'}</p>;
+    return error ? (
+      <p className="text-sm text-slate-500">{error}</p>
+    ) : (
+      <SkeletonRows rows={6} />
+    );
   }
 
   return (

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, EmptyState, Field, Notice, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Field, Notice, TermHelp, inputClass } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
 interface DnsRecord {
@@ -184,8 +184,8 @@ function Domains() {
       {ok && <Notice kind="ok">{ok}</Notice>}
 
       <Card
-        title="Mail gateway allow-list"
-        subtitle="Give these to your IT team. Without them your own filters quarantine the simulation."
+        title="Let our emails through"
+        subtitle="Ask your IT team to approve these addresses so simulations reach inboxes. Without this, your own filters quarantine them."
       >
         {!allowlist?.configured ? (
           <p className="text-xs text-slate-500">
@@ -293,8 +293,13 @@ function Domains() {
               <p className="text-slate-500">
                 Use the phishing-simulation / allow settings above rather than a blanket rule, so
                 only this traffic is exempted and your real protection is untouched. The sending
-                domain is fully authenticated (SPF, DKIM and DMARC), so this gateway step is all
-                that is needed for staff on Microsoft 365 or Google.
+                domain is fully authenticated (SPF, DKIM and DMARC
+                <TermHelp term="SPF, DKIM, DMARC">
+                  Email-authentication records in your DNS that prove a message really came from
+                  the domain it claims. They stop others forging your address and let inboxes trust
+                  your mail — including these simulations.
+                </TermHelp>
+                ), so this gateway step is all that is needed for staff on Microsoft 365 or Google.
               </p>
             </div>
 

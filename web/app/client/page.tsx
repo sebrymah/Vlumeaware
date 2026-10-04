@@ -553,7 +553,7 @@ function Campaigns() {
                   onChange={(e) => setScheduledSendAt(e.target.value)}
                 />
               </Field>
-              <Field label="Drip window (minutes)" hint="Spread sends randomly; 0 = all at once.">
+              <Field label="Spread sending over (minutes)" hint="Emails arrive at random times within this period. 0 sends them all at once.">
                 <input
                   className={inputClass}
                   type="number"
@@ -562,7 +562,7 @@ function Campaigns() {
                   onChange={(e) => setSendWindowMinutes(e.target.value)}
                 />
               </Field>
-              <Field label="Repeat every (days)" hint="e.g. 90 for quarterly. Blank = one-off.">
+              <Field label="Repeat every (days)" hint="For example 90 for every quarter. Leave blank to run once.">
                 <input
                   className={inputClass}
                   type="number"

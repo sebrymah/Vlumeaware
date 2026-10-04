@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 
 interface Employee {
   id: string;
@@ -34,6 +34,7 @@ export default function EmployeesPage() {
 function Employees() {
   const tenantId = useActingTenant();
   const [list, setList] = useState<Employee[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -70,6 +71,8 @@ function Employees() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoaded(true);
     }
   }, [tenantId]);
 
@@ -327,16 +330,20 @@ function Employees() {
 
       <Card title="Roster">
         <div className="max-h-[28rem] overflow-y-auto">
-          <Table head={['Name', 'Email', 'Department', '']}>
+          {loaded ? (
+            <Table head={['Name', 'Email', 'Department', '']}>
             {list.map((e) => (
               <tr key={e.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">{e.name}</td>
                 <td className="px-2 py-2 text-slate-500">{e.email}</td>
                 <td className="px-2 py-2">{e.department ?? '—'}</td>
                 <td className="px-2 py-2 text-right">
-                  <Button variant="ghost" onClick={() => remove(e.id)} disabled={busy}>
-                    Remove
-                  </Button>
+                  <ConfirmButton
+                    label="Remove"
+                    question={`Remove ${e.name}? They stop receiving simulations; past results are kept.`}
+                    onConfirm={() => remove(e.id)}
+                    disabled={busy}
+                  />
                 </td>
               </tr>
             ))}
@@ -347,7 +354,10 @@ function Employees() {
                 </td>
               </tr>
             )}
-          </Table>
+            </Table>
+          ) : (
+            <SkeletonRows rows={5} />
+          )}
         </div>
       </Card>
     </div>

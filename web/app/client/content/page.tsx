@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, uploadWithProgress } from '@/lib/api';
 import { formatDuration, readVideoDuration } from '@/lib/video-duration';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
 import { Icon } from '@/components/icons';
 
@@ -46,6 +46,7 @@ export default function ContentPage() {
 function Content() {
   const tenantId = useActingTenant();
   const [list, setList] = useState<TrainingModule[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [libraryItems, setLibraryItems] = useState<SharedModule[]>([]);
   const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +77,8 @@ function Content() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoaded(true);
     }
   }, [tenantId]);
 
@@ -119,7 +122,7 @@ function Content() {
         setUploadPct(0);
         await uploadWithProgress(`/tenants/${tenantId}/training-modules/upload`, form, setUploadPct);
       }
-      setOk('Awareness module saved. Map it to a scenario under Training routing.');
+      setOk('Awareness module saved. Map it to a scenario under Training after a click.');
       reset();
       await load();
     } catch (err) {
@@ -136,7 +139,7 @@ function Content() {
     setOk(null);
     try {
       await api.post(`/tenants/${tenantId}/training-modules/from-shared/${sharedId}`);
-      setOk('Added to your library. Map it to a scenario under Training routing.');
+      setOk('Added to your library. Map it to a scenario under Training after a click.');
       await load();
     } catch (err) {
       setError((err as Error).message);
@@ -179,7 +182,7 @@ function Content() {
         <h1 className="text-lg font-semibold text-slate-900">Awareness content</h1>
         <p className="mt-1 text-xs text-slate-500">
           Your own training videos. Upload a file, or link one already hosted on your LMS. Map a
-          module to a scenario under Training routing so a click assigns it automatically.
+          module to a scenario under Training after a click so a click assigns it automatically.
         </p>
       </div>
 
@@ -280,7 +283,7 @@ function Content() {
 
       <Card
         title="Vlumetech shared library"
-        subtitle="Curated awareness videos. Add any to your library, then map it under Training routing."
+        subtitle="Curated awareness videos. Add any to your library, then map it under Training after a click."
       >
         <Table head={['Title', 'Category', 'Duration', '']}>
           {libraryItems.map((m) => {
@@ -319,7 +322,8 @@ function Content() {
       </Card>
 
       <Card title="Your modules" subtitle="Attach a quiz to each video — employees take it after watching.">
-        <Table head={['Title', 'Source', 'Quiz', 'Added', '']}>
+        {loaded ? (
+          <Table head={['Title', 'Source', 'Quiz', 'Added', '']}>
           {list.map((m) => {
             const current = quizzes.find((q) => q.module?.id === m.id);
             return (
@@ -355,9 +359,12 @@ function Content() {
                 <td className="px-2 py-2">
                   <div className="flex items-center justify-end gap-2">
                     <VideoPreviewButton url={m.videoUrl} title={m.title} />
-                    <Button variant="ghost" onClick={() => remove(m.id)} disabled={busy}>
-                      Delete
-                    </Button>
+                    <ConfirmButton
+                      label="Delete"
+                      question={`Delete “${m.title}”? Routing rules that use it stop assigning it.`}
+                      onConfirm={() => remove(m.id)}
+                      disabled={busy}
+                    />
                   </div>
                 </td>
               </tr>
@@ -370,7 +377,10 @@ function Content() {
               </td>
             </tr>
           )}
-        </Table>
+          </Table>
+        ) : (
+          <SkeletonRows rows={5} />
+        )}
       </Card>
     </div>
   );

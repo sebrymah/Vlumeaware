@@ -126,7 +126,7 @@ function Routing() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900">Training routing</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Training after a click</h1>
         <p className="mt-1 text-xs text-slate-500">
           One rule per scenario. An employee who clicks is assigned the mapped module
           automatically — there is no per-employee routing to do.

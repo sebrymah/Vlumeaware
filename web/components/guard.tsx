@@ -3,7 +3,7 @@
 import { useRouter, usePathname } from 'next/navigation';
 import { LogoMark } from '@/components/logo';
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { clearSession, homeFor, loginPathFor, loginPathForAllowed, readSession, type Role, type Session } from '@/lib/session';
 import { TrialBanner } from '@/components/trial-banner';
 import { Icon } from '@/components/icons';
@@ -42,7 +42,7 @@ const NAV: Record<Role, NavEntry[]> = {
       items: [
         { href: '/client/content', label: 'Awareness content' },
         { href: '/client/quizzes', label: 'Quizzes' },
-        { href: '/client/routing', label: 'Training routing' },
+        { href: '/client/routing', label: 'Training after a click' },
       ],
     },
     {
@@ -62,7 +62,7 @@ const NAV: Record<Role, NavEntry[]> = {
       icon: 'chart',
       items: [
         { href: '/client/certificates', label: 'Certificates' },
-        { href: '/client/reported', label: 'Reported' },
+        { href: '/client/reported', label: 'Phish reports' },
       ],
     },
     { kind: 'link', href: '/client/settings', label: 'Branding', icon: 'sparkles' },
@@ -74,65 +74,126 @@ const NAV: Record<Role, NavEntry[]> = {
     { kind: 'link', href: '/dashboard', label: 'Reporting', icon: 'chart' },
     { kind: 'link', href: '/client/risk', label: 'Risk', icon: 'shield' },
     { kind: 'link', href: '/client/certificates', label: 'Certificates', icon: 'award' },
-    { kind: 'link', href: '/client/reported', label: 'Reported', icon: 'flag' },
+    { kind: 'link', href: '/client/reported', label: 'Phish reports', icon: 'flag' },
   ],
 };
 
-function NavBar({ role, pathname }: { role: Role; pathname: string | null }) {
-  const isActive = (href: string) =>
+function useIsActive(pathname: string | null) {
+  return (href: string) =>
     href === '/client' || href === '/super-admin' || href === '/dashboard'
       ? pathname === href
       : !!pathname && pathname.startsWith(href);
+}
+
+const TOP_ITEM =
+  'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500';
+const ON = 'bg-brand-50 text-brand-700';
+const OFF = 'text-slate-600 hover:bg-slate-100 hover:text-slate-900';
+
+/**
+ * Desktop nav. Groups open on click or Enter/Space (not hover), close on
+ * Escape, outside click, or choosing a page, and expose aria-expanded so touch
+ * and keyboard users can reach every page.
+ */
+function NavBar({ role, pathname }: { role: Role; pathname: string | null }) {
+  const isActive = useIsActive(pathname);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement>(null);
+
+  useEffect(() => setOpenGroup(null), [pathname]);
+
+  useEffect(() => {
+    if (!openGroup) return;
+    const onDown = (e: MouseEvent) => {
+      if (!navRef.current?.contains(e.target as Node)) setOpenGroup(null);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpenGroup(null);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [openGroup]);
 
   return (
-    <nav className="flex items-center gap-1">
+    <nav ref={navRef} aria-label="Main" className="flex items-center gap-1">
       {NAV[role].map((entry) =>
         entry.kind === 'link' ? (
           <Link
             key={entry.href}
             href={entry.href}
-            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition ${
-              isActive(entry.href)
-                ? 'bg-brand-50 text-brand-700'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
+            aria-current={isActive(entry.href) ? 'page' : undefined}
+            className={`${TOP_ITEM} ${isActive(entry.href) ? ON : OFF}`}
           >
             <Icon name={entry.icon} className="h-4 w-4" />
             {entry.label}
           </Link>
         ) : (
-          <div key={entry.label} className="group relative">
+          <div key={entry.label} className="relative">
             <button
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-medium transition ${
-                entry.items.some((i) => isActive(i.href))
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-              }`}
+              type="button"
+              aria-expanded={openGroup === entry.label}
+              aria-haspopup="true"
+              onClick={() => setOpenGroup((g) => (g === entry.label ? null : entry.label))}
+              className={`${TOP_ITEM} ${entry.items.some((i) => isActive(i.href)) ? ON : OFF}`}
             >
               <Icon name={entry.icon} className="h-4 w-4" />
               {entry.label}
-              <Icon name="chevron" className="h-3 w-3 opacity-60" />
+              <Icon
+                name="chevron"
+                className={`h-3 w-3 opacity-60 transition ${openGroup === entry.label ? 'rotate-180' : ''}`}
+              />
             </button>
-            <div className="invisible absolute left-0 top-full z-30 min-w-[190px] pt-1.5 opacity-0 transition group-hover:visible group-hover:opacity-100">
-              <div className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-pop">
-                {entry.items.map((item) => (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`block rounded-lg px-3 py-2 text-[13px] transition ${
-                      isActive(item.href)
-                        ? 'bg-brand-50 font-medium text-brand-700'
-                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                ))}
+            {openGroup === entry.label && (
+              <div className="absolute left-0 top-full z-30 min-w-[190px] pt-1.5">
+                <div className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-pop">
+                  {entry.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={isActive(item.href) ? 'page' : undefined}
+                      className={`block rounded-lg px-3 py-2 text-[13px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500 ${
+                        isActive(item.href)
+                          ? 'bg-brand-50 font-medium text-brand-700'
+                          : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                      }`}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ),
       )}
+    </nav>
+  );
+}
+
+/**
+ * Phone nav. Hover menus cannot work on touch, so every page is shown as one
+ * flat, horizontally scrolling row of links. Phase 2 replaces this with a
+ * bottom tab bar.
+ */
+function MobileNav({ role, pathname }: { role: Role; pathname: string | null }) {
+  const isActive = useIsActive(pathname);
+  const links = NAV[role].flatMap((e) =>
+    e.kind === 'link' ? [{ href: e.href, label: e.label }] : e.items,
+  );
+  return (
+    <nav aria-label="Main" className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-1">
+      {links.map((l) => (
+        <Link
+          key={l.href}
+          href={l.href}
+          aria-current={isActive(l.href) ? 'page' : undefined}
+          className={`${TOP_ITEM} shrink-0 whitespace-nowrap ${isActive(l.href) ? ON : OFF}`}
+        >
+          {l.label}
+        </Link>
+      ))}
     </nav>
   );
 }
@@ -161,7 +222,7 @@ export function Guard({ allow, children }: { allow: Role[]; children: ReactNode 
   }, [allow, router]);
 
   if (session === undefined) {
-    return <div className="grid min-h-screen place-items-center text-sm text-slate-400">Loading…</div>;
+    return <div role="status" aria-live="polite" className="grid min-h-screen place-items-center text-sm text-slate-500">Loading…</div>;
   }
   if (session === null) return null;
 
@@ -195,7 +256,7 @@ export function Guard({ allow, children }: { allow: Role[]; children: ReactNode 
         </div>
         {/* mobile nav */}
         <div className="border-t border-slate-100 px-4 py-2 md:hidden">
-          <NavBar role={session.role} pathname={pathname} />
+          <MobileNav role={session.role} pathname={pathname} />
         </div>
       </header>
       {session.role !== 'vlumetech_superadmin' && <TrialBanner />}

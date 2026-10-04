@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, EmptyState, Field, Notice, inputClass } from '@/components/ui';
+import { Button, Card, ConfirmButton, EmptyState, Field, Notice, TermHelp, inputClass } from '@/components/ui';
 
 interface DnsRecord {
   record?: string;
@@ -265,9 +265,13 @@ function SendingDomains() {
                   <span className="text-[11px] text-slate-400">Verified by Vlumeaware · no DNS to publish</span>
                   <div className="ml-auto flex gap-2">
                     {s.enabled && s.id ? (
-                      <Button variant="ghost" onClick={() => remove(s.id!)} disabled={busy === s.id}>
-                        {busy === s.id ? 'Turning off…' : 'Turn off'}
-                      </Button>
+                      <ConfirmButton
+                        label={busy === s.id ? 'Turning off…' : 'Turn off'}
+                        confirmLabel="Turn off"
+                        question={`Turn off ${s.domain}? Campaigns can no longer send from it.`}
+                        onConfirm={() => remove(s.id!)}
+                        disabled={busy === s.id}
+                      />
                     ) : (
                       <Button onClick={() => enableShared(s.domain)} disabled={busy === `shared:${s.domain}`}>
                         {busy === `shared:${s.domain}` ? 'Enabling…' : 'Use this domain'}
@@ -337,18 +341,26 @@ function SendingDomains() {
                         {busy === d.id ? 'Checking…' : 'Check verification'}
                       </Button>
                     )}
-                    <Button variant="ghost" onClick={() => remove(d.id)} disabled={busy === d.id}>
-                      Remove
-                    </Button>
+                    <ConfirmButton
+                      label="Remove"
+                      question={`Remove ${d.domain}? Campaigns can no longer send from it.`}
+                      onConfirm={() => remove(d.id)}
+                      disabled={busy === d.id}
+                    />
                   </div>
                 </div>
 
                 {d.status !== 'verified' && d.dnsRecords && d.dnsRecords.length > 0 && (
                   <div className="mt-3 space-y-3">
                     <p className="text-xs leading-relaxed text-slate-600">
-                      Add these to your DNS, then click <strong>Check verification</strong>. It can
-                      take a while for DNS to propagate — the page also re-checks whenever you open
-                      it.
+                      Add these to your DNS
+                      <TermHelp term="DNS records">
+                        DNS records are settings at your domain provider (where the domain was
+                        registered). Publishing these proves you own the domain, so mail sent from
+                        it is trusted instead of treated as spam.
+                      </TermHelp>
+                      , then click <strong>Check verification</strong>. It can take a while for DNS
+                      to propagate — the page also re-checks whenever you open it.
                     </p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-[12px]">
