@@ -288,6 +288,8 @@ model Campaign {
   landingPage       CustomLandingPage? @relation(fields: [landingPageId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
+  // The scheduler tick filters every tenant's campaigns by status + due time.
+  @@index([status, scheduledSendAt])
   @@map("campaigns")
 }
 
@@ -348,7 +350,11 @@ model Send {
 
   @@unique([campaignId, employeeId, scenarioId])
   @@index([tenantId])
-  @@index([campaignId])
+  // (campaignId, sentAt) covers campaignId-only lookups and the report-metrics
+  // filter on a campaign's sent rows; employeeId powers risk scoring and the
+  // learner portal/training lookups (Postgres does not auto-index FKs).
+  @@index([campaignId, sentAt])
+  @@index([employeeId])
   @@map("sends")
 }
 
