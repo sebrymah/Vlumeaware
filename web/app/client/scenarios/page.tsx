@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, Field, Notice, Table, inputClass } from '@/components/ui';
 import { RichEditor } from '@/components/rich-editor';
 
 interface Scenario {
@@ -337,9 +337,12 @@ function Scenarios() {
                   <Button variant="ghost" onClick={() => startEdit(s)} disabled={busy}>
                     Edit
                   </Button>
-                  <Button variant="ghost" onClick={() => remove(s)} disabled={busy}>
-                    Delete
-                  </Button>
+                  <ConfirmButton
+                    label="Delete"
+                    question={`Delete “${s.title}”? Campaigns already sent keep their results.`}
+                    onConfirm={() => remove(s)}
+                    disabled={busy}
+                  />
                 </div>
               </td>
             </tr>

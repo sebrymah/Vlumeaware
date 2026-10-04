@@ -45,7 +45,7 @@ function Reported() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-lg font-semibold text-slate-900">Reported emails</h1>
+        <h1 className="text-lg font-semibold text-slate-900">Phish reports</h1>
         <p className="mt-1 text-xs text-slate-500">
           Real emails your staff forwarded to the monitored report-a-phish address. A report matched
           to one of our simulations is tagged, so genuine threats stand out from training traffic.

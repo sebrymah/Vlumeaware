@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export function Card({
   title,
@@ -200,3 +200,104 @@ export function EmptyState({
 }
 
 export const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+
+/**
+ * Two-step destructive action. The first click swaps the button for an inline
+ * question that names the item and says what happens next; only the second
+ * click runs `onConfirm`. Escape or Cancel backs out. Replaces both bare
+ * delete buttons and the browser's native confirm dialog.
+ */
+export function ConfirmButton({
+  label,
+  confirmLabel,
+  question,
+  onConfirm,
+  disabled,
+}: {
+  label: string;
+  confirmLabel?: string;
+  question: string;
+  onConfirm: () => void;
+  disabled?: boolean;
+}) {
+  const [asking, setAsking] = useState(false);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (asking) confirmRef.current?.focus();
+  }, [asking]);
+
+  if (!asking) {
+    return (
+      <Button variant="ghost" onClick={() => setAsking(true)} disabled={disabled}>
+        {label}
+      </Button>
+    );
+  }
+  return (
+    <span
+      role="group"
+      aria-label={question}
+      onKeyDown={(e) => e.key === 'Escape' && setAsking(false)}
+      className="inline-flex flex-wrap items-center justify-end gap-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5"
+    >
+      <span className="text-xs font-medium text-red-700">{question}</span>
+      <button
+        ref={confirmRef}
+        type="button"
+        onClick={() => {
+          setAsking(false);
+          onConfirm();
+        }}
+        className="rounded-md bg-red-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+      >
+        {confirmLabel ?? label}
+      </button>
+      <button
+        type="button"
+        onClick={() => setAsking(false)}
+        className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-400"
+      >
+        Cancel
+      </button>
+    </span>
+  );
+}
+
+/** Grey placeholder rows shown while a list loads, instead of bare "Loading…". */
+export function SkeletonRows({ rows = 4 }: { rows?: number }) {
+  return (
+    <div role="status" aria-live="polite" aria-label="Loading" className="animate-pulse space-y-3 py-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="h-8 rounded-lg bg-slate-100" style={{ opacity: 1 - i * 0.15 }} />
+      ))}
+      <span className="sr-only">Loading</span>
+    </div>
+  );
+}
+
+/**
+ * "What's this?" disclosure for a technical term. Works by click, tap and
+ * keyboard, unlike a hover tooltip.
+ */
+export function TermHelp({ term, children }: { term: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span className="inline-block align-baseline">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="ml-1 rounded-full border border-slate-300 px-1.5 text-[10px] font-semibold text-slate-500 hover:bg-slate-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-500"
+      >
+        <span className="sr-only">What is {term}?</span>
+        <span aria-hidden="true">?</span>
+      </button>
+      {open && (
+        <span className="mt-1 block max-w-sm rounded-lg bg-slate-50 px-3 py-2 text-xs font-normal normal-case leading-relaxed text-slate-600 ring-1 ring-slate-200">
+          {children}
+        </span>
+      )}
+    </span>
+  );
+}

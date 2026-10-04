@@ -184,8 +184,8 @@ function Domains() {
       {ok && <Notice kind="ok">{ok}</Notice>}
 
       <Card
-        title="Mail gateway allow-list"
-        subtitle="Give these to your IT team. Without them your own filters quarantine the simulation."
+        title="Let our emails through"
+        subtitle="Ask your IT team to approve these addresses so simulations reach inboxes. Without this, your own filters quarantine them."
       >
         {!allowlist?.configured ? (
           <p className="text-xs text-slate-500">

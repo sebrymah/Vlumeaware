@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Button, Card, ConfirmButton, Field, Notice, Table, inputClass } from '@/components/ui';
 
 interface Employee {
   id: string;
@@ -334,9 +334,12 @@ function Employees() {
                 <td className="px-2 py-2 text-slate-500">{e.email}</td>
                 <td className="px-2 py-2">{e.department ?? '—'}</td>
                 <td className="px-2 py-2 text-right">
-                  <Button variant="ghost" onClick={() => remove(e.id)} disabled={busy}>
-                    Remove
-                  </Button>
+                  <ConfirmButton
+                    label="Remove"
+                    question={`Remove ${e.name}? They stop receiving simulations; past results are kept.`}
+                    onConfirm={() => remove(e.id)}
+                    disabled={busy}
+                  />
                 </td>
               </tr>
             ))}

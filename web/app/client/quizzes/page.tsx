@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, Field, Notice, Table, inputClass } from '@/components/ui';
 
 interface TrainingModule { id: string; title: string }
 interface Campaign { id: string; name: string }
@@ -282,9 +282,12 @@ function Quizzes() {
                   <Button variant="ghost" onClick={() => viewResults(q)}>
                     Results
                   </Button>
-                  <Button variant="ghost" onClick={() => remove(q.id)} disabled={busy}>
-                    Delete
-                  </Button>
+                  <ConfirmButton
+                    label="Delete"
+                    question="Delete this quiz and its results?"
+                    onConfirm={() => remove(q.id)}
+                    disabled={busy}
+                  />
                 </div>
               </td>
             </tr>
