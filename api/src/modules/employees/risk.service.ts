@@ -37,8 +37,44 @@ export class RiskService {
     const employees = await this.prisma.db.employee.findMany({
       select: { id: true, name: true, email: true, department: true },
     });
+    if (employees.length === 0) return [];
 
-    const rows = await Promise.all(employees.map((e) => this.scoreOne(e)));
+    // Three grouped queries per tenant replace five counts per employee.
+    // `_count` on a nullable column counts its non-null rows per group, so one
+    // groupBy yields sends/clicks/reports; credential submissions and quiz
+    // passes are boolean filters, so each needs its own grouped count. All three
+    // run inside the tenant scope, like the per-employee counts they replace.
+    const [sendAgg, credAgg, quizAgg] = await Promise.all([
+      this.prisma.db.send.groupBy({
+        by: ['employeeId'],
+        _count: { sentAt: true, clickedAt: true, reportedAt: true },
+      }),
+      this.prisma.db.send.groupBy({
+        by: ['employeeId'],
+        where: { credentialsSubmitted: true },
+        _count: { _all: true },
+      }),
+      this.prisma.db.quizAttempt.groupBy({
+        by: ['employeeId'],
+        where: { passed: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const sendMap = new Map(sendAgg.map((r) => [r.employeeId, r._count]));
+    const credMap = new Map(credAgg.map((r) => [r.employeeId, r._count._all]));
+    const quizMap = new Map(quizAgg.map((r) => [r.employeeId, r._count._all]));
+
+    const rows = employees.map((e) => {
+      const s = sendMap.get(e.id);
+      return this.assemble(e, {
+        sends: s?.sentAt ?? 0,
+        clicks: s?.clickedAt ?? 0,
+        reports: s?.reportedAt ?? 0,
+        creds: credMap.get(e.id) ?? 0,
+        quizPasses: quizMap.get(e.id) ?? 0,
+      });
+    });
     return rows.sort((a, b) => b.riskScore - a.riskScore);
   }
 
@@ -55,13 +91,22 @@ export class RiskService {
       this.prisma.db.send.count({ where: { employeeId: employee.id, credentialsSubmitted: true } }),
       this.prisma.db.quizAttempt.count({ where: { employeeId: employee.id, passed: true } }),
     ]);
+    return this.assemble(employee, { sends, clicks, reports, creds, quizPasses });
+  }
 
+  /**
+   * The scoring math, shared by scoreOne and scoreAll so both return identical
+   * rows for the same counts. Clicks and especially credential submissions
+   * raise risk; reports and quiz passes lower it. Clamped to 0..100, with every
+   * term captured in `breakdown` so the client sees exactly how it formed.
+   */
+  private assemble(
+    employee: { id: string; name: string; email: string; department: string | null },
+    counts: { sends: number; clicks: number; reports: number; creds: number; quizPasses: number },
+  ): EmployeeRisk {
+    const { sends, clicks, reports, creds, quizPasses } = counts;
     const clickRate = sends ? clicks / sends : 0;
     const reportRate = sends ? reports / sends : 0;
-
-    // Weighted score. Clicks and especially credential submissions raise risk;
-    // reports and quiz passes lower it. Clamped to 0..100. Every term is also
-    // captured in `breakdown` so the client sees exactly how the number formed.
     const submitRate = sends ? creds / sends : 0;
     const parts = {
       click: clickRate * 60,
