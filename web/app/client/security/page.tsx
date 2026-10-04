@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 import { readSession } from '@/lib/session';
 
 interface SecurityUser {
@@ -155,7 +155,7 @@ function Security() {
     void startMfa();
   }, [security, me, startMfa]);
 
-  if (!security) return <p className="text-sm text-slate-500">{error ?? 'Loading…'}</p>;
+  if (!security) return error ? <p className="text-sm text-slate-500">{error}</p> : <SkeletonRows rows={6} />;
 
   const myMfa = security.users.find((u) => u.email === me)?.mfaEnabled ?? false;
   const hours = Math.round((Number(timeout) / 60) * 10) / 10;

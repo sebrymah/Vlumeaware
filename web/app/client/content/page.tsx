@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, uploadWithProgress } from '@/lib/api';
 import { formatDuration, readVideoDuration } from '@/lib/video-duration';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
 import { Icon } from '@/components/icons';
 
@@ -46,6 +46,7 @@ export default function ContentPage() {
 function Content() {
   const tenantId = useActingTenant();
   const [list, setList] = useState<TrainingModule[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [libraryItems, setLibraryItems] = useState<SharedModule[]>([]);
   const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +77,8 @@ function Content() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoaded(true);
     }
   }, [tenantId]);
 
@@ -319,7 +322,8 @@ function Content() {
       </Card>
 
       <Card title="Your modules" subtitle="Attach a quiz to each video — employees take it after watching.">
-        <Table head={['Title', 'Source', 'Quiz', 'Added', '']}>
+        {loaded ? (
+          <Table head={['Title', 'Source', 'Quiz', 'Added', '']}>
           {list.map((m) => {
             const current = quizzes.find((q) => q.module?.id === m.id);
             return (
@@ -373,7 +377,10 @@ function Content() {
               </td>
             </tr>
           )}
-        </Table>
+          </Table>
+        ) : (
+          <SkeletonRows rows={5} />
+        )}
       </Card>
     </div>
   );
