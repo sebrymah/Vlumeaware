@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, ConfirmButton, EmptyState, Field, Notice, inputClass } from '@/components/ui';
+import { Button, Card, ConfirmButton, EmptyState, Field, Notice, TermHelp, inputClass } from '@/components/ui';
 
 interface DnsRecord {
   record?: string;
@@ -353,9 +353,14 @@ function SendingDomains() {
                 {d.status !== 'verified' && d.dnsRecords && d.dnsRecords.length > 0 && (
                   <div className="mt-3 space-y-3">
                     <p className="text-xs leading-relaxed text-slate-600">
-                      Add these to your DNS, then click <strong>Check verification</strong>. It can
-                      take a while for DNS to propagate — the page also re-checks whenever you open
-                      it.
+                      Add these to your DNS
+                      <TermHelp term="DNS records">
+                        DNS records are settings at your domain provider (where the domain was
+                        registered). Publishing these proves you own the domain, so mail sent from
+                        it is trusted instead of treated as spam.
+                      </TermHelp>
+                      , then click <strong>Check verification</strong>. It can take a while for DNS
+                      to propagate — the page also re-checks whenever you open it.
                     </p>
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-[12px]">

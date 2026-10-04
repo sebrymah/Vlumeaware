@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 
 interface TrainingModule { id: string; title: string }
 interface Campaign { id: string; name: string }
@@ -50,6 +50,7 @@ export default function QuizzesPage() {
 function Quizzes() {
   const tenantId = useActingTenant();
   const [quizzes, setQuizzes] = useState<QuizListItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [modules, setModules] = useState<TrainingModule[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +91,8 @@ function Quizzes() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoaded(true);
     }
   }, [tenantId]);
 
@@ -249,7 +252,8 @@ function Quizzes() {
       {ok && <Notice kind="ok">{ok}</Notice>}
 
       <Card title="Your quizzes">
-        <Table head={['Title', 'Attached to', 'Questions', 'Attempts', 'Pass mark', '']}>
+        {loaded ? (
+          <Table head={['Title', 'Attached to', 'Questions', 'Attempts', 'Pass mark', '']}>
           {quizzes.map((q) => (
             <tr key={q.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{q.title}</td>
@@ -299,7 +303,10 @@ function Quizzes() {
               </td>
             </tr>
           )}
-        </Table>
+          </Table>
+        ) : (
+          <SkeletonRows rows={5} />
+        )}
       </Card>
 
       {results && (

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 import { RichEditor } from '@/components/rich-editor';
 
 interface Scenario {
@@ -37,6 +37,7 @@ export default function ScenariosPage() {
 function Scenarios() {
   const tenantId = useActingTenant();
   const [list, setList] = useState<Scenario[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,6 +112,8 @@ function Scenarios() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoaded(true);
     }
   }, [tenantId]);
 
@@ -323,7 +326,8 @@ function Scenarios() {
       )}
 
       <Card title="Saved scenarios">
-        <Table head={['Title', 'Tier', 'Subject', 'Source', '']}>
+        {loaded ? (
+          <Table head={['Title', 'Tier', 'Subject', 'Source', '']}>
           {list.map((s) => (
             <tr key={s.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{s.title}</td>
@@ -354,7 +358,10 @@ function Scenarios() {
               </td>
             </tr>
           )}
-        </Table>
+          </Table>
+        ) : (
+          <SkeletonRows rows={5} />
+        )}
       </Card>
     </div>
   );
