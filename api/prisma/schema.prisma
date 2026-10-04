@@ -331,6 +331,10 @@ model Send {
   employeeId           String    @map("employee_id") @db.Uuid
   scenarioId           String    @map("scenario_id") @db.Uuid
   uniqueTrackingToken  String    @unique @map("unique_tracking_token")
+  /// Set by the worker when it claims a row to mail it, before sentAt. Lets a
+  /// retry after a mid-send crash tell "being sent" from "unsent", so one
+  /// recipient is not mailed twice (B5). A stale claim is re-claimable.
+  sendingAt            DateTime? @map("sending_at")
   sentAt               DateTime? @map("sent_at")
   openedAt             DateTime? @map("opened_at")
   clickedAt            DateTime? @map("clicked_at")

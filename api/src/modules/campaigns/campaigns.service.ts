@@ -420,17 +420,27 @@ export class CampaignsService {
       select: { id: true },
     });
 
+    // B8: removing queued jobs is housekeeping — the status flip above is what
+    // actually halts sending (the worker re-checks status before every email).
+    // So drain in parallel chunks instead of one Redis round trip per job, which
+    // was thousands of sequential calls on a large campaign.
+    const CHUNK = 100;
     let removedJobs = 0;
-    for (const send of unsent) {
-      const job = await this.sendQueue.getJob(`send-${send.id}`);
-      if (job) {
-        try {
-          await job.remove();
-          removedJobs += 1;
-        } catch {
-          // Already running: the status check in the processor stops it.
-        }
-      }
+    for (let i = 0; i < unsent.length; i += CHUNK) {
+      const results = await Promise.all(
+        unsent.slice(i, i + CHUNK).map(async (send) => {
+          const job = await this.sendQueue.getJob(`send-${send.id}`);
+          if (!job) return 0;
+          try {
+            await job.remove();
+            return 1;
+          } catch {
+            // Already running: the status check in the processor stops it.
+            return 0;
+          }
+        }),
+      );
+      removedJobs += results.reduce<number>((sum, n) => sum + n, 0);
     }
 
     return { campaignId, status: 'killed', removedJobs, unsentRemaining: unsent.length };
