@@ -1,0 +1,142 @@
+'use client';
+
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+
+/**
+ * Standalone, read-only preview of the built-in landing-page designs, shown in
+ * the campaign builder so an admin can see each template before choosing it.
+ * It renders sample chrome with an inert sign-in form and placeholder branding
+ * — it is deliberately separate from the real simulated-login page (/t/[token]/
+ * login) so previewing can never affect the live capture path.
+ */
+function SampleForm({ accent, emailLabel = 'Email' }: { accent: string; emailLabel?: string }) {
+  return (
+    <div className="mt-4 space-y-3 text-left">
+      <input
+        disabled
+        className="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-500"
+        placeholder={emailLabel}
+      />
+      <input
+        disabled
+        type="password"
+        className="w-full rounded border border-slate-300 px-3 py-2 text-sm text-slate-500"
+        placeholder="Password"
+      />
+      <button
+        disabled
+        className="w-full rounded px-3 py-2 text-sm font-medium text-white"
+        style={{ background: accent }}
+      >
+        Sign in
+      </button>
+      <p className="text-center text-[10px] text-slate-400">
+        Preview only — the real page captures no password, just whether someone submitted.
+      </p>
+    </div>
+  );
+}
+
+function Shell({ background, children }: { background: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center px-6 py-10" style={{ background }}>
+      {children}
+    </div>
+  );
+}
+
+function MicrosoftMark() {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="grid grid-cols-2 gap-[2px]">
+        <span className="h-[9px] w-[9px] bg-[#f25022]" />
+        <span className="h-[9px] w-[9px] bg-[#7fba00]" />
+        <span className="h-[9px] w-[9px] bg-[#00a4ef]" />
+        <span className="h-[9px] w-[9px] bg-[#ffb900]" />
+      </div>
+      <span className="text-[15px] font-semibold text-[#5e5e5e]">Microsoft</span>
+    </div>
+  );
+}
+
+function GoogleMark() {
+  return (
+    <svg className="mx-auto h-[48px] w-[48px]" viewBox="0 0 48 48" aria-hidden>
+      <path fill="#4285F4" d="M45 24c0-1.6-.1-2.8-.4-4H24v7.6h12c-.2 1.9-1.5 4.8-4.3 6.7l6.6 5.1C42.2 36 45 30.6 45 24z" />
+      <path fill="#34A853" d="M24 46c5.9 0 10.8-1.9 14.4-5.3l-6.6-5.1c-1.8 1.2-4.2 2-7.8 2-6 0-11-4-12.8-9.5l-6.8 5.3C7.9 40.9 15.3 46 24 46z" />
+      <path fill="#FBBC05" d="M11.2 28.1c-.5-1.4-.7-2.8-.7-4.1s.2-2.7.7-4.1l-6.8-5.3C3 17.4 2.3 20.6 2.3 24s.7 6.6 2.1 9.4l6.8-5.3z" />
+      <path fill="#EA4335" d="M24 10.5c3.4 0 5.6 1.5 6.9 2.7l5.8-5.7C33.2 4.1 28.9 2 24 2 15.3 2 7.9 7.1 4.4 14.6l6.8 5.3C13 14.5 18 10.5 24 10.5z" />
+    </svg>
+  );
+}
+
+function Preview() {
+  const sp = useSearchParams();
+  const template = sp.get('template') || 'generic';
+  const name = sp.get('name') || 'Your organisation';
+  const accent = sp.get('color') || '#1F6F43';
+
+  if (template === 'microsoft') {
+    return (
+      <Shell background="#f2f2f2">
+        <div className="w-full max-w-[440px] bg-white px-11 py-11 shadow-[0_2px_6px_rgba(0,0,0,0.2)]">
+          <MicrosoftMark />
+          <h1 className="mt-4 text-[24px] font-semibold text-[#1b1b1b]">Sign in</h1>
+          <p className="mt-1 text-sm text-[#1b1b1b]">to continue to {name}</p>
+          <SampleForm accent="#0067b8" emailLabel="Email, phone, or Skype" />
+          <p className="mt-6 text-xs text-[#666]">Use your work or school account.</p>
+        </div>
+      </Shell>
+    );
+  }
+
+  if (template === 'google') {
+    return (
+      <Shell background="#ffffff">
+        <div className="w-full max-w-[448px] rounded-[28px] border border-[#dadce0] px-10 py-10 text-center">
+          <GoogleMark />
+          <h1 className="mt-3 text-[24px] font-normal text-[#202124]">Sign in</h1>
+          <p className="mt-1 text-[16px] text-[#202124]">to continue to {name}</p>
+          <SampleForm accent="#1a73e8" emailLabel="Email or phone" />
+        </div>
+      </Shell>
+    );
+  }
+
+  if (template === 'okta') {
+    return (
+      <Shell background="#f9f9f9">
+        <div className="w-full max-w-[400px] rounded-md border border-[#e1e1e1] bg-white px-8 py-9 text-center shadow-sm">
+          <div className="text-lg font-semibold text-[#00297a]">{name}</div>
+          <h1 className="mt-5 text-[20px] font-normal text-[#5e5e5e]">Sign In</h1>
+          <SampleForm accent="#00297a" emailLabel="Username" />
+        </div>
+      </Shell>
+    );
+  }
+
+  // generic — the tenant's own brand
+  return (
+    <Shell background="#f1f5f4">
+      <div className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-sm">
+        <div className="flex items-center justify-center px-6 py-6" style={{ background: accent }}>
+          <span className="text-base font-semibold text-white">{name}</span>
+        </div>
+        <div className="px-6 py-7">
+          <h1 className="text-base font-semibold text-slate-900">Sign in to continue</h1>
+          <p className="mt-1 text-xs text-slate-500">{name} single sign-on</p>
+          <SampleForm accent={accent} />
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+export default function LandingPreviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <Preview />
+    </Suspense>
+  );
+}

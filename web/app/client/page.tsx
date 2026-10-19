@@ -67,6 +67,7 @@ function Campaigns() {
   const [landingHtml, setLandingHtml] = useState('');
   const [landingPageName, setLandingPageName] = useState('');
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
@@ -542,6 +543,18 @@ function Campaigns() {
                 </optgroup>
               </select>
 
+              {['generic', 'microsoft', 'google', 'okta'].includes(landingTemplate) && (
+                <div className="mt-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setPreviewSrc(`/landing-preview?template=${encodeURIComponent(landingTemplate)}`)}
+                  >
+                    Preview this design
+                  </Button>
+                </div>
+              )}
+
               {landingTemplate === 'custom' && (
                 <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
                   <input
@@ -619,8 +632,15 @@ function Campaigns() {
         )}
       </Card>
 
-      {previewHtml !== null && (
-        <LandingPreview html={previewHtml} onClose={() => setPreviewHtml(null)} />
+      {(previewHtml !== null || previewSrc !== null) && (
+        <LandingPreview
+          html={previewHtml}
+          src={previewSrc}
+          onClose={() => {
+            setPreviewHtml(null);
+            setPreviewSrc(null);
+          }}
+        />
       )}
     </div>
   );
@@ -631,11 +651,20 @@ function Campaigns() {
  * HTML with a (non-functional) copy of the metadata-only sign-in form injected
  * at the {{LOGIN_FORM}} marker. This is a preview only — the form does nothing.
  */
-function LandingPreview({ html, onClose }: { html: string; onClose: () => void }) {
+function LandingPreview({
+  html,
+  src,
+  onClose,
+}: {
+  html?: string | null;
+  src?: string | null;
+  onClose: () => void;
+}) {
   const marker = '{{LOGIN_FORM}}';
-  const idx = html.indexOf(marker);
-  const before = idx >= 0 ? html.slice(0, idx) : html;
-  const after = idx >= 0 ? html.slice(idx + marker.length) : '';
+  const safe = html ?? '';
+  const idx = safe.indexOf(marker);
+  const before = idx >= 0 ? safe.slice(0, idx) : safe;
+  const after = idx >= 0 ? safe.slice(idx + marker.length) : '';
   const mockForm = (
     <div className="mx-auto w-full max-w-sm px-6 py-6">
       <div className="space-y-3">
@@ -665,9 +694,15 @@ function LandingPreview({ html, onClose }: { html: string; onClose: () => void }
           </Button>
         </div>
         <div className="overflow-auto bg-white">
-          {before && <div dangerouslySetInnerHTML={{ __html: before }} />}
-          {mockForm}
-          {after && <div dangerouslySetInnerHTML={{ __html: after }} />}
+          {src ? (
+            <iframe src={src} title="Landing page preview" className="h-[80vh] w-full border-0" />
+          ) : (
+            <>
+              {before && <div dangerouslySetInnerHTML={{ __html: before }} />}
+              {mockForm}
+              {after && <div dangerouslySetInnerHTML={{ __html: after }} />}
+            </>
+          )}
         </div>
       </div>
     </div>
