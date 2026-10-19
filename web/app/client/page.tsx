@@ -7,6 +7,7 @@ import { Guard, useActingTenant } from '@/components/guard';
 import { ReadinessChecklist } from '@/components/readiness';
 import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
 import { LandingDesign } from '@/components/landing-design';
+import { LANDING_LIBRARY } from '@/components/landing-library';
 
 interface Scenario {
   id: string;
@@ -161,6 +162,10 @@ function Campaigns() {
   // built-in template, an already-saved custom page, or HTML to build one now.
   function landingPayload(): Record<string, unknown> {
     if (landingTemplate.startsWith('page:')) return { landingPageId: landingTemplate.slice(5) };
+    if (landingTemplate.startsWith('lib:')) {
+      const design = LANDING_LIBRARY.find((d) => d.id === landingTemplate.slice(4));
+      return design ? { landingHtml: design.html, landingPageName: design.name } : { landingTemplate: 'generic' };
+    }
     if (landingTemplate === 'custom') {
       return { landingHtml: landingHtml.trim() || undefined, landingPageName: landingPageName.trim() || undefined };
     }
@@ -530,6 +535,13 @@ function Campaigns() {
                   <option value="google">Google Workspace sign-in</option>
                   <option value="okta">Okta sign-in</option>
                 </optgroup>
+                <optgroup label="Ready-made pages">
+                  {LANDING_LIBRARY.map((d) => (
+                    <option key={d.id} value={`lib:${d.id}`}>
+                      {d.name}
+                    </option>
+                  ))}
+                </optgroup>
                 {landingPages.length > 0 && (
                   <optgroup label="Your saved pages">
                     {landingPages.map((p) => (
@@ -544,12 +556,20 @@ function Campaigns() {
                 </optgroup>
               </select>
 
-              {['generic', 'microsoft', 'google', 'okta'].includes(landingTemplate) && (
+              {(['generic', 'microsoft', 'google', 'okta'].includes(landingTemplate) ||
+                landingTemplate.startsWith('lib:')) && (
                 <div className="mt-2">
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => setPreviewDesign(landingTemplate)}
+                    onClick={() => {
+                      if (landingTemplate.startsWith('lib:')) {
+                        const design = LANDING_LIBRARY.find((d) => d.id === landingTemplate.slice(4));
+                        setPreviewHtml(design?.html ?? '');
+                      } else {
+                        setPreviewDesign(landingTemplate);
+                      }
+                    }}
                   >
                     Preview this design
                   </Button>
