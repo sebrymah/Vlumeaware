@@ -44,6 +44,38 @@ interface SharedQuizItem {
 
 const blankQuestion = (): DraftQuestion => ({ prompt: '', options: ['', ''], correctIndex: 0, explanation: '' });
 
+type PreviewQuestion = { prompt: string; options: string[]; correctIndex: number; explanation?: string };
+
+/** Read-only render of a quiz's questions — correct option marked, with the
+ *  explanation. Shared by the shared-library preview and the own-quiz preview. */
+function QuestionList({ questions }: { questions: PreviewQuestion[] }) {
+  return (
+    <ol className="space-y-3">
+      {questions.map((q, i) => (
+        <li key={i} className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+          <p className="text-xs font-medium text-slate-800">
+            {i + 1}. {q.prompt}
+          </p>
+          <ul className="mt-2 space-y-1">
+            {q.options.map((opt, oi) => (
+              <li
+                key={oi}
+                className={`flex items-start gap-2 text-[11px] ${
+                  oi === q.correctIndex ? 'font-medium text-emerald-700' : 'text-slate-600'
+                }`}
+              >
+                <span aria-hidden="true">{oi === q.correctIndex ? '✓' : '○'}</span>
+                <span>{opt}</span>
+              </li>
+            ))}
+          </ul>
+          {q.explanation && <p className="mt-2 text-[11px] italic text-slate-500">Why: {q.explanation}</p>}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default function QuizzesPage() {
   return (
     <Guard allow={['client_admin']}>
@@ -62,6 +94,7 @@ function Quizzes() {
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<{ quiz: QuizListItem; attempts: Attempt[] } | null>(null);
+  const [preview, setPreview] = useState<{ id: string; title: string; passingScorePct: number; questions: PreviewQuestion[] } | null>(null);
   const csvRef = useRef<HTMLInputElement>(null);
 
   // clone-from-shared form
@@ -243,6 +276,21 @@ function Quizzes() {
     }
   }
 
+  async function openPreview(quiz: QuizListItem) {
+    if (preview?.id === quiz.id) {
+      setPreview(null);
+      return;
+    }
+    try {
+      const full = await api.get<{ title: string; passingScorePct: number; questions: PreviewQuestion[] }>(
+        `/tenants/${tenantId}/quizzes/${quiz.id}`,
+      );
+      setPreview({ id: quiz.id, title: full.title, passingScorePct: full.passingScorePct, questions: full.questions });
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -288,6 +336,9 @@ function Quizzes() {
                       Save pass mark
                     </Button>
                   )}
+                  <Button variant="ghost" onClick={() => openPreview(q)}>
+                    {preview?.id === q.id ? 'Hide' : 'Preview'}
+                  </Button>
                   <Button variant="ghost" onClick={() => viewResults(q)}>
                     Results
                   </Button>
@@ -313,6 +364,19 @@ function Quizzes() {
           <SkeletonRows rows={5} />
         )}
       </Card>
+
+      {preview && (
+        <Card
+          title={`Preview — ${preview.title}`}
+          actions={<Button variant="ghost" onClick={() => setPreview(null)}>Close</Button>}
+        >
+          <p className="mb-3 text-xs text-slate-500">
+            {preview.questions.length} question{preview.questions.length === 1 ? '' : 's'} · pass mark{' '}
+            {preview.passingScorePct}%
+          </p>
+          <QuestionList questions={preview.questions} />
+        </Card>
+      )}
 
       {results && (
         <Card
@@ -405,31 +469,7 @@ function Quizzes() {
                       {picked.passingScorePct}%
                     </span>
                   </div>
-                  <ol className="space-y-3">
-                    {picked.questions.map((q, i) => (
-                      <li key={i} className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-                        <p className="text-xs font-medium text-slate-800">
-                          {i + 1}. {q.prompt}
-                        </p>
-                        <ul className="mt-2 space-y-1">
-                          {q.options.map((opt, oi) => (
-                            <li
-                              key={oi}
-                              className={`flex items-start gap-2 text-[11px] ${
-                                oi === q.correctIndex ? 'font-medium text-emerald-700' : 'text-slate-600'
-                              }`}
-                            >
-                              <span aria-hidden="true">{oi === q.correctIndex ? '✓' : '○'}</span>
-                              <span>{opt}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        {q.explanation && (
-                          <p className="mt-2 text-[11px] italic text-slate-500">Why: {q.explanation}</p>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
+                  <QuestionList questions={picked.questions} />
                 </div>
               );
             })()}
