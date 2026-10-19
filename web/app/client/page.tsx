@@ -54,6 +54,7 @@ function Campaigns() {
   const [selected, setSelected] = useState<string[]>([]);
   const [recipientMode, setRecipientMode] = useState<'all' | 'selected'>('all');
   const [recipients, setRecipients] = useState<string[]>([]);
+  const [recipientSearch, setRecipientSearch] = useState('');
   const [scheduledSendAt, setScheduledSendAt] = useState('');
   const [sendWindowMinutes, setSendWindowMinutes] = useState('0');
   const [recurrenceDays, setRecurrenceDays] = useState('');
@@ -376,31 +377,61 @@ function Campaigns() {
                     Selected staff
                   </label>
                 </div>
-                {recipientMode === 'selected' && (
-                  <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2">
-                    {employees.length === 0 && (
-                      <p className="px-1 py-2 text-[11px] text-slate-500">No employees on the roster yet — add them under People → Employees.</p>
-                    )}
-                    {employees.map((emp) => (
-                      <label key={emp.id} className="flex items-center gap-2 px-1 text-xs text-slate-600">
+                {recipientMode === 'selected' && (() => {
+                  const q = recipientSearch.trim().toLowerCase();
+                  const shown = q
+                    ? employees.filter((emp) =>
+                        [emp.name, emp.email, emp.department ?? ''].some((v) => v.toLowerCase().includes(q)),
+                      )
+                    : employees;
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
                         <input
-                          type="checkbox"
-                          checked={recipients.includes(emp.id)}
-                          onChange={(e) =>
-                            setRecipients(
-                              e.target.checked
-                                ? [...recipients, emp.id]
-                                : recipients.filter((id) => id !== emp.id),
-                            )
-                          }
+                          className={`${inputClass} flex-1`}
+                          type="search"
+                          placeholder="Search staff by name, email or department…"
+                          value={recipientSearch}
+                          onChange={(e) => setRecipientSearch(e.target.value)}
+                          aria-label="Search staff"
                         />
-                        <span className="font-medium text-slate-700">{emp.name}</span>
-                        <span className="text-slate-400">{emp.email}</span>
-                        {emp.department && <Badge>{emp.department}</Badge>}
-                      </label>
-                    ))}
-                  </div>
-                )}
+                        <button
+                          type="button"
+                          className="whitespace-nowrap rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                          onClick={() => setRecipients((prev) => [...new Set([...prev, ...shown.map((e) => e.id)])])}
+                        >
+                          Select all shown ({shown.length})
+                        </button>
+                      </div>
+                      <div className="max-h-52 space-y-1 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-2">
+                        {employees.length === 0 && (
+                          <p className="px-1 py-2 text-[11px] text-slate-500">No employees on the roster yet — add them under People → Employees.</p>
+                        )}
+                        {employees.length > 0 && shown.length === 0 && (
+                          <p className="px-1 py-2 text-[11px] text-slate-500">No staff match “{recipientSearch}”.</p>
+                        )}
+                        {shown.map((emp) => (
+                          <label key={emp.id} className="flex items-center gap-2 px-1 text-xs text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={recipients.includes(emp.id)}
+                              onChange={(e) =>
+                                setRecipients(
+                                  e.target.checked
+                                    ? [...recipients, emp.id]
+                                    : recipients.filter((id) => id !== emp.id),
+                                )
+                              }
+                            />
+                            <span className="font-medium text-slate-700">{emp.name}</span>
+                            <span className="text-slate-400">{emp.email}</span>
+                            {emp.department && <Badge>{emp.department}</Badge>}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
                 <p className="text-[11px] text-slate-400">
                   {recipientMode === 'all'
                     ? 'The simulation goes to everyone on your roster (verified domains only).'

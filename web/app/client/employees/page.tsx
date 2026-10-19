@@ -35,6 +35,7 @@ function Employees() {
   const tenantId = useActingTenant();
   const [list, setList] = useState<Employee[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [rosterSearch, setRosterSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [busy, setBusy] = useState(false);
@@ -329,10 +330,25 @@ function Employees() {
       </Card>
 
       <Card title="Roster">
+        {loaded && list.length > 0 && (
+          <input
+            className={`${inputClass} mb-2`}
+            type="search"
+            placeholder="Search by name, email or department…"
+            value={rosterSearch}
+            onChange={(e) => setRosterSearch(e.target.value)}
+            aria-label="Search roster"
+          />
+        )}
         <div className="max-h-[28rem] overflow-y-auto">
           {loaded ? (
             <Table head={['Name', 'Email', 'Department', '']}>
-            {list.map((e) => (
+            {list
+              .filter((e) => {
+                const q = rosterSearch.trim().toLowerCase();
+                return !q || [e.name, e.email, e.department ?? ''].some((v) => v.toLowerCase().includes(q));
+              })
+              .map((e) => (
               <tr key={e.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">{e.name}</td>
                 <td className="px-2 py-2 text-slate-500">{e.email}</td>
@@ -354,6 +370,18 @@ function Employees() {
                 </td>
               </tr>
             )}
+            {list.length > 0 &&
+              rosterSearch.trim() &&
+              !list.some((e) => {
+                const q = rosterSearch.trim().toLowerCase();
+                return [e.name, e.email, e.department ?? ''].some((v) => v.toLowerCase().includes(q));
+              }) && (
+                <tr>
+                  <td colSpan={4} className="px-2 py-6 text-center text-slate-500">
+                    No staff match “{rosterSearch}”.
+                  </td>
+                </tr>
+              )}
             </Table>
           ) : (
             <SkeletonRows rows={5} />
