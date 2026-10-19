@@ -1,15 +1,16 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
-
 /**
- * Standalone, read-only preview of the built-in landing-page designs, shown in
- * the campaign builder so an admin can see each template before choosing it.
- * It renders sample chrome with an inert sign-in form and placeholder branding
- * — it is deliberately separate from the real simulated-login page (/t/[token]/
- * login) so previewing can never affect the live capture path.
+ * Read-only, inert preview of the built-in landing-page designs, rendered
+ * INSIDE the authenticated campaign builder (never as a public route) so it
+ * cannot be abused as a hosted brand-spoofing page. No external inputs: the
+ * template is restricted to the known set and the organisation name is a fixed
+ * placeholder, so the chrome only ever shows generic sample branding.
  */
+export type LandingTemplate = 'generic' | 'microsoft' | 'google' | 'okta';
+
+const SAMPLE_NAME = 'Your organisation';
+
 function SampleForm({ accent, emailLabel = 'Email' }: { accent: string; emailLabel?: string }) {
   return (
     <div className="mt-4 space-y-3 text-left">
@@ -40,7 +41,7 @@ function SampleForm({ accent, emailLabel = 'Email' }: { accent: string; emailLab
 
 function Shell({ background, children }: { background: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-10" style={{ background }}>
+    <div className="flex min-h-[560px] items-center justify-center px-6 py-10" style={{ background }}>
       {children}
     </div>
   );
@@ -71,11 +72,8 @@ function GoogleMark() {
   );
 }
 
-function Preview() {
-  const sp = useSearchParams();
-  const template = sp.get('template') || 'generic';
-  const name = sp.get('name') || 'Your organisation';
-  const accent = sp.get('color') || '#1F6F43';
+export function LandingDesign({ template }: { template: string }) {
+  const name = SAMPLE_NAME;
 
   if (template === 'microsoft') {
     return (
@@ -116,7 +114,8 @@ function Preview() {
     );
   }
 
-  // generic — the tenant's own brand
+  // generic — the tenant's own brand (shown here with a neutral placeholder)
+  const accent = '#1F6F43';
   return (
     <Shell background="#f1f5f4">
       <div className="w-full max-w-sm overflow-hidden rounded-xl bg-white shadow-sm">
@@ -130,13 +129,5 @@ function Preview() {
         </div>
       </div>
     </Shell>
-  );
-}
-
-export default function LandingPreviewPage() {
-  return (
-    <Suspense fallback={null}>
-      <Preview />
-    </Suspense>
   );
 }

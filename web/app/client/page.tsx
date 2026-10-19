@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { ReadinessChecklist } from '@/components/readiness';
 import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { LandingDesign } from '@/components/landing-design';
 
 interface Scenario {
   id: string;
@@ -67,7 +68,7 @@ function Campaigns() {
   const [landingHtml, setLandingHtml] = useState('');
   const [landingPageName, setLandingPageName] = useState('');
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
-  const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+  const [previewDesign, setPreviewDesign] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [blocked, setBlocked] = useState<Record<string, string[]>>({});
 
@@ -548,7 +549,7 @@ function Campaigns() {
                   <Button
                     type="button"
                     variant="ghost"
-                    onClick={() => setPreviewSrc(`/landing-preview?template=${encodeURIComponent(landingTemplate)}`)}
+                    onClick={() => setPreviewDesign(landingTemplate)}
                   >
                     Preview this design
                   </Button>
@@ -632,13 +633,13 @@ function Campaigns() {
         )}
       </Card>
 
-      {(previewHtml !== null || previewSrc !== null) && (
+      {(previewHtml !== null || previewDesign !== null) && (
         <LandingPreview
           html={previewHtml}
-          src={previewSrc}
+          design={previewDesign}
           onClose={() => {
             setPreviewHtml(null);
-            setPreviewSrc(null);
+            setPreviewDesign(null);
           }}
         />
       )}
@@ -653,11 +654,11 @@ function Campaigns() {
  */
 function LandingPreview({
   html,
-  src,
+  design,
   onClose,
 }: {
   html?: string | null;
-  src?: string | null;
+  design?: string | null;
   onClose: () => void;
 }) {
   const marker = '{{LOGIN_FORM}}';
@@ -694,8 +695,8 @@ function LandingPreview({
           </Button>
         </div>
         <div className="overflow-auto bg-white">
-          {src ? (
-            <iframe src={src} title="Landing page preview" className="h-[80vh] w-full border-0" />
+          {design ? (
+            <LandingDesign template={design} />
           ) : (
             <>
               {before && <div dangerouslySetInnerHTML={{ __html: before }} />}
