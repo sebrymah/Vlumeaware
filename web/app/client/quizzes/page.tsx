@@ -34,7 +34,12 @@ interface SharedQuizItem {
   title: string;
   category: string | null;
   passingScorePct: number;
-  questions: { prompt: string }[];
+  questions: {
+    prompt: string;
+    options: string[];
+    correctIndex: number;
+    explanation?: string;
+  }[];
 }
 
 const blankQuestion = (): DraftQuestion => ({ prompt: '', options: ['', ''], correctIndex: 0, explanation: '' });
@@ -387,6 +392,47 @@ function Quizzes() {
               Add a training video first (Awareness content) — a quiz must attach to one.
             </p>
           )}
+          {cloneSharedId &&
+            (() => {
+              const picked = sharedQuizzes.find((s) => s.id === cloneSharedId);
+              if (!picked) return null;
+              return (
+                <div className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="text-sm font-semibold text-slate-800">Preview — {picked.title}</h3>
+                    <span className="text-[11px] text-slate-500">
+                      {picked.questions.length} question{picked.questions.length === 1 ? '' : 's'} · pass mark{' '}
+                      {picked.passingScorePct}%
+                    </span>
+                  </div>
+                  <ol className="space-y-3">
+                    {picked.questions.map((q, i) => (
+                      <li key={i} className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
+                        <p className="text-xs font-medium text-slate-800">
+                          {i + 1}. {q.prompt}
+                        </p>
+                        <ul className="mt-2 space-y-1">
+                          {q.options.map((opt, oi) => (
+                            <li
+                              key={oi}
+                              className={`flex items-start gap-2 text-[11px] ${
+                                oi === q.correctIndex ? 'font-medium text-emerald-700' : 'text-slate-600'
+                              }`}
+                            >
+                              <span aria-hidden="true">{oi === q.correctIndex ? '✓' : '○'}</span>
+                              <span>{opt}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        {q.explanation && (
+                          <p className="mt-2 text-[11px] italic text-slate-500">Why: {q.explanation}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              );
+            })()}
         </Card>
       )}
 
