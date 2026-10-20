@@ -57,6 +57,28 @@ interface TrainingModule {
   title: string;
 }
 
+/** The furthest stage a recipient reached — one bucket each, for filtering. */
+type Stage = 'pending' | 'delivered' | 'opened' | 'clicked' | 'submitted' | 'reported';
+
+function stageOf(r: Recipient): Stage {
+  if (!r.sentAt) return 'pending';
+  if (r.credentialsSubmitted) return 'submitted';
+  if (r.clickedAt) return 'clicked';
+  if (r.reportedAt) return 'reported';
+  if (r.openedAt) return 'opened';
+  return 'delivered';
+}
+
+const STAGE_FILTERS: { key: Stage | 'all'; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'delivered', label: 'Delivered' },
+  { key: 'opened', label: 'Opened' },
+  { key: 'clicked', label: 'Clicked' },
+  { key: 'submitted', label: 'Submitted' },
+  { key: 'reported', label: 'Reported' },
+];
+
 function StatusPills({ r }: { r: Recipient }) {
   const pill = (label: string, tone: 'ok' | 'warn' | 'bad' | 'muted') => {
     const cls = {
@@ -98,6 +120,7 @@ export function CampaignReport({
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<Stage | 'all'>('all');
 
   const load = useCallback(async () => {
     try {
@@ -197,6 +220,16 @@ export function CampaignReport({
   const m = data.metrics;
   const worst = m.byDepartment[0];
   const unsent = m.totalRecipients - m.totalSent;
+
+  const stageCounts = recipients.reduce<Record<Stage, number>>(
+    (acc, r) => {
+      acc[stageOf(r)] += 1;
+      return acc;
+    },
+    { pending: 0, delivered: 0, opened: 0, clicked: 0, submitted: 0, reported: 0 },
+  );
+  const filteredRecipients =
+    statusFilter === 'all' ? recipients : recipients.filter((r) => stageOf(r) === statusFilter);
 
   return (
     <div className="space-y-6">
@@ -309,9 +342,29 @@ export function CampaignReport({
         title="Recipients"
         subtitle={`Who this went to and where each person is — ${recipients.length} recipient${recipients.length === 1 ? '' : 's'}.`}
       >
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {STAGE_FILTERS.map((f) => {
+            const count = f.key === 'all' ? recipients.length : stageCounts[f.key];
+            const active = statusFilter === f.key;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setStatusFilter(f.key)}
+                className={`rounded-full px-3 py-1 text-[12px] font-medium ring-1 ring-inset transition ${
+                  active
+                    ? 'bg-brand-600 text-white ring-brand-600'
+                    : 'bg-white text-slate-600 ring-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {f.label} <span className={active ? 'text-white/80' : 'text-slate-400'}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
         <div className="max-h-[28rem] overflow-y-auto">
           <Table head={canGenerate ? ['Recipient', 'Department', 'Status', 'Assign training'] : ['Recipient', 'Department', 'Status']}>
-            {recipients.map((r) => (
+            {filteredRecipients.map((r) => (
               <tr key={r.email} className="border-b border-slate-100">
                 <td className="px-2 py-2">
                   <div className="font-medium text-slate-800">{r.name}</div>
@@ -357,6 +410,13 @@ export function CampaignReport({
               <tr>
                 <td colSpan={canGenerate ? 4 : 3} className="px-2 py-6 text-center text-slate-500">
                   No recipients yet — launch the campaign to generate sends.
+                </td>
+              </tr>
+            )}
+            {recipients.length > 0 && !filteredRecipients.length && (
+              <tr>
+                <td colSpan={canGenerate ? 4 : 3} className="px-2 py-6 text-center text-slate-500">
+                  No recipients at the “{statusFilter}” stage.
                 </td>
               </tr>
             )}

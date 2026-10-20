@@ -51,12 +51,26 @@ export class ReportsService {
     // as a campaign grows. opened/clicked/reported/submitted are over delivered
     // sends (sentAt set), matching the rates below.
     const deliveredWhere = { campaignId, sentAt: { not: null } } as const;
+    // The funnel is hierarchical: submitting credentials implies a click, and a
+    // click (or a report) implies an open. Open tracking relies on a pixel that
+    // most corporate mail clients block, so a raw openedAt count undercounts and
+    // can fall *below* clicks and submissions. We therefore count each stage as
+    // "reached at least this far", which keeps opened >= clicked >= submitted.
+    const clickedOrBeyond = { OR: [{ clickedAt: { not: null } }, { credentialsSubmitted: true }] };
+    const openedOrBeyond = {
+      OR: [
+        { openedAt: { not: null } },
+        { clickedAt: { not: null } },
+        { credentialsSubmitted: true },
+        { reportedAt: { not: null } },
+      ],
+    };
     const [totalRecipients, totalSent, opened, clicked, reported, credentialsSubmitted] =
       await Promise.all([
         this.prisma.db.send.count({ where: { campaignId } }),
         this.prisma.db.send.count({ where: deliveredWhere }),
-        this.prisma.db.send.count({ where: { ...deliveredWhere, openedAt: { not: null } } }),
-        this.prisma.db.send.count({ where: { ...deliveredWhere, clickedAt: { not: null } } }),
+        this.prisma.db.send.count({ where: { ...deliveredWhere, ...openedOrBeyond } }),
+        this.prisma.db.send.count({ where: { ...deliveredWhere, ...clickedOrBeyond } }),
         this.prisma.db.send.count({ where: { ...deliveredWhere, reportedAt: { not: null } } }),
         this.prisma.db.send.count({ where: { ...deliveredWhere, credentialsSubmitted: true } }),
       ]);

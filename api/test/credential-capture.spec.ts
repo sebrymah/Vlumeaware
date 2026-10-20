@@ -98,6 +98,10 @@ describe('metadata-only credential capture', () => {
       db.send.findUnique({ where: { id: sendId } }),
     );
     expect(send!.credentialsSubmitted).toBe(true);
+    // Funnel stays hierarchical: a submission backfills click + open, so the
+    // open pixel being blocked can never make opened < submitted.
+    expect(send!.clickedAt).not.toBeNull();
+    expect(send!.openedAt).not.toBeNull();
   });
 
   it('has no column capable of holding a typed secret', async () => {

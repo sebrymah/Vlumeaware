@@ -76,6 +76,13 @@ export class TrackingService {
         data: { clickedAt: new Date() },
       });
 
+      // A recorded click proves the email was opened, even when the open pixel
+      // was blocked. Backfill so the funnel stays hierarchical (open >= click).
+      await this.prisma.db.send.updateMany({
+        where: { id: ref.id, openedAt: null },
+        data: { openedAt: new Date() },
+      });
+
       // The course is assigned when someone actually submits credentials, not
       // on a click alone — so here we only READ whether an assignment already
       // exists for this send (it will, if they submitted before reaching the
@@ -151,6 +158,11 @@ export class TrackingService {
         where: { id: ref.id, reportedAt: null },
         data: { reportedAt: new Date() },
       });
+      // Reporting proves they opened it.
+      await this.prisma.db.send.updateMany({
+        where: { id: ref.id, openedAt: null },
+        data: { openedAt: new Date() },
+      });
       return { credited: true };
     });
   }
@@ -196,6 +208,18 @@ export class TrackingService {
       await this.prisma.db.send.updateMany({
         where: { id: ref.id },
         data: { credentialsSubmitted: true },
+      });
+
+      // Submitting proves both a click and an open, even if those events were
+      // never separately recorded (blocked pixel, or a click that missed
+      // tracking). Backfill both so the funnel stays hierarchical.
+      await this.prisma.db.send.updateMany({
+        where: { id: ref.id, clickedAt: null },
+        data: { clickedAt: new Date() },
+      });
+      await this.prisma.db.send.updateMany({
+        where: { id: ref.id, openedAt: null },
+        data: { openedAt: new Date() },
       });
 
       // Submitting credentials is the real failure, so this is where the course
