@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { Badge, Button, Card, Notice, Stat, Table, pct } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, Notice, Stat, Table, pct } from '@/components/ui';
 
 export interface Metrics {
   campaignId: string;
@@ -96,6 +96,7 @@ export function CampaignReport({
   const [assignNote, setAssignNote] = useState<Record<string, string>>({});
   const [assigningId, setAssigningId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -154,6 +155,27 @@ export function CampaignReport({
     }
   }
 
+  async function retryUnsent() {
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      const res = await api.post<{ requeued: number; staleJobsCleared: number; windowMinutes: number }>(
+        `/tenants/${tenantId}/campaigns/${campaignId}/retry`,
+        { overMinutes: 120 },
+      );
+      setOk(
+        `Re-queued ${res.requeued} unsent message${res.requeued === 1 ? '' : 's'}, dripping over ${res.windowMinutes} min. ` +
+          `Watch the delivered count climb; if it stalls again, your email provider is still blocking.`,
+      );
+      await load();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function exportCsv() {
     const token = JSON.parse(localStorage.getItem('vlumeaware.session') ?? '{}').accessToken;
     const base = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -174,6 +196,7 @@ export function CampaignReport({
 
   const m = data.metrics;
   const worst = m.byDepartment[0];
+  const unsent = m.totalRecipients - m.totalSent;
 
   return (
     <div className="space-y-6">
@@ -188,6 +211,14 @@ export function CampaignReport({
           </p>
         </div>
         <div className="flex gap-2">
+          {canGenerate && m.status === 'active' && unsent > 0 && (
+            <ConfirmButton
+              label={`Retry ${unsent} unsent`}
+              question={`Re-queue the ${unsent} message${unsent === 1 ? '' : 's'} that haven't sent yet, dripped over ~2 hours? Only do this once your email provider block is cleared, or they'll just fail again.`}
+              onConfirm={retryUnsent}
+              disabled={busy}
+            />
+          )}
           <Button variant="ghost" onClick={exportCsv}>
             Export CSV
           </Button>
@@ -198,6 +229,8 @@ export function CampaignReport({
           )}
         </div>
       </div>
+
+      {ok && <Notice kind="ok">{ok}</Notice>}
 
       <div className="grid gap-3 sm:grid-cols-4">
         <Stat label="Open rate" value={pct(m.openRate)} hint={`${m.opened} opened`} />

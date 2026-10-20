@@ -38,6 +38,11 @@ class ScheduleDto {
   @IsOptional() @IsDateString() scheduledSendAt?: string;
 }
 
+class RetryDto {
+  /** Re-drip the backlog over this many minutes (0 = as fast as possible). */
+  @IsOptional() @IsInt() @Min(0) @Max(1440) overMinutes?: number;
+}
+
 @Controller()
 export class CampaignsController {
   constructor(private readonly campaigns: CampaignsService) {}
@@ -118,6 +123,19 @@ export class CampaignsController {
   @RequiresApprovedTenant()
   resume(@Param('campaignId', ParseUUIDPipe) campaignId: string) {
     return this.campaigns.resume(campaignId);
+  }
+
+  /**
+   * Re-queue a campaign's un-sent rows after a mail-provider outage. Needed
+   * because failed BullMQ jobs block a plain resume (same job id is deduped);
+   * this clears the stale jobs and re-enqueues, optionally re-dripped.
+   */
+  @Post('tenants/:tenantId/campaigns/:campaignId/retry')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @RequiresSignedAgreement()
+  @RequiresApprovedTenant()
+  retry(@Param('campaignId', ParseUUIDPipe) campaignId: string, @Body() dto: RetryDto) {
+    return this.campaigns.retryUnsent(campaignId, dto.overMinutes);
   }
 
   /** Kill switch. Available to client admins and to Vlumetech across tenants. */

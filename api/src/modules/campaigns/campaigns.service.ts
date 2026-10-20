@@ -436,6 +436,71 @@ export class CampaignsService {
     return { campaignId, status: 'killed', removedJobs, unsentRemaining: unsent.length };
   }
 
+  /**
+   * Re-queues a campaign's un-sent rows after a mail-provider outage. The
+   * original jobs are parked as `failed` in Redis once they exhaust their
+   * retries, and BullMQ will NOT re-add a job whose id already exists — so a
+   * plain resume/relaunch silently does nothing for them. This removes each
+   * stale job first, then re-enqueues under the same id, spread over a fresh
+   * drip window so the retry does not slam the provider again. Idempotent:
+   * running it twice re-queues the same rows, and the processor's `sentAt`
+   * check means an already-sent row is never mailed twice.
+   *
+   * `overMinutes` overrides the drip window for the retry only (defaults to the
+   * campaign's own send window). 0 sends the backlog as fast as the worker can.
+   */
+  async retryUnsent(campaignId: string, overMinutes?: number) {
+    const campaign = await this.findOne(campaignId);
+    if (campaign.status !== 'active') {
+      throw new ConflictException(
+        `Can only retry an active campaign — this one is ${campaign.status}.`,
+      );
+    }
+
+    const tenantId = currentTenantId();
+    const pending = await this.prisma.db.send.findMany({
+      where: { campaignId, sentAt: null },
+      select: { id: true },
+    });
+
+    // Clear any lingering job (failed / completed / delayed) so the re-add is
+    // not deduplicated by its stale id. A job that is mid-flight cannot be
+    // removed; leave it — the processor's sentAt check keeps it idempotent.
+    let cleared = 0;
+    for (const send of pending) {
+      const job = await this.sendQueue.getJob(`send-${send.id}`);
+      if (job) {
+        try {
+          await job.remove();
+          cleared += 1;
+        } catch {
+          // Active right now; it will complete or re-fail on its own.
+        }
+      }
+    }
+
+    const windowMinutes = Math.max(0, overMinutes ?? campaign.sendWindowMinutes);
+    const windowMs = windowMinutes * 60_000;
+    await this.sendQueue.addBulk(
+      pending.map((send) => ({
+        name: 'send-simulation',
+        data: { sendId: send.id, tenantId, campaignId },
+        opts: {
+          jobId: `send-${send.id}`,
+          delay: windowMs > 0 ? randomInt(0, windowMs + 1) : 0,
+        },
+      })),
+    );
+
+    await this.audit.record(
+      'campaign.retry',
+      `"${campaign.name}" re-queued ${pending.length} un-sent (${cleared} stale jobs cleared)` +
+        (windowMinutes ? ` over ${windowMinutes}m` : ''),
+    );
+
+    return { campaignId, requeued: pending.length, staleJobsCleared: cleared, windowMinutes };
+  }
+
   private async launchPending(campaignId: string) {
     const tenantId = currentTenantId();
     const pending = await this.prisma.db.send.findMany({
