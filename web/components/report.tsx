@@ -57,16 +57,30 @@ interface TrainingModule {
   title: string;
 }
 
-/** The furthest stage a recipient reached — one bucket each, for filtering. */
 type Stage = 'pending' | 'delivered' | 'opened' | 'clicked' | 'submitted' | 'reported';
 
-function stageOf(r: Recipient): Stage {
-  if (!r.sentAt) return 'pending';
-  if (r.credentialsSubmitted) return 'submitted';
-  if (r.clickedAt) return 'clicked';
-  if (r.reportedAt) return 'reported';
-  if (r.openedAt) return 'opened';
-  return 'delivered';
+/**
+ * Cumulative funnel membership: "did this person reach AT LEAST this stage?"
+ * A click proves an open and a submit proves a click, so the stages nest and
+ * the chip counts match the headline funnel (opened >= clicked >= submitted)
+ * instead of contradicting it. Counts therefore overlap on purpose — someone
+ * who clicked is also counted under Opened.
+ */
+function reached(r: Recipient, stage: Stage): boolean {
+  switch (stage) {
+    case 'pending':
+      return !r.sentAt;
+    case 'delivered':
+      return !!r.sentAt;
+    case 'opened':
+      return !!(r.openedAt || r.clickedAt || r.credentialsSubmitted || r.reportedAt);
+    case 'clicked':
+      return !!(r.clickedAt || r.credentialsSubmitted);
+    case 'submitted':
+      return r.credentialsSubmitted;
+    case 'reported':
+      return !!r.reportedAt;
+  }
 }
 
 const STAGE_FILTERS: { key: Stage | 'all'; label: string }[] = [
@@ -221,15 +235,16 @@ export function CampaignReport({
   const worst = m.byDepartment[0];
   const unsent = m.totalRecipients - m.totalSent;
 
-  const stageCounts = recipients.reduce<Record<Stage, number>>(
-    (acc, r) => {
-      acc[stageOf(r)] += 1;
-      return acc;
-    },
-    { pending: 0, delivered: 0, opened: 0, clicked: 0, submitted: 0, reported: 0 },
-  );
+  const stageCounts: Record<Stage, number> = {
+    pending: recipients.filter((r) => reached(r, 'pending')).length,
+    delivered: recipients.filter((r) => reached(r, 'delivered')).length,
+    opened: recipients.filter((r) => reached(r, 'opened')).length,
+    clicked: recipients.filter((r) => reached(r, 'clicked')).length,
+    submitted: recipients.filter((r) => reached(r, 'submitted')).length,
+    reported: recipients.filter((r) => reached(r, 'reported')).length,
+  };
   const filteredRecipients =
-    statusFilter === 'all' ? recipients : recipients.filter((r) => stageOf(r) === statusFilter);
+    statusFilter === 'all' ? recipients : recipients.filter((r) => reached(r, statusFilter));
 
   return (
     <div className="space-y-6">
@@ -362,6 +377,9 @@ export function CampaignReport({
             );
           })}
         </div>
+        <p className="mb-2 text-[11px] text-slate-400">
+          Counts are cumulative — someone who clicked is also counted under Opened, so Opened ≥ Clicked ≥ Submitted.
+        </p>
         <div className="max-h-[28rem] overflow-y-auto">
           <Table head={canGenerate ? ['Recipient', 'Department', 'Status', 'Assign training'] : ['Recipient', 'Department', 'Status']}>
             {filteredRecipients.map((r) => (
@@ -416,7 +434,7 @@ export function CampaignReport({
             {recipients.length > 0 && !filteredRecipients.length && (
               <tr>
                 <td colSpan={canGenerate ? 4 : 3} className="px-2 py-6 text-center text-slate-500">
-                  No recipients at the “{statusFilter}” stage.
+                  Nobody reached the “{statusFilter}” stage.
                 </td>
               </tr>
             )}
