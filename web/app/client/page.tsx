@@ -54,9 +54,11 @@ function Campaigns() {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
-  const [recipientMode, setRecipientMode] = useState<'all' | 'selected'>('all');
+  const [recipientMode, setRecipientMode] = useState<'all' | 'selected' | 'group'>('all');
   const [recipients, setRecipients] = useState<string[]>([]);
   const [recipientSearch, setRecipientSearch] = useState('');
+  const [groups, setGroups] = useState<{ id: string; name: string; _count: { members: number } }[]>([]);
+  const [groupId, setGroupId] = useState('');
   const [scheduledSendAt, setScheduledSendAt] = useState('');
   const [sendWindowMinutes, setSendWindowMinutes] = useState('0');
   const [recurrenceDays, setRecurrenceDays] = useState('');
@@ -76,18 +78,22 @@ function Campaigns() {
   const load = useCallback(async () => {
     if (!tenantId) return;
     try {
-      const [c, s, emp, sd, lp] = await Promise.all([
+      const [c, s, emp, sd, lp, grp] = await Promise.all([
         api.get<Campaign[]>(`/tenants/${tenantId}/campaigns`),
         api.get<Scenario[]>(`/tenants/${tenantId}/scenarios`),
         api.get<Employee[]>(`/tenants/${tenantId}/employees`),
         api.get<SendingDomain[]>(`/tenants/${tenantId}/sending-domains/verified`),
         api.get<{ id: string; name: string }[]>(`/tenants/${tenantId}/landing-pages`).catch(() => []),
+        api
+          .get<{ id: string; name: string; _count: { members: number } }[]>(`/tenants/${tenantId}/groups`)
+          .catch(() => []),
       ]);
       setCampaigns(c);
       setScenarios(s);
       setEmployees(emp);
       setSendingDomains(sd);
       setLandingPages(lp);
+      setGroups(grp);
       setError(null);
     } catch (err) {
       setError((err as Error).message);
@@ -172,6 +178,22 @@ function Campaigns() {
     return { landingTemplate };
   }
 
+  // Targeting a group loads its members into the selected-recipients list at
+  // build time (snapshot): later changes to the group do not alter this draft.
+  async function chooseGroup(id: string) {
+    setGroupId(id);
+    if (!id) {
+      setRecipients([]);
+      return;
+    }
+    try {
+      const detail = await api.get<{ members: { id: string }[] }>(`/tenants/${tenantId}/groups/${id}`);
+      setRecipients(detail.members.map((m) => m.id));
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
   // Sanitize and show the custom page exactly as a target would see it, with
   // the metadata-only form injected — without saving anything.
   async function previewLanding() {
@@ -201,7 +223,7 @@ function Campaigns() {
       await api.post(`/tenants/${tenantId}/campaigns`, {
         name,
         scenarioIds: selected,
-        employeeIds: recipientMode === 'selected' ? recipients : undefined,
+        employeeIds: recipientMode === 'all' ? undefined : recipients,
         scheduledSendAt: scheduledSendAt ? new Date(scheduledSendAt).toISOString() : undefined,
         sendWindowMinutes: Number(sendWindowMinutes) || 0,
         recurrenceDays: recurrenceDays ? Number(recurrenceDays) : undefined,
@@ -383,6 +405,21 @@ function Campaigns() {
                     />
                     Selected staff
                   </label>
+                  {groups.length > 0 && (
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="recipientMode"
+                        checked={recipientMode === 'group'}
+                        onChange={() => {
+                          setRecipientMode('group');
+                          setRecipients([]);
+                          setGroupId('');
+                        }}
+                      />
+                      A group
+                    </label>
+                  )}
                 </div>
                 {recipientMode === 'selected' && (() => {
                   const q = recipientSearch.trim().toLowerCase();
@@ -439,10 +476,24 @@ function Campaigns() {
                     </div>
                   );
                 })()}
+                {recipientMode === 'group' && (
+                  <select className={inputClass} value={groupId} onChange={(e) => chooseGroup(e.target.value)}>
+                    <option value="">— choose a group —</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name} ({g._count.members})
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <p className="text-[11px] text-slate-400">
                   {recipientMode === 'all'
                     ? 'The simulation goes to everyone on your roster (verified domains only).'
-                    : `${recipients.length} selected.`}
+                    : recipientMode === 'group'
+                      ? groupId
+                        ? `${recipients.length} staff in this group.`
+                        : 'Pick a group to target.'
+                      : `${recipients.length} selected.`}
                 </p>
               </div>
             </Field>
@@ -644,7 +695,7 @@ function Campaigns() {
                 busy ||
                 !selected.length ||
                 name.trim().length < 2 ||
-                (recipientMode === 'selected' && recipients.length === 0)
+                (recipientMode !== 'all' && recipients.length === 0)
               }
             >
               Create draft campaign

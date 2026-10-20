@@ -12,6 +12,8 @@ import { currentScope, TenantScopeError } from './tenant-context';
 export const TENANT_SCOPED_MODELS = new Set<string>([
   'TenantUser',
   'Employee',
+  'EmployeeGroup',
+  'EmployeeGroupMember',
   'Scenario',
   'Campaign',
   'CampaignScenario',

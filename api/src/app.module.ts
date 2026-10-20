@@ -12,6 +12,7 @@ import { RateLimitGuard } from './common/ratelimit/rate-limit.guard';
 import { RATE_LIMIT_STORE, rateLimitStore } from './common/ratelimit/rate-limit.store';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { EmployeesModule } from './modules/employees/employees.module';
+import { GroupsModule } from './modules/groups/groups.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { ScenariosModule } from './modules/scenarios/scenarios.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -41,6 +42,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     TenantsModule,
     EmployeesModule,
+    GroupsModule,
     ScenariosModule,
     CampaignsModule,
     TrackingModule,

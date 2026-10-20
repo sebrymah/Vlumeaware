@@ -51,6 +51,7 @@ const NAV: Record<Role, NavEntry[]> = {
       icon: 'users',
       items: [
         { href: '/client/employees', label: 'Employees' },
+        { href: '/client/groups', label: 'Groups' },
         { href: '/client/domains', label: 'Domains' },
         { href: '/client/sending-domains', label: 'Sending domains' },
         { href: '/client/risk', label: 'Risk' },

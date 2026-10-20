@@ -121,6 +121,8 @@ model Tenant {
 
   tenantUsers           TenantUser[]
   employees             Employee[]
+  employeeGroups        EmployeeGroup[]
+  employeeGroupMembers  EmployeeGroupMember[]
   scenarios             Scenario[]
   campaigns             Campaign[]
   routingRules          TrainingRoutingRule[]
@@ -215,10 +217,43 @@ model Employee {
   quizAttempts        QuizAttempt[]
   certificates        Certificate[]
   phishReports        PhishReport[]
+  groupMemberships    EmployeeGroupMember[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@map("employees")
+}
+
+model EmployeeGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members EmployeeGroupMember[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("employee_groups")
+}
+
+model EmployeeGroupMember {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  groupId    String   @map("group_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group    EmployeeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  employee Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, employeeId])
+  @@index([tenantId])
+  @@index([groupId])
+  @@index([employeeId])
+  @@map("employee_group_members")
 }
 
 model Scenario {
