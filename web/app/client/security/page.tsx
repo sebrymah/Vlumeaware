@@ -15,6 +15,7 @@ import {
   inputClass,
 } from '@/components/ui';
 import { readSession } from '@/lib/session';
+import { useToast } from '@/components/toast';
 
 interface SecurityUser {
   id: string;
@@ -56,6 +57,7 @@ export default function SecurityPage() {
 }
 
 function Security() {
+  const { show } = useToast();
   const tenantId = useActingTenant();
   const me = readSession()?.email;
 
@@ -107,7 +109,11 @@ function Security() {
     setError(null);
     setOk(null);
     try {
-      setOk(await job());
+      const message = await job();
+      setOk(message);
+      // Actions here save near the bottom of a long page, so the inline notice is
+      // often below the fold: confirm it where the eye already is too.
+      show(message);
       await load();
     } catch (err) {
       setError((err as Error).message);

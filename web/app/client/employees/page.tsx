@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { Button, Card, ConfirmButton, EmptyRow, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { useToast } from '@/components/toast';
 
 interface Employee {
   id: string;
@@ -32,6 +33,13 @@ export default function EmployeesPage() {
 }
 
 function Employees() {
+  const { show } = useToast();
+  // Records the message inline and shows it where the eye already is; a save at
+  // the bottom of a long page would otherwise be announced below the fold.
+  const flash = (message: string) => {
+    flash(message);
+    show(message);
+  };
   const tenantId = useActingTenant();
   const [list, setList] = useState<Employee[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -91,7 +99,7 @@ function Employees() {
         `/tenants/${tenantId}/training/assign`,
         body,
       );
-      setOk(
+      flash(
         `Training assigned: ${res.assigned} new, ${res.skipped} already had it` +
           (notify ? `, ${res.notified} emailed.` : '.'),
       );
@@ -140,7 +148,7 @@ function Employees() {
       if (res.skipped.length > 0) {
         setError(`Not added: ${res.skipped[0].reason}`);
       } else {
-        setOk(res.created ? `${oneName} added to the roster.` : `${oneName} updated.`);
+        flash(res.created ? `${oneName} added to the roster.` : `${oneName} updated.`);
         setOneName('');
         setOneEmail('');
         setOneDept('');

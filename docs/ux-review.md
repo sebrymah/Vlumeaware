@@ -44,7 +44,7 @@ Severity is about user impact. Effort is rough: S ≤ half a day, M ≤ 3 days, 
 | A1 | No `error.tsx` / `not-found.tsx` / `global-error.tsx`: failures and bad URLs show an unbranded Next page | all three files absent | High | S |
 | A2 | 12 pages rendered an empty row ("No certificates issued yet") before their request settled, so a slow connection looked like an empty account | **fixed everywhere it could happen** — 18 pages now have a loading state, verified by scanning for empty states without one | High | M |
 | A3 | `Guard` paints a full-screen "Loading…" text on every navigation while it reads localStorage | `components/guard.tsx` session gate | Medium | S |
-| A4 | No toast or inline-at-top feedback: notices render where the form is, so a save at the bottom of a long page is announced off-screen | 61 `Notice` uses, no toast system | Medium | M |
+| A4 | Feedback rendered only where the form sat, so a save at the bottom of a long page was announced off-screen | fixed: `ToastProvider` plus wiring on campaigns, employees, groups and security | Medium | M |
 | A5 | `EmptyState` exists and six pages use it, but **20 empty rows bypassed it** for a bare `colSpan` line with ad-hoc padding | 20 `colSpan` sites across 13 files | Medium | S |
 | A6 | No global focus style and no `prefers-reduced-motion`; 17 elements carry their own `focus-visible` classes | `globals.css` has print only | Medium | S |
 

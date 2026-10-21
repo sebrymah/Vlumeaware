@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { ReadinessChecklist } from '@/components/readiness';
 import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass } from '@/components/ui';
+import { useToast } from '@/components/toast';
 import { LandingDesign } from '@/components/landing-design';
 import { LANDING_LIBRARY } from '@/components/landing-library';
 
@@ -45,6 +46,13 @@ export default function AdminCampaignsPage() {
 }
 
 function Campaigns() {
+  const { show } = useToast();
+  // Launching, scheduling and killing a campaign are the consequential actions on
+  // this page; confirm them where the eye is, not only at the top of the screen.
+  const flash = (message: string) => {
+    flash(message);
+    show(message);
+  };
   const tenantId = useActingTenant();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -149,7 +157,7 @@ function Campaigns() {
       const res = await api.post<Record<string, unknown>>(
         `/tenants/${tenantId}/campaigns/${campaignId}/${action}`,
       );
-      setOk(
+      flash(
         action === 'launch' || action === 'resume'
           ? `Campaign ${action}ed — ${res.queued} sends queued.`
           : action === 'kill'
@@ -245,7 +253,7 @@ function Campaigns() {
       setLandingTemplate('generic');
       setLandingHtml('');
       setLandingPageName('');
-      setOk(
+      flash(
         scheduledSendAt
           ? 'Campaign scheduled. It will auto-launch at the set time.'
           : 'Campaign created as a draft. Launch it when you are ready to send.',
