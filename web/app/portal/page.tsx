@@ -54,7 +54,10 @@ export default function PortalRequestPage() {
           </span>
         </div>
 
-        <Card title="Your training dashboard">
+        <h1 className="mb-3 text-center text-2xl font-semibold tracking-tight text-slate-900">
+          Your training dashboard
+        </h1>
+        <Card>
           {sent ? (
             <>
               <Notice kind="ok">Check your email — the link is on its way.</Notice>

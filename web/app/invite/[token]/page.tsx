@@ -76,7 +76,10 @@ export default function InvitePage() {
           </span>
         </div>
 
-        <Card title="Choose your password">
+        <h1 className="mb-3 text-center text-2xl font-semibold tracking-tight text-slate-900">
+          Choose your password
+        </h1>
+        <Card>
           {loadError && (
             <Notice kind="error">
               {loadError} Ask the administrator of your account to send a new link.
