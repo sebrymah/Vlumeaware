@@ -72,3 +72,79 @@ describe('phishing-reporting channel', () => {
     await runAsSystem('cleanup', () => base.tenant.delete({ where: { id: other.id } }));
   });
 });
+
+describe('simulation credit is gated against a spoofed reporter', () => {
+  // A send to the reporter, with a known tracking token in its forwarded body.
+  async function seedSend(recipientEmail: string): Promise<{ sendId: string; body: string }> {
+    return runInTenant(tenantId, async () => {
+      const recipient = await db.employee.upsert({
+        where: { tenantId_email: { tenantId, email: recipientEmail } },
+        update: {},
+        create: { tenantId, email: recipientEmail, name: 'Recipient' },
+      });
+      const scenario = await db.scenario.create({
+        data: {
+          tenantId,
+          title: 'Lure',
+          difficultyTier: 'medium',
+          subjectLine: 's',
+          bodyHtml: 'b',
+          senderSpoofName: 'IT',
+          redFlags: ['x'],
+          approvedAt: new Date(),
+        },
+      });
+      const campaign = await db.campaign.create({ data: { tenantId, name: `c-${Date.now()}` } });
+      const tok = `tok${Date.now()}${Math.random().toString(36).slice(2, 10)}`;
+      const send = await db.send.create({
+        data: {
+          tenantId,
+          campaignId: campaign.id,
+          employeeId: recipient.id,
+          scenarioId: scenario.id,
+          uniqueTrackingToken: tok,
+          sentAt: new Date(),
+        },
+      });
+      return { sendId: send.id, body: `forwarded /track/click/${tok} end` };
+    });
+  }
+
+  async function reportedAt(sendId: string) {
+    const s = await runInTenant(tenantId, () => db.send.findUnique({ where: { id: sendId } }));
+    return s!.reportedAt;
+  }
+
+  it('credits when the reporter IS the recipient and the sender is authenticated', async () => {
+    const { sendId, body } = await seedSend(reporterEmail);
+    const res = await intake.ingest(
+      { reporterEmail, rawBody: body },
+      { tenantId, senderAuthenticated: true },
+    );
+    expect(res.matchedSimulation).toBe(true);
+    expect(await reportedAt(sendId)).not.toBeNull();
+  });
+
+  it('does NOT credit when the reporter is not the send recipient (spoof of a colleague)', async () => {
+    const victim = `victim-${Date.now()}@x.test`;
+    const { sendId, body } = await seedSend(victim);
+    // reporterEmail (a different employee) forwards the victim's simulation.
+    const res = await intake.ingest(
+      { reporterEmail, rawBody: body },
+      { tenantId, senderAuthenticated: true },
+    );
+    expect(res.matchedSimulation).toBe(true);
+    expect(await reportedAt(sendId)).toBeNull();
+  });
+
+  it('does NOT credit when the sender failed authentication', async () => {
+    const email = `unauth-${Date.now()}@x.test`;
+    const { sendId, body } = await seedSend(email);
+    const res = await intake.ingest(
+      { reporterEmail: email, rawBody: body },
+      { tenantId, senderAuthenticated: false },
+    );
+    expect(res.matchedSimulation).toBe(true);
+    expect(await reportedAt(sendId)).toBeNull();
+  });
+});

@@ -23,7 +23,7 @@ export class IntakeService {
       sender?: string;
       rawBody?: string;
     },
-    opts: { tenantId?: string } = {},
+    opts: { tenantId?: string; senderAuthenticated?: boolean } = {},
   ) {
     const reporter = input.reporterEmail.trim().toLowerCase();
 
@@ -46,17 +46,26 @@ export class IntakeService {
     // Did they forward one of our own simulations?
     let matchedSendId: string | null = null;
     let matchedSimulation = false;
+    let creditEligible = false;
     const tokenMatch = input.rawBody?.match(IntakeService.TOKEN_RE);
     if (tokenMatch) {
       const send = await runAsSystem('intake: resolve token in forwarded mail', () =>
         this.prisma.db.send.findUnique({
           where: { uniqueTrackingToken: tokenMatch[1] },
-          select: { id: true, tenantId: true },
+          select: { id: true, tenantId: true, employeeId: true },
         }),
       );
       if (send && send.tenantId === employee.tenantId) {
         matchedSendId = send.id;
         matchedSimulation = true;
+        // Only credit the catch when the reporter is the person the simulation
+        // was actually sent to, and — for feeders that can tell us — the sending
+        // address was authenticated (DKIM/DMARC). The `From` on a forwarded mail
+        // is spoofable, so without these checks an attacker who learned the
+        // forwarding token could mark any colleague as having reported, or
+        // inflate a risk score. `senderAuthenticated === undefined` means the
+        // feeder vouches for the sender itself (e.g. the shared-secret endpoint).
+        creditEligible = send.employeeId === employee.id && opts.senderAuthenticated !== false;
       }
     }
 
@@ -75,8 +84,9 @@ export class IntakeService {
     );
 
     // A forwarded simulation still counts as a correct catch: credit the report
-    // on the send if it was not already clicked.
-    if (matchedSimulation && matchedSendId) {
+    // on the send if it was not already clicked — but only when the reporter is
+    // the real recipient and the sender was authenticated (see creditEligible).
+    if (matchedSimulation && matchedSendId && creditEligible) {
       await runInTenant(employee.tenantId, () =>
         this.prisma.db.send.updateMany({
           where: { id: matchedSendId, reportedAt: null, clickedAt: null },

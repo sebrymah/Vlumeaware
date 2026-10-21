@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, Post, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
-import { IsOptional, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Public } from '../../common/auth/roles.decorator';
 import { Throttle } from '../../common/ratelimit/rate-limit.decorator';
@@ -12,6 +12,11 @@ class PostmarkAddress {
   @IsOptional() @IsString() Name?: string;
 }
 
+class PostmarkHeader {
+  @IsOptional() @IsString() Name?: string;
+  @IsOptional() @IsString() Value?: string;
+}
+
 /** The subset of Postmark's inbound payload we use. */
 class PostmarkInboundDto {
   /** The token after the "+" in report+<token>@… — resolves the tenant. */
@@ -21,6 +26,20 @@ class PostmarkInboundDto {
   @IsOptional() @IsString() HtmlBody?: string;
   @IsOptional() @IsString() From?: string;
   @IsOptional() @ValidateNested() @Type(() => PostmarkAddress) FromFull?: PostmarkAddress;
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => PostmarkHeader)
+  Headers?: PostmarkHeader[];
+}
+
+/**
+ * Whether the inbound message's sending address was authenticated. Reads the
+ * Authentication-Results header Postmark passes through: a legitimate forward
+ * (sent by the staffer through their own mail system) passes DKIM/DMARC for
+ * their domain, while an attacker spoofing a colleague's From from outside that
+ * system fails. Absent header ⟹ treated as unauthenticated (fail safe).
+ */
+function postmarkSenderAuthenticated(headers?: PostmarkHeader[]): boolean {
+  const ar = headers?.find((h) => h.Name?.toLowerCase() === 'authentication-results')?.Value ?? '';
+  return /\bdmarc=pass\b/i.test(ar) || /\bdkim=pass\b/i.test(ar);
 }
 
 @Controller()
@@ -57,7 +76,7 @@ export class PostmarkController {
 
     const result = await this.intake.ingest(
       { reporterEmail, subject: body.Subject, rawBody: body.TextBody || body.HtmlBody },
-      { tenantId: tenant.tenantId },
+      { tenantId: tenant.tenantId, senderAuthenticated: postmarkSenderAuthenticated(body.Headers) },
     );
     if (result.recorded) await this.channel.markReceived(tenant.tenantId);
     return result;
