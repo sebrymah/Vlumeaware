@@ -64,6 +64,7 @@ const NAV: Record<Role, NavEntry[]> = {
       items: [
         { href: '/client/certificates', label: 'Certificates' },
         { href: '/client/reported', label: 'Phish reports' },
+        { href: '/client/reporting-setup', label: 'Reporting setup' },
       ],
     },
     { kind: 'link', href: '/client/settings', label: 'Branding', icon: 'sparkles' },

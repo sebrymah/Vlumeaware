@@ -137,6 +137,7 @@ model Tenant {
   quizAttempts          QuizAttempt[]
   certificates          Certificate[]
   phishReports          PhishReport[]
+  reportChannel         TenantReportChannel?
   verifiedDomains       VerifiedDomain[]
   licenseTokens         LicenseToken[]
   sendingDomains        SendingDomain[]
@@ -630,6 +631,47 @@ model PhishReport {
 
   @@index([tenantId])
   @@map("phish_reports")
+}
+
+/// How a tenant's staff report phishing. One channel per tenant (Phase 1:
+/// forwarding to a Vlumeaware-hosted address; later: a connected mailbox polled
+/// via the provider's API). The sink — POST /intake/phish-report — is the same
+/// for every method.
+model TenantReportChannel {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @unique @map("tenant_id") @db.Uuid
+  method          ReportMethod    @default(forwarding)
+  /// Set only for the connected-mailbox method (Phase 2+).
+  provider        ReportProvider?
+  /// Per-tenant alias token: staff forward to report+<token>@report.vlumesec.com,
+  /// and Postmark hands it back as the MailboxHash so we resolve the tenant
+  /// without guessing from the sender's domain.
+  forwardingToken String          @unique @map("forwarding_token")
+  status          ChannelStatus   @default(active)
+  lastReceivedAt  DateTime?       @map("last_received_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_report_channels")
+}
+
+enum ReportMethod {
+  forwarding
+  connected
+}
+
+enum ReportProvider {
+  zoho
+  google
+  microsoft
+}
+
+enum ChannelStatus {
+  unconfigured
+  active
+  error
 }
 
 /// Shared awareness-content library curated by Vlumetech staff. GLOBAL by

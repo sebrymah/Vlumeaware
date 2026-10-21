@@ -23,6 +23,7 @@ import { TemplatesModule } from './modules/templates/templates.module';
 import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { CertificatesModule } from './modules/certificates/certificates.module';
 import { IntakeModule } from './modules/intake/intake.module';
+import { ReportChannelModule } from './modules/report-channel/report-channel.module';
 import { SendingDomainsModule } from './modules/sending-domains/sending-domains.module';
 import { LandingPagesModule } from './modules/landing-pages/landing-pages.module';
 import { PortalModule } from './modules/portal/portal.module';
@@ -52,6 +53,7 @@ import { HealthController } from './health.controller';
     QuizzesModule,
     CertificatesModule,
     IntakeModule,
+    ReportChannelModule,
     SharedModulesModule,
     SendingDomainsModule,
     LandingPagesModule,

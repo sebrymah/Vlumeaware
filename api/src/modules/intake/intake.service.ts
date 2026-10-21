@@ -16,18 +16,24 @@ export class IntakeService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async ingest(input: {
-    reporterEmail: string;
-    subject?: string;
-    sender?: string;
-    rawBody?: string;
-  }) {
+  async ingest(
+    input: {
+      reporterEmail: string;
+      subject?: string;
+      sender?: string;
+      rawBody?: string;
+    },
+    opts: { tenantId?: string } = {},
+  ) {
     const reporter = input.reporterEmail.trim().toLowerCase();
 
-    // Resolve which tenant this reporter belongs to (system-scoped lookup).
+    // Resolve which tenant this reporter belongs to (system-scoped lookup). When
+    // the feeder already knows the tenant (e.g. the Postmark path resolved it
+    // from the forwarding token), scope the match to that tenant so an address
+    // that exists in two tenants can never be mis-attributed across them.
     const employee = await runAsSystem('intake: match reporter to employee', () =>
       this.prisma.db.employee.findFirst({
-        where: { email: reporter },
+        where: opts.tenantId ? { email: reporter, tenantId: opts.tenantId } : { email: reporter },
         select: { id: true, tenantId: true },
       }),
     );

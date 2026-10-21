@@ -28,6 +28,7 @@ export const TENANT_SCOPED_MODELS = new Set<string>([
   'QuizAttempt',
   'Certificate',
   'PhishReport',
+  'TenantReportChannel',
   'VerifiedDomain',
   'LicenseToken',
   'SendingDomain',
