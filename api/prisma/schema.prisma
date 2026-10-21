@@ -203,6 +203,11 @@ model TenantUser {
   /// and every authenticated request refuse a deactivated account, so this takes
   /// effect immediately rather than at token expiry.
   deactivatedAt DateTime? @map("deactivated_at")
+  /// When the user actually chose a password by following their link. Null means
+  /// nobody has: the row holds a random unknowable hash, so every sign-in fails —
+  /// which looked identical to "active" in the console and sent admins looking for
+  /// a password problem that did not exist.
+  passwordSetAt DateTime? @map("password_set_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

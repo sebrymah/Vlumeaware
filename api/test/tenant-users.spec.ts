@@ -334,3 +334,35 @@ describe('deactivating a console user', () => {
     );
   });
 });
+
+describe('an invitation nobody completed', () => {
+  it('is reported as awaiting a password, not as active', async () => {
+    const t = await freshTenant();
+    await tenants.createTenantUser(t.id, {
+      email: 'never-finished@example.test',
+      role: 'client_viewer',
+    });
+
+    const security = await runInTenant(t.id, () => tenants.getSecurity(t.id));
+    const row = security.users.find((u) => u.email === 'never-finished@example.test');
+    // The row is neither deactivated nor locked, so before this it looked
+    // "active" — while every sign-in failed, because no password existed.
+    expect(row?.deactivated).toBe(false);
+    expect(row?.awaitingPassword).toBe(true);
+    expect(row?.passwordSet).toBe(false);
+    expect(row?.lastSignInAt).toBeNull();
+  });
+
+  it('stops awaiting one once the link is used', async () => {
+    const t = await freshTenant();
+    sent.length = 0;
+    await tenants.createTenantUser(t.id, { email: 'finished@example.test', role: 'client_viewer' });
+    const token = /\/invite\/([A-Za-z0-9_-]+)/.exec(sent[sent.length - 1].html)![1];
+    await invites.accept(token, 'a properly long password');
+
+    const security = await runInTenant(t.id, () => tenants.getSecurity(t.id));
+    const row = security.users.find((u) => u.email === 'finished@example.test');
+    expect(row?.awaitingPassword).toBe(false);
+    expect(row?.passwordSet).toBe(true);
+  });
+});

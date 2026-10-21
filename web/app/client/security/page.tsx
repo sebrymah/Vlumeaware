@@ -26,6 +26,10 @@ interface SecurityUser {
   invitePending: boolean;
   /** Access withdrawn; the record is kept so it can be restored or audited. */
   deactivated: boolean;
+  /** Invited, and no password has been recorded since: cannot sign in yet. */
+  awaitingPassword: boolean;
+  /** Never signed in shows as null, which is the useful signal. */
+  lastSignInAt: string | null;
 }
 
 interface Security {
@@ -352,7 +356,7 @@ function Security() {
       </Card>
 
       <Card title={`Console users (${security.users.length})`}>
-        <Table head={['Email', 'Role', 'MFA', 'Status', '']}>
+        <Table head={['Email', 'Role', 'MFA', 'Status', 'Last sign-in', '']}>
           {security.users.map((u) => (
             <tr key={u.id} className="border-b border-slate-100">
               <td className="px-2 py-2">{u.email}</td>
@@ -367,9 +371,16 @@ function Security() {
                   <span className="text-xs font-medium text-red-600">locked</span>
                 ) : u.invitePending ? (
                   <span className="text-xs font-medium text-amber-700">invited</span>
+                ) : u.awaitingPassword ? (
+                  // Looks active, but no password was ever chosen: every
+                  // sign-in fails until a fresh link is sent.
+                  <span className="text-xs font-medium text-amber-700">no password yet</span>
                 ) : (
                   <span className="text-xs text-slate-500">active</span>
                 )}
+              </td>
+              <td className="whitespace-nowrap px-2 py-2 text-slate-500">
+                {u.lastSignInAt ? new Date(u.lastSignInAt).toLocaleDateString() : 'never'}
               </td>
               <td className="px-2 py-2">
                 <div className="flex justify-end gap-1">
@@ -403,7 +414,10 @@ function Security() {
           ))}
         </Table>
         <p className="mt-3 text-[11px] text-slate-400">
-          <b>Invited</b> means the emailed link has not been used yet, so no password has been chosen.
+          <b>Invited</b> means the emailed link is still valid; <b>no password yet</b> means one was sent
+          but never completed, so the account cannot sign in until you send a fresh link. Both are
+          fixed by <b>Reset password</b>. The last sign-in column is how you tell a forgotten password
+          from an account nobody has ever signed into.
           <b> Reset password</b> emails a fresh link and invalidates any earlier one. <b>Deactivate</b>
           withdraws access immediately but keeps the record, so it can be restored; you cannot
           deactivate yourself, and the last active administrator cannot be deactivated. An account

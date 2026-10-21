@@ -107,9 +107,19 @@ export class TenantsService {
         createdAt: true,
         inviteExpiresAt: true,
         deactivatedAt: true,
+        passwordSetAt: true,
+        inviteSentAt: true,
       },
       orderBy: { createdAt: 'asc' },
     });
+    // "Never signed in" is what separates a user who forgot a password from one
+    // who never got as far as choosing one.
+    const lastLogins = await this.prisma.db.auditLog.groupBy({
+      by: ['actorId'],
+      where: { tenantId, action: 'auth.login', actorId: { in: users.map((u) => u.id) } },
+      _max: { createdAt: true },
+    });
+    const lastSignIn = new Map(lastLogins.map((l) => [l.actorId, l._max.createdAt]));
     return {
       passwordMinLength: tenant.passwordMinLength,
       sessionTimeoutMinutes: tenant.sessionTimeoutMinutes,
@@ -124,6 +134,12 @@ export class TenantsService {
         invitePending: Boolean(u.inviteExpiresAt && u.inviteExpiresAt > new Date()),
         // Access withdrawn; the record is kept so it can be restored.
         deactivated: Boolean(u.deactivatedAt),
+        // An invitation went out and no password has been recorded since, so
+        // this account cannot be signed into until a new link is sent. That is
+        // why an account can look "active" and still reject every password.
+        awaitingPassword: Boolean(u.inviteSentAt && !u.passwordSetAt),
+        passwordSet: Boolean(u.passwordSetAt),
+        lastSignInAt: lastSignIn.get(u.id) ?? null,
         createdAt: u.createdAt,
       })),
     };

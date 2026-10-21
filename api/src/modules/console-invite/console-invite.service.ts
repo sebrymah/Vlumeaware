@@ -168,6 +168,9 @@ export class ConsoleInviteService {
         where: { id: user.id },
         data: {
           passwordHash,
+          // The account now has a password somebody knows, which the console
+          // needs to distinguish from an invitation nobody ever completed.
+          passwordSetAt: new Date(),
           // Clearing the hash is what makes the link single-use.
           inviteTokenHash: null,
           inviteExpiresAt: null,
