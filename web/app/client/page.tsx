@@ -486,7 +486,7 @@ function Campaigns() {
                     ))}
                   </select>
                 )}
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   {recipientMode === 'all'
                     ? 'The simulation goes to everyone on your roster (verified domains only).'
                     : recipientMode === 'group'
@@ -550,7 +550,7 @@ function Campaigns() {
                     placeholder="e.g. IT Service Desk"
                     aria-label="Sender display name"
                   />
-                  <p className="mt-1 text-[11px] text-slate-400">
+                  <p className="mt-1 text-[11px] text-slate-500">
                     The name staff see in their inbox. Set a convincing title so the sending address
                     is not the first thing they notice. Leave blank to use each scenario&rsquo;s own
                     sender name.

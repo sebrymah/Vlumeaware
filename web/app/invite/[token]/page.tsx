@@ -121,7 +121,7 @@ export default function InvitePage() {
               >
                 {busy ? 'Saving…' : 'Save password'}
               </button>
-              <p className="text-[11px] leading-relaxed text-slate-400">
+              <p className="text-[11px] leading-relaxed text-slate-500">
                 At least {details.passwordMinLength} characters. The link works once; afterwards sign
                 in normally.
               </p>

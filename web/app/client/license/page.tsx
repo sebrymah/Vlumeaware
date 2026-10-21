@@ -122,7 +122,7 @@ function License() {
                 )}
               </dd>
               {access.licenseEndsAt && (
-                <dd className="mt-0.5 text-[11px] text-slate-400">
+                <dd className="mt-0.5 text-[11px] text-slate-500">
                   {access.licenseDaysLeft != null && access.licenseDaysLeft > 0 ? 'renews' : 'ended'}{' '}
                   {new Date(access.licenseEndsAt).toLocaleDateString()}
                 </dd>

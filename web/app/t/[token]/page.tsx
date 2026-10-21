@@ -206,7 +206,7 @@ function Shell({
         <p className="mt-4 text-center text-[11px] text-slate-500">
           Authorized security awareness exercise delivered by Vlumetech LTD on behalf of {org}.
         </p>
-        <p className="mt-1 text-center text-[11px] text-slate-400">
+        <p className="mt-1 text-center text-[11px] text-slate-500">
           <Link href="/" className="hover:underline">
             Vlumeaware
           </Link>

@@ -84,7 +84,7 @@ export default function PortalRequestPage() {
               {busy ? 'Sending…' : 'Email me a sign-in link'}
             </button>
             {busy && (
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 This can take a moment the first time — waking the server.
               </p>
             )}

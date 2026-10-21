@@ -47,7 +47,7 @@ export default function VerifyPage({ params }: { params: Promise<{ serial: strin
           <LogoMark size={18} className="mr-1.5 inline-block align-[-3px]" />
           Vlume<span className="text-brand-600">aware</span>
         </span>
-        <span className="text-[11px] uppercase tracking-widest text-slate-400">
+        <span className="text-[11px] uppercase tracking-widest text-slate-500">
           Certificate verification
         </span>
       </div>

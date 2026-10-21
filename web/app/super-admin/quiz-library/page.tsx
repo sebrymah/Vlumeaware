@@ -177,7 +177,7 @@ function QuizLibrary() {
               <tr key={z.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">
                   {z.title}
-                  {z.source && <div className="text-[11px] text-slate-400">{z.source}</div>}
+                  {z.source && <div className="text-[11px] text-slate-500">{z.source}</div>}
                 </td>
                 <td className="px-2 py-2 text-slate-500">{z.category ?? '—'}</td>
                 <td className="px-2 py-2">{z.questions?.length ?? 0}</td>

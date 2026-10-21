@@ -366,7 +366,7 @@ function Security() {
               </td>
               <td className="px-2 py-2">
                 {u.deactivated ? (
-                  <span className="text-xs font-medium text-slate-400">deactivated</span>
+                  <span className="text-xs font-medium text-slate-500">deactivated</span>
                 ) : u.locked ? (
                   <span className="text-xs font-medium text-red-600">locked</span>
                 ) : u.invitePending ? (
@@ -413,7 +413,7 @@ function Security() {
             </tr>
           ))}
         </Table>
-        <p className="mt-3 text-[11px] text-slate-400">
+        <p className="mt-3 text-[11px] text-slate-500">
           <b>Invited</b> means the emailed link is still valid; <b>no password yet</b> means one was sent
           but never completed, so the account cannot sign in until you send a fresh link. Both are
           fixed by <b>Reset password</b>. The last sign-in column is how you tell a forgotten password
@@ -457,7 +457,7 @@ function Security() {
             </Button>
           </div>
         </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
           You do not set their password. They receive a one-time link, choose one themselves, and it
           must be at least {security.passwordMinLength} characters to match your policy.
           {security.requireMfa &&

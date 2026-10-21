@@ -124,7 +124,7 @@ function SenderTitle({
           {busy ? 'Saving…' : 'Save name'}
         </Button>
       </div>
-      <p className="mt-1 text-[11px] text-slate-400">
+      <p className="mt-1 text-[11px] text-slate-500">
         Shown as the sender&rsquo;s name. The domain and address the mail comes from do not change.
         Leave blank to use each scenario&rsquo;s own sender name.
       </p>
@@ -262,7 +262,7 @@ function SendingDomains() {
                       not enabled
                     </span>
                   )}
-                  <span className="text-[11px] text-slate-400">Verified by Vlumeaware · no DNS to publish</span>
+                  <span className="text-[11px] text-slate-500">Verified by Vlumeaware · no DNS to publish</span>
                   <div className="ml-auto flex gap-2">
                     {s.enabled && s.id ? (
                       <ConfirmButton
@@ -331,7 +331,7 @@ function SendingDomains() {
                   <span className="font-mono text-sm font-medium text-slate-900">{d.domain}</span>
                   <StatusPill status={d.status} />
                   {d.verifiedAt && (
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-slate-500">
                       verified {new Date(d.verifiedAt).toLocaleDateString()}
                     </span>
                   )}

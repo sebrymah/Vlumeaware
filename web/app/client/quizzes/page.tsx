@@ -452,7 +452,7 @@ function Quizzes() {
             </Button>
           </form>
           {modules.length === 0 && (
-            <p className="mt-2 text-[11px] text-slate-400">
+            <p className="mt-2 text-[11px] text-slate-500">
               Add a training video first (Awareness content) — a quiz must attach to one.
             </p>
           )}

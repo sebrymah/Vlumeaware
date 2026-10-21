@@ -352,7 +352,7 @@ function Content() {
                       ))}
                     </select>
                   ) : (
-                    <span className="text-[11px] text-slate-400">No quizzes yet</span>
+                    <span className="text-[11px] text-slate-500">No quizzes yet</span>
                   )}
                 </td>
                 <td className="px-2 py-2">{new Date(m.createdAt).toLocaleDateString()}</td>

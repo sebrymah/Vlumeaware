@@ -649,7 +649,7 @@ function TenantDetail() {
                           {status}
                         </span>
                         {k.redeemedBy && (
-                          <span className="block text-[11px] text-slate-400">{k.redeemedBy}</span>
+                          <span className="block text-[11px] text-slate-500">{k.redeemedBy}</span>
                         )}
                       </td>
                       <td className="px-2 py-2 text-right">
@@ -762,7 +762,7 @@ function TenantDetail() {
             </Field>
           </div>
           <div className="w-56">
-            <p className="text-[11px] leading-relaxed text-slate-400">
+            <p className="text-[11px] leading-relaxed text-slate-500">
               No password to set: they receive a one-time link, choose their own, and the tenant's
               password policy applies to it.
             </p>

@@ -252,14 +252,14 @@ function Risk() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-[11px] text-slate-400">
+                  <p className="mt-2 text-[11px] text-slate-500">
                     These are suggestions. Assign them from the Training page, or use the remediation
                     enrolment below.
                   </p>
                 </div>
               )}
 
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 Generated {new Date(advice.generatedAt).toLocaleString()} from the table below.
                 Judgement stays yours.
               </p>
