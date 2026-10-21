@@ -46,10 +46,20 @@ export class SignupService {
       );
     }
 
-    // Email must be unique across staff and all client accounts.
+    // Email must be unique across staff and all client accounts, and the check
+    // has to ignore case: otherwise `Admin@x.com` registers alongside
+    // `admin@x.com`, leaving two rows claiming one address.
+    const address = email.trim();
     const clash = await runAsSystem('signup: check email in use', async () => {
-      const staff = await this.prisma.db.user.findUnique({ where: { email }, select: { id: true } });
-      const tenantUser = await this.prisma.db.tenantUser.findFirst({ where: { email }, select: { id: true } });
+      const insensitive = { equals: address, mode: 'insensitive' as const };
+      const staff = await this.prisma.db.user.findFirst({
+        where: { email: insensitive },
+        select: { id: true },
+      });
+      const tenantUser = await this.prisma.db.tenantUser.findFirst({
+        where: { email: insensitive },
+        select: { id: true },
+      });
       return staff || tenantUser;
     });
     if (clash) throw new ConflictException('That email is already registered');

@@ -45,7 +45,15 @@ export class AuthService {
   }
 
   async login(email: string, password: string): Promise<LoginResult> {
-    const staff = await this.prisma.db.user.findUnique({ where: { email } });
+    // The comparison must not depend on case. People capitalise their own names,
+    // addresses arrive pasted with a trailing space, and newer accounts are
+    // stored lower-cased while older ones are stored exactly as they were typed
+    // — looking up the raw string failed for every one of those.
+    const address = (email ?? '').trim();
+
+    const staff = await this.prisma.db.user.findFirst({
+      where: { email: { equals: address, mode: 'insensitive' } },
+    });
     if (staff) {
       this.assertNotLocked(staff.lockedUntil);
       if (!(await bcrypt.compare(password, staff.passwordHash))) {
@@ -71,21 +79,41 @@ export class AuthService {
     }
 
     // Login predates any tenant context, so the lookup is explicitly system
-    // scoped. It reads only the credential row it was asked for.
-    const tenantUser = await runAsSystem('login: resolve tenant user by email', () =>
-      this.prisma.db.tenantUser.findFirst({ where: { email } }),
+    // scoped. It reads only the credential rows it was asked for.
+    //
+    // More than one row can carry the same address — the same person can be a
+    // console user of two tenants — so the password decides which account this
+    // is. Taking the first row, as this used to, meant sign-in simply failed
+    // whenever the other tenant's row came back first.
+    const candidates = await runAsSystem('login: resolve tenant user by email', () =>
+      this.prisma.db.tenantUser.findMany({
+        where: { email: { equals: address, mode: 'insensitive' } },
+        take: 10,
+      }),
     );
+
+    let tenantUser: (typeof candidates)[number] | undefined;
+    for (const candidate of candidates) {
+      if (await bcrypt.compare(password, candidate.passwordHash)) {
+        tenantUser = candidate;
+        break;
+      }
+    }
+    if (!tenantUser && candidates.length) {
+      // Record the failure against each matching account, which is what would
+      // happen if the attempt had been aimed at them one at a time.
+      for (const candidate of candidates) {
+        await this.recordTenantUserFailure(
+          candidate.id,
+          candidate.failedLoginCount,
+          candidate.tenantId,
+          candidate.role,
+        );
+      }
+      throw new UnauthorizedException('Invalid credentials');
+    }
     if (tenantUser) {
       this.assertNotLocked(tenantUser.lockedUntil);
-      if (!(await bcrypt.compare(password, tenantUser.passwordHash))) {
-        await this.recordTenantUserFailure(
-          tenantUser.id,
-          tenantUser.failedLoginCount,
-          tenantUser.tenantId,
-          tenantUser.role,
-        );
-        throw new UnauthorizedException('Invalid credentials');
-      }
       await this.resetTenantUserFailures(tenantUser.id);
 
       // Checked after the password so a withdrawn account cannot be used to

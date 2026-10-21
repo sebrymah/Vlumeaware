@@ -1,5 +1,6 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
 import { IsEmail, IsString, Length, Matches, MinLength } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { Throttle } from '../ratelimit/rate-limit.decorator';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
@@ -10,7 +11,12 @@ import { ROLES } from './roles';
 import type { JwtPayload } from './roles';
 
 class LoginDto {
-  @IsEmail() email!: string;
+  // Trimmed before validation: an address pasted from an email or a password
+  // manager routinely carries a trailing space, and rejecting it as "not an
+  // email" is a dead end for the user — nothing about the form looks wrong.
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsEmail()
+  email!: string;
   @IsString() @MinLength(8) password!: string;
 }
 
