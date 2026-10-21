@@ -20,7 +20,7 @@ describe('isAuthenticatedSender', () => {
   });
 
   it('accepts a DMARC pass aligned to the From domain from our MTA', () => {
-    const headers = [ar(`${AUTHSERV}; spf=pass dkim=pass header.d=acme.test dmarc=pass header.from=acme.test`)];
+    const headers = [ar(`${AUTHSERV}; spf=pass; dkim=pass header.d=acme.test; dmarc=pass header.from=acme.test`)];
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(true);
   });
 
@@ -39,16 +39,26 @@ describe('isAuthenticatedSender', () => {
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 
-  it('rejects a pass verdict hidden inside a comment', () => {
-    const headers = [ar(`${AUTHSERV}; dmarc=fail (dmarc=pass header.from=acme.test) header.from=acme.test`)];
+  it('rejects a pass verdict hidden inside a (nested) comment', () => {
+    const headers = [ar(`${AUTHSERV}; dmarc=fail (a(dmarc=pass header.from=acme.test)b) header.from=acme.test`)];
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 
-  it('uses the topmost trusted header, not a lower injected one', () => {
+  it('rejects a pass hidden in a quoted property value', () => {
+    const headers = [ar(`${AUTHSERV}; dmarc=fail reason="dmarc=pass header.from=acme.test" header.from=acme.test`)];
+    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
+  });
+
+  it('rejects when two headers carry the trusted authserv-id (injection attempt)', () => {
     const headers = [
-      ar(`${AUTHSERV}; dmarc=fail header.from=acme.test`), // our MTA's real verdict (topmost)
-      ar(`${AUTHSERV}; dmarc=pass header.from=acme.test`), // injected lower down
+      ar(`${AUTHSERV}; dmarc=fail header.from=acme.test`), // our MTA's real verdict
+      ar(`${AUTHSERV}; dmarc=pass header.from=acme.test`), // sender-injected duplicate
     ];
+    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
+  });
+
+  it('rejects a From that is a sibling, not a subdomain, of the signing domain', () => {
+    const headers = [ar(`${AUTHSERV}; dkim=pass header.d=notacme.test`)];
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 
