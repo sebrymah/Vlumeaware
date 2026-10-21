@@ -227,11 +227,12 @@ The "Now" tranche is complete, and the direction-independent half of "Next". Wha
 remains: the public pages onto the kit, toasts, skeleton coverage, and the product
 decision below.
 
-**A duplication worth fixing properly.** The training page carries its own copy of the
-quiz markup rather than sharing `app/t/[token]/quiz.tsx`, so the pass had to be applied
-twice and the two will drift. Extracting one learner-facing quiz component is a small
-refactor with a real payoff; it is on the "Later" list rather than done here, because it
-touches scoring-adjacent UI.
+**The learner quiz is now one component.** `components/learner-quiz.tsx` holds the
+markup and is deliberately presentational: the two callers submit to different
+endpoints and the training page redirects on a pass, so their behaviour stayed where it
+was. What moved was the part that had already drifted — the training page's copy still
+had 11px explanations and a 12px submit after the landing page was fixed. The training
+page's `Result` type now extends the shared one rather than redefining it.
 
 ### The decision the employee pass needs
 

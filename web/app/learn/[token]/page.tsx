@@ -1,6 +1,8 @@
 'use client';
 
 import { use, useCallback, useEffect, useState } from 'react';
+import { LearnerQuiz } from '@/components/learner-quiz';
+import type { LearnerQuizResult } from '@/components/learner-quiz';
 import { useRouter } from 'next/navigation';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
@@ -17,12 +19,8 @@ interface Learn {
     questions: Array<{ id: string; prompt: string; options: string[] }>;
   } | null;
 }
-interface Result {
-  score: number;
-  total: number;
-  passed: boolean;
-  passingScorePct: number;
-  results: Array<{ questionId: string; correct: boolean; correctIndex: number; explanation: string | null }>;
+// The shared result shape, plus the two fields only this page's endpoint returns.
+interface Result extends LearnerQuizResult {
   certificateId: string | null;
   certificateEmailed?: boolean;
 }
@@ -124,8 +122,6 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
     }
   }
 
-  const byId = (id: string) => result?.results.find((r) => r.questionId === id);
-  const allAnswered = data.quiz ? data.quiz.questions.every((q) => answers[q.id] !== undefined) : false;
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-10">
@@ -166,71 +162,19 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
           ✓ Training complete — taking you to your certificate…
         </div>
       ) : data.quiz ? (
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-          <h2 className="text-lg font-semibold text-slate-900">Knowledge check</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {result
-              ? `You scored ${result.score}/${result.total}. Pass mark ${result.passingScorePct}%.`
-              : `Answer ${data.quiz.questions.length} questions. Pass mark ${data.quiz.passingScorePct}%.`}
-          </p>
-          <div className="mt-3 space-y-4">
-            {data.quiz.questions.map((q, qi) => {
-              const r = byId(q.id);
-              return (
-                <div key={q.id}>
-                  <p className="text-base font-medium text-slate-800">{qi + 1}. {q.prompt}</p>
-                  <div className="mt-1 space-y-1">
-                    {q.options.map((opt, oi) => {
-                      const chosen = answers[q.id] === oi;
-                      const isCorrect = r && r.correctIndex === oi;
-                      const wrongPick = r && chosen && !r.correct;
-                      return (
-                        <label
-                          key={oi}
-                          className={`flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-base ${
-                            isCorrect
-                              ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
-                              : wrongPick
-                                ? 'border-red-300 bg-red-50 text-red-900'
-                                : chosen
-                                  ? 'border-slate-400 bg-slate-50 text-slate-900'
-                                  : 'border-slate-200 text-slate-700'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name={q.id}
-                            disabled={!!result}
-                            checked={chosen}
-                            onChange={() => setAnswers({ ...answers, [q.id]: oi })}
-                          />
-                          {opt}
-                          {isCorrect && <span className="ml-auto text-[11px] font-semibold">correct</span>}
-                        </label>
-                      );
-                    })}
-                  </div>
-                  {r?.explanation && <p className="mt-1 text-[11px] text-slate-500">{r.explanation}</p>}
-                </div>
-              );
-            })}
-          </div>
-          {!result && (
-            <button
-              onClick={submit}
-              disabled={busy || !allAnswered}
-              className="mt-4 rounded px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
-              style={{ background: accent }}
-            >
-              {busy ? 'Checking…' : 'Submit answers'}
-            </button>
-          )}
-          {result && !result.passed && (
-            <div role="status" aria-live="polite" className="mt-5 rounded-lg bg-amber-50 px-4 py-3 text-base text-amber-900">
-              Not quite — review the explanations above and try again if you have attempts left.
-            </div>
-          )}
-        </section>
+        <LearnerQuiz
+            quiz={data.quiz}
+            accent={accent}
+            answers={answers}
+            onAnswer={(questionId, choice) => setAnswers({ ...answers, [questionId]: choice })}
+            result={result}
+            busy={busy}
+            onSubmit={submit}
+            submitError={submitError}
+            heading="Knowledge check"
+            passMessage="Passed — taking you to your certificate…"
+            failMessage="Not quite — review the explanations above and try again if you have attempts left."
+          />
       ) : (
         <button
           onClick={markComplete}
