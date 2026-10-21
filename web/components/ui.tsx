@@ -65,24 +65,37 @@ export function Button({
   variant = 'primary',
   disabled,
   type = 'button',
+  size = 'sm',
+  className = '',
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
   disabled?: boolean;
   type?: 'button' | 'submit';
+  /**
+   * 'sm' is the console's dense default. Public and employee-facing forms use
+   * 'md': a 28px target is fine beside a table row and too small on a login
+   * form, especially on a phone.
+   */
+  size?: 'sm' | 'md';
+  className?: string;
 }) {
   const styles = {
     primary: 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm',
     ghost: 'border border-slate-300 bg-white hover:bg-slate-50 text-slate-700',
     danger: 'bg-red-600 hover:bg-red-700 text-white shadow-sm',
   }[variant];
+  const sizes = {
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-4 py-2.5 text-sm',
+  }[size];
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${styles}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${sizes} ${styles} ${className}`}
     >
       {children}
     </button>

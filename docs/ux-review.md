@@ -63,8 +63,9 @@ Severity is about user impact. Effort is rough: S ≤ half a day, M ≤ 3 days, 
 
 | # | Finding | Evidence | Sev | Effort |
 |---|---|---|---|---|
-| C1 | Public pages bypass the kit: 1 of 6 imports `components/ui` | login, docs, terms, portal, verify | Medium | M |
-| C2 | The invite page is entirely hand-rolled | `app/invite/[token]/page.tsx` | Medium | S |
+| C1 | Public surfaces drift from the kit. `/login` and `/signup` do import it (the login through `PortalLogin`), but their primary buttons are hand-rolled, `/portal` was entirely hand-rolled, and `/docs`, `/terms` and `/verify` style themselves | 2 of 6 direct, 1 indirect | Medium | M |
+| C2 | The invite page is entirely hand-rolled — *fixed* | `app/invite/[token]/page.tsx` | Medium | S |
+| C6 | `Button` had a single size: 12px text on a ~28px target, used for primary actions everywhere including login forms | `components/ui.tsx` | Medium | S |
 | C3 | Two type scales coexist: admin 11–13px, docs 15px, marketing site its own. Employee-facing pages use 20px headings and 14px body | `app/docs` vs `app/client/*` vs `app/t/*` | Medium | M |
 | C4 | One blocking native dialog remains: group rename uses `window.prompt` | `app/client/groups/page.tsx:87` | Low | S |
 | C5 | Terminology drifts: "console users", "users", "team", "people" all name different things in different places | `app/client/security`, `guard.tsx`, `employees` | Low | S |
@@ -175,6 +176,17 @@ Second tranche, same branch:
   the product built from raw elements.
 - **The landing preview is a real dialog**: `role="dialog"`, `aria-modal`, labelled,
   Escape closes it, focus moves in and returns to the opener.
+
+Fourth tranche — the public surfaces:
+
+- **`Button` gained a size.** It was 12px on a ~28px target, used for every primary
+  action including the sign-in form. `size="md"` (14px, ~40px) is now used by login,
+  the portal request page, the invite page and employee actions; the console keeps its
+  dense default, so no admin screen shifted.
+- **`/portal` moved onto the kit** (`Card`/`Field`/`Button`/`Notice`, logo header), and
+  the login's two hand-rolled submit buttons became `Button`, so the first screen a
+  user meets matches the rest of the product.
+- `/verify` already used a branded card and 16px body; it needed nothing.
 
 Third tranche — the employee-facing pass, without changing what those pages say:
 

@@ -121,7 +121,7 @@ export default function InvitePage() {
                 </Field>
                 {error && <Notice kind="error">{error}</Notice>}
                 <div className="[&>button]:w-full">
-                  <Button type="submit" disabled={busy || !password || !confirm}>
+                  <Button type="submit" size="md" disabled={busy || !password || !confirm}>
                     {busy ? 'Saving…' : 'Save password'}
                   </Button>
                 </div>
@@ -142,7 +142,7 @@ export default function InvitePage() {
                 authentication, you will be asked to set it up before you start.
               </p>
               <Link href="/login" className="mt-4 inline-block">
-                <Button>Go to sign in</Button>
+                <Button size="md">Go to sign in</Button>
               </Link>
             </>
           )}

@@ -6,7 +6,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { login, verifyMfa, type LoginResponse } from '@/lib/api';
 import { homeFor, loginPathFor, writeSession, type Role } from '@/lib/session';
-import { Field, Notice, inputClass } from '@/components/ui';
+import { Button, Field, Notice, inputClass } from '@/components/ui';
 
 /**
  * A role-gated login form. Each portal (client vs Vlumetech staff) renders this
