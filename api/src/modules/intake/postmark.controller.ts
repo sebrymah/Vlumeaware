@@ -5,6 +5,7 @@ import { Public } from '../../common/auth/roles.decorator';
 import { Throttle } from '../../common/ratelimit/rate-limit.decorator';
 import { PostmarkGuard } from './postmark.guard';
 import { IntakeService } from './intake.service';
+import { isAuthenticatedSender } from './postmark-auth';
 import { ReportChannelService } from '../report-channel/report-channel.service';
 
 class PostmarkAddress {
@@ -28,18 +29,6 @@ class PostmarkInboundDto {
   @IsOptional() @ValidateNested() @Type(() => PostmarkAddress) FromFull?: PostmarkAddress;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => PostmarkHeader)
   Headers?: PostmarkHeader[];
-}
-
-/**
- * Whether the inbound message's sending address was authenticated. Reads the
- * Authentication-Results header Postmark passes through: a legitimate forward
- * (sent by the staffer through their own mail system) passes DKIM/DMARC for
- * their domain, while an attacker spoofing a colleague's From from outside that
- * system fails. Absent header ⟹ treated as unauthenticated (fail safe).
- */
-function postmarkSenderAuthenticated(headers?: PostmarkHeader[]): boolean {
-  const ar = headers?.find((h) => h.Name?.toLowerCase() === 'authentication-results')?.Value ?? '';
-  return /\bdmarc=pass\b/i.test(ar) || /\bdkim=pass\b/i.test(ar);
 }
 
 @Controller()
@@ -76,7 +65,7 @@ export class PostmarkController {
 
     const result = await this.intake.ingest(
       { reporterEmail, subject: body.Subject, rawBody: body.TextBody || body.HtmlBody },
-      { tenantId: tenant.tenantId, senderAuthenticated: postmarkSenderAuthenticated(body.Headers) },
+      { tenantId: tenant.tenantId, senderAuthenticated: isAuthenticatedSender(body.Headers, reporterEmail) },
     );
     if (result.recorded) await this.channel.markReceived(tenant.tenantId);
     return result;
