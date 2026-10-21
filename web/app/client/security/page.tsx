@@ -24,6 +24,8 @@ interface SecurityUser {
   locked: boolean;
   /** Invited, but has not followed the link and chosen a password yet. */
   invitePending: boolean;
+  /** Access withdrawn; the record is kept so it can be restored or audited. */
+  deactivated: boolean;
 }
 
 interface Security {
@@ -176,10 +178,14 @@ function Security() {
         : `Could not email ${user.email}. Check the mail provider, then try again.`;
     });
 
-  const removeUser = (user: SecurityUser) =>
+  const setActive = (user: SecurityUser, active: boolean) =>
     run(async () => {
-      await api.del(`/tenants/${tenantId}/users/${user.id}`);
-      return `${user.email} can no longer sign in.`;
+      await api.post(
+        `/tenants/${tenantId}/users/${user.id}/${active ? 'reactivate' : 'deactivate'}`,
+      );
+      return active
+        ? `${user.email} can sign in again. Send them a link if they have no password.`
+        : `${user.email} can no longer sign in.`;
     });
 
   /**
@@ -355,7 +361,9 @@ function Security() {
                 <Badge>{u.mfaEnabled ? 'on' : 'off'}</Badge>
               </td>
               <td className="px-2 py-2">
-                {u.locked ? (
+                {u.deactivated ? (
+                  <span className="text-xs font-medium text-slate-400">deactivated</span>
+                ) : u.locked ? (
                   <span className="text-xs font-medium text-red-600">locked</span>
                 ) : u.invitePending ? (
                   <span className="text-xs font-medium text-amber-700">invited</span>
@@ -370,20 +378,25 @@ function Security() {
                       Unlock
                     </Button>
                   )}
-                  {u.email !== me && (
-                    <>
-                      <Button variant="ghost" onClick={() => sendLink(u)} disabled={busy}>
-                        {u.invitePending ? 'Resend link' : 'Reset password'}
+                  {u.email !== me &&
+                    (u.deactivated ? (
+                      <Button variant="ghost" onClick={() => setActive(u, true)} disabled={busy}>
+                        Restore
                       </Button>
-                      <ConfirmButton
-                        label="Remove"
-                        confirmLabel="Remove user"
-                        question={`Remove ${u.email}? They will no longer be able to sign in.`}
-                        onConfirm={() => removeUser(u)}
-                        disabled={busy}
-                      />
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <Button variant="ghost" onClick={() => sendLink(u)} disabled={busy}>
+                          {u.invitePending ? 'Resend link' : 'Reset password'}
+                        </Button>
+                        <ConfirmButton
+                          label="Deactivate"
+                          confirmLabel="Deactivate"
+                          question={`Deactivate ${u.email}? They lose access immediately. The account can be restored later.`}
+                          onConfirm={() => setActive(u, false)}
+                          disabled={busy}
+                        />
+                      </>
+                    ))}
                 </div>
               </td>
             </tr>
@@ -391,9 +404,10 @@ function Security() {
         </Table>
         <p className="mt-3 text-[11px] text-slate-400">
           <b>Invited</b> means the emailed link has not been used yet, so no password has been chosen.
-          <b> Reset password</b> emails a fresh link and invalidates any earlier one. An account locks
-          itself after repeated failed sign-ins; Unlock releases it early. You cannot remove your own
-          account, and the last administrator cannot be removed.
+          <b> Reset password</b> emails a fresh link and invalidates any earlier one. <b>Deactivate</b>
+          withdraws access immediately but keeps the record, so it can be restored; you cannot
+          deactivate yourself, and the last active administrator cannot be deactivated. An account
+          locks itself after repeated failed sign-ins; Unlock releases it early.
         </p>
       </Card>
 

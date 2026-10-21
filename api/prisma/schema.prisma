@@ -198,6 +198,11 @@ model TenantUser {
   inviteTokenHash String?   @unique @map("invite_token_hash")
   inviteExpiresAt DateTime? @map("invite_expires_at")
   inviteSentAt    DateTime? @map("invite_sent_at")
+  /// Set when an administrator withdraws access. The row is kept so the audit
+  /// trail still resolves who did what, and so access can be restored. Sign-in
+  /// and every authenticated request refuse a deactivated account, so this takes
+  /// effect immediately rather than at token expiry.
+  deactivatedAt DateTime? @map("deactivated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

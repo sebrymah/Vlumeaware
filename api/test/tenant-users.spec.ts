@@ -9,6 +9,7 @@ import { TrialService } from '../src/common/trial/trial.service';
 import { TenantsService } from '../src/modules/tenants/tenants.service';
 import { TenantsController } from '../src/modules/tenants/tenants.controller';
 import { ConsoleInviteService } from '../src/modules/console-invite/console-invite.service';
+import { JwtStrategy } from '../src/common/auth/jwt.strategy';
 import { ROLES_KEY } from '../src/common/auth/roles.decorator';
 import { ROLES } from '../src/common/auth/roles';
 
@@ -219,5 +220,117 @@ describe('resetting a console user password', () => {
     // getSecurity relies on the request scope the interceptor opens in production.
     const security = await runInTenant(t.id, () => tenants.getSecurity(t.id));
     expect(security.users.find((u) => u.email === 'reset-me@example.test')?.invitePending).toBe(true);
+  });
+});
+
+describe('deactivating a console user', () => {
+  it('stops access on the very next request, not at token expiry', async () => {
+    const t = await freshTenant();
+    // A viewer, so the last-administrator guard does not colour this test: the
+    // point here is only that a live token stops working.
+    const user = await tenants.createTenantUser(t.id, {
+      email: 'offboarded@example.test',
+      role: 'client_viewer',
+    });
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      role: 'client_viewer' as const,
+      tenantId: t.id,
+    };
+    const strategy = new JwtStrategy(prisma);
+    await expect(strategy.validate(payload)).resolves.toEqual(payload);
+
+    await tenants.deactivateTenantUser(t.id, user.id, { userId: 'another-admin' });
+
+    await expect(strategy.validate(payload)).rejects.toThrow(/no longer active/i);
+  });
+
+  it('keeps the record and can be reversed', async () => {
+    const t = await freshTenant();
+    const user = await tenants.createTenantUser(t.id, {
+      email: 'returning@example.test',
+      role: 'client_viewer',
+    });
+    await tenants.deactivateTenantUser(t.id, user.id, { userId: 'admin-actor' });
+
+    const security = await runInTenant(t.id, () => tenants.getSecurity(t.id));
+    expect(security.users.find((u) => u.email === 'returning@example.test')?.deactivated).toBe(true);
+
+    await tenants.reactivateTenantUser(t.id, user.id);
+    const after = await runInTenant(t.id, () => tenants.getSecurity(t.id));
+    expect(after.users.find((u) => u.email === 'returning@example.test')?.deactivated).toBe(false);
+
+    const strategy = new JwtStrategy(prisma);
+    await expect(
+      strategy.validate({
+        sub: user.id,
+        email: user.email,
+        role: 'client_viewer',
+        tenantId: t.id,
+      }),
+    ).resolves.toBeTruthy();
+  });
+
+  it('is audited', async () => {
+    const t = await freshTenant();
+    const user = await tenants.createTenantUser(t.id, {
+      email: 'audited-offboarding@example.test',
+      role: 'client_viewer',
+    });
+    await tenants.deactivateTenantUser(t.id, user.id, { userId: 'admin-actor' });
+    const entry = await runInTenant(t.id, () =>
+      db.auditLog.findFirst({
+        where: { tenantId: t.id, action: 'tenant.user.deactivate' },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+    expect(entry?.detail).toContain('audited-offboarding@example.test');
+  });
+
+  it('refuses to deactivate you', async () => {
+    const t = await freshTenant();
+    const me = await tenants.createTenantUser(t.id, {
+      email: 'self@example.test',
+      role: 'client_admin',
+    });
+    await expect(
+      tenants.deactivateTenantUser(t.id, me.id, { userId: me.id }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('refuses to deactivate the last active administrator', async () => {
+    const t = await freshTenant();
+    await tenants.createTenantUser(t.id, { email: 'admin-a@example.test', role: 'client_admin' });
+    const b = await tenants.createTenantUser(t.id, {
+      email: 'admin-b@example.test',
+      role: 'client_admin',
+    });
+    // Two admins: either one can go.
+    await tenants.deactivateTenantUser(t.id, b.id, { userId: 'admin-a' });
+    // One left: now it is refused.
+    const a = (await tenants.listTenantUsers(t.id)).find((u) => u.email === 'admin-a@example.test');
+    await expect(
+      tenants.deactivateTenantUser(t.id, a!.id, { userId: 'admin-b' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('cannot accept an invitation issued before it was withdrawn', async () => {
+    const t = await freshTenant();
+    sent.length = 0;
+    const user = await tenants.createTenantUser(t.id, {
+      email: 'invite-then-withdraw@example.test',
+      role: 'client_viewer',
+    });
+    const token = /\/invite\/([A-Za-z0-9_-]+)/.exec(sent[sent.length - 1].html)![1];
+
+    await tenants.deactivateTenantUser(t.id, user.id, { userId: 'admin-actor' });
+
+    await expect(invites.peek(token)).rejects.toThrow();
+    await expect(invites.accept(token, 'a properly long password')).rejects.toThrow();
+    // And no new link may be issued for it either.
+    await expect(tenants.sendConsoleInvite(t.id, user.id)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

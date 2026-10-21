@@ -38,7 +38,7 @@ const SECTIONS: DocSection[] = [
           'Sign in at the client portal and change the password you were given.',
           'Under Security, set the password policy your team must meet and how long a session lasts.',
           'If your organisation requires it, switch on "Require multi-factor authentication", then turn MFA on for your own account with "Turn on MFA".',
-          'On the same page, use "Add a console user" to add a colleague as a second admin, or as a viewer if they only need to read reports. They receive an email with a one-time link and choose their own password — you never set or see it. "Reset password" sends a fresh link, and "Remove" revokes access.',
+          'On the same page, use "Add a console user" to add a colleague as a second admin, or as a viewer if they only need to read reports. They receive an email with a one-time link and choose their own password — you never set or see it. "Reset password" sends a fresh link, and "Deactivate" withdraws access immediately — the record is kept, so it can be restored.',
         ],
         tip: 'Switching on "Require multi-factor authentication" applies to the console accounts you create from that point on. Anyone who already has an account is asked to enrol the next time they sign in, but is not locked out — so if you need the whole team covered immediately, say so to your Vlumetech contact and they will set it per account.',
       },

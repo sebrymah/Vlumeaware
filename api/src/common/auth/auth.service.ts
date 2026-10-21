@@ -88,6 +88,21 @@ export class AuthService {
       }
       await this.resetTenantUserFailures(tenantUser.id);
 
+      // Checked after the password so a withdrawn account cannot be used to
+      // probe whether an address exists; the message is only useful to someone
+      // who already knew the password anyway.
+      if (tenantUser.deactivatedAt) {
+        this.authEvent(
+          'auth.login_refused_deactivated',
+          tenantUser.id,
+          tenantUser.role,
+          tenantUser.tenantId,
+        );
+        throw new UnauthorizedException(
+          'This account has been deactivated. Ask an administrator to restore it.',
+        );
+      }
+
       const policy = await this.tenantPolicy(tenantUser.tenantId);
 
       // MFA active → a challenge, exactly as for staff.

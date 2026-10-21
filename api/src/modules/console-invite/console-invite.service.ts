@@ -190,11 +190,14 @@ export class ConsoleInviteService {
           tenantId: true,
           email: true,
           inviteExpiresAt: true,
+          deactivatedAt: true,
         },
       }),
     );
 
     if (!user) throw new NotFoundException('This link is not valid.');
+    // An account withdrawn after the link was sent must not be able to use it.
+    if (user.deactivatedAt) throw new NotFoundException('This link is not valid.');
     if (!user.inviteExpiresAt || user.inviteExpiresAt.getTime() < Date.now()) {
       throw new NotFoundException('This link has expired. Ask an administrator for a new one.');
     }

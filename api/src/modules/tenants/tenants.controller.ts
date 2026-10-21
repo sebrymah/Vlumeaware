@@ -315,9 +315,38 @@ export class TenantsController {
     return this.tenants.sendConsoleInvite(tenantId, userId, user.email);
   }
 
-  @Delete(':tenantId/users/:userId')
+  /**
+   * Erasure, as opposed to the ordinary offboarding path: a client admin
+   * deactivates, and only Vlumetech destroys the row (for a data-deletion
+   * request, say). Keeping the row is what lets the audit trail resolve it.
+   */
+  @Post(':tenantId/users/:userId/deactivate')
   @HttpCode(200)
   @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  deactivateUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.deactivateTenantUser(tenantId, userId, {
+      userId: user.sub,
+      email: user.email,
+    });
+  }
+
+  @Post(':tenantId/users/:userId/reactivate')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  reactivateUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.tenants.reactivateTenantUser(tenantId, userId);
+  }
+
+  @Delete(':tenantId/users/:userId')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin)
   removeUser(
     @Param('tenantId', ParseUUIDPipe) tenantId: string,
     @Param('userId', ParseUUIDPipe) userId: string,

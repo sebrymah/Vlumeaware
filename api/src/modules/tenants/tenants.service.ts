@@ -106,6 +106,7 @@ export class TenantsService {
         lockedUntil: true,
         createdAt: true,
         inviteExpiresAt: true,
+        deactivatedAt: true,
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -121,6 +122,8 @@ export class TenantsService {
         locked: Boolean(u.lockedUntil && u.lockedUntil > new Date()),
         // A link is outstanding: invited, but has not chosen a password yet.
         invitePending: Boolean(u.inviteExpiresAt && u.inviteExpiresAt > new Date()),
+        // Access withdrawn; the record is kept so it can be restored.
+        deactivated: Boolean(u.deactivatedAt),
         createdAt: u.createdAt,
       })),
     };
@@ -369,6 +372,9 @@ export class TenantsService {
    */
   async sendConsoleInvite(tenantId: string, userId: string, actorEmail?: string) {
     const user = await this.findConsoleUser(tenantId, userId);
+    if (user.deactivatedAt) {
+      throw new BadRequestException('Restore this account before sending it a sign-in link.');
+    }
     const { emailSent, expiresAt } = await this.invites.issue({
       tenantId,
       userId: user.id,
@@ -395,16 +401,7 @@ export class TenantsService {
         'You cannot remove your own account. Ask another administrator to do it.',
       );
     }
-    if (user.role === 'client_admin') {
-      const admins = await runInTenant(tenantId, () =>
-        this.prisma.db.tenantUser.count({ where: { role: 'client_admin' } }),
-      );
-      if (admins <= 1) {
-        throw new BadRequestException(
-          'This is the only administrator. Add another administrator first, or the account will be locked out.',
-        );
-      }
-    }
+    await this.assertNotLastActiveAdmin(tenantId, user);
     await runInTenant(tenantId, () =>
       this.prisma.db.tenantUser.delete({ where: { id: user.id } }),
     );
@@ -412,11 +409,73 @@ export class TenantsService {
     return { removed: user.email };
   }
 
+  /**
+   * Withdraws access without destroying the record.
+   *
+   * Preferred over deletion for offboarding: the audit trail still resolves who
+   * this person was, a mistake is reversible, and because the session check
+   * re-reads this row, access stops on the next request rather than whenever the
+   * token happens to expire.
+   */
+  async deactivateTenantUser(
+    tenantId: string,
+    userId: string,
+    actor: { userId: string; email?: string },
+  ) {
+    const user = await this.findConsoleUser(tenantId, userId);
+    if (user.deactivatedAt) return { deactivated: user.email, alreadyInactive: true };
+    if (user.id === actor.userId) {
+      throw new BadRequestException(
+        'You cannot deactivate your own account. Ask another administrator to do it.',
+      );
+    }
+    await this.assertNotLastActiveAdmin(tenantId, user);
+    await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.update({
+        where: { id: user.id },
+        data: { deactivatedAt: new Date(), inviteTokenHash: null, inviteExpiresAt: null },
+      }),
+    );
+    await this.audit.record('tenant.user.deactivate', `${user.role} ${user.email}`, tenantId);
+    return { deactivated: user.email };
+  }
+
+  async reactivateTenantUser(tenantId: string, userId: string) {
+    const user = await this.findConsoleUser(tenantId, userId);
+    await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.update({
+        where: { id: user.id },
+        data: { deactivatedAt: null, failedLoginCount: 0, lockedUntil: null },
+      }),
+    );
+    await this.audit.record('tenant.user.reactivate', `${user.role} ${user.email}`, tenantId);
+    // They still need a password if they never set one, so the admin is told to
+    // send a link rather than being sent one automatically.
+    return { reactivated: user.email, needsPassword: Boolean(user.deactivatedAt) };
+  }
+
+  private async assertNotLastActiveAdmin(
+    tenantId: string,
+    user: { role: string; email: string },
+  ) {
+    if (user.role !== 'client_admin') return;
+    const admins = await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.count({
+        where: { role: 'client_admin', deactivatedAt: null },
+      }),
+    );
+    if (admins <= 1) {
+      throw new BadRequestException(
+        'This is the only active administrator. Add another administrator first, or the account will be locked out.',
+      );
+    }
+  }
+
   private async findConsoleUser(tenantId: string, userId: string) {
     const user = await runInTenant(tenantId, () =>
       this.prisma.db.tenantUser.findFirst({
         where: { id: userId },
-        select: { id: true, email: true, role: true },
+        select: { id: true, email: true, role: true, deactivatedAt: true },
       }),
     );
     if (!user) throw new NotFoundException('Console user not found');
