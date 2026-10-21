@@ -55,7 +55,7 @@ Severity is about user impact. Effort is rough: S ≤ half a day, M ≤ 3 days, 
 | B1 | 28 hints are 11–12px in `text-slate-400` on white — about 2.8:1, below the 4.5:1 minimum | 63 `text-slate-400`, 28 at small sizes | High | S |
 | B2 | Placeholder-only inputs had no accessible name (search boxes, quiz fields) and the preview's mock sign-in was exposed to assistive tech as a set of unusable controls | 10 such inputs found; all labelled or hidden | High | M |
 | B3 | Tables have no `scope="col"` and scroll horizontally with no affordance | `components/ui.tsx` Table | Medium | S |
-| B4 | The landing-preview modal has no `role="dialog"`, `aria-modal`, Escape handler or focus return | `app/client/page.tsx` preview modal | Medium | S |
+| B4 | The landing-preview modal had no dialog semantics, Escape, focus return or focus trap | fixed: `role="dialog"`, `aria-modal`, labelled, Escape, focus in/out, Tab contained | Medium | S |
 | B5 | Mobile navigation is a flat 13-link horizontal scroller: no grouping, no cue that it scrolls (it does have `aria-current` and a label, which is good) | `components/guard.tsx` MobileNav | Medium | M |
 | B6 | Charts are width-encoded with the number in a table column (good), but the bar divs are unlabelled decoration | `components/report.tsx` | Low | S |
 
