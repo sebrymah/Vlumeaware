@@ -125,12 +125,18 @@ export class ConsoleInviteService {
   /** What the recipient's page needs to show before they type a password. */
   async peek(rawToken: string) {
     const user = await this.findByToken(rawToken);
-    const tenant = await runAsSystem('console invite: tenant name', () =>
-      this.prisma.db.tenant.findUnique({ where: { id: user.tenantId }, select: { name: true } }),
+    const tenant = await runAsSystem('console invite: tenant details', () =>
+      this.prisma.db.tenant.findUnique({
+        where: { id: user.tenantId },
+        select: { name: true, passwordMinLength: true },
+      }),
     );
     return {
       email: user.email,
       tenantName: tenant?.name ?? 'Vlumeaware',
+      // So the page can state the real rule instead of implying a guess. Safe to
+      // disclose: the caller already holds a valid one-time link for this account.
+      passwordMinLength: tenant?.passwordMinLength ?? 12,
       expiresAt: user.inviteExpiresAt,
     };
   }

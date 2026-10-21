@@ -16,6 +16,8 @@ import { api } from '@/lib/api';
 interface InviteDetails {
   email: string;
   tenantName: string;
+  /** The tenant's own policy, so the page can state the real rule. */
+  passwordMinLength: number;
   expiresAt: string;
 }
 
@@ -91,6 +93,7 @@ export default function InvitePage() {
                   className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100"
                   type="password"
                   autoComplete="new-password"
+                  minLength={details.passwordMinLength}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoFocus
@@ -119,8 +122,8 @@ export default function InvitePage() {
                 {busy ? 'Saving…' : 'Save password'}
               </button>
               <p className="text-[11px] leading-relaxed text-slate-400">
-                Use at least the number of characters your account policy requires. The link works
-                once; afterwards sign in normally.
+                At least {details.passwordMinLength} characters. The link works once; afterwards sign
+                in normally.
               </p>
             </form>
           </>
