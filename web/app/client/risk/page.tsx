@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass, pct } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass, pct, SkeletonRows } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { readSession } from '@/lib/session';
 
@@ -64,12 +64,16 @@ function Risk() {
   const [advice, setAdvice] = useState<RiskAdvice | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [advising, setAdvising] = useState(false);
+  // The table used to show "No employees yet" while the risk query was still in
+  // flight, which reads as an empty roster rather than a loading one.
+  const [loading, setLoading] = useState(true);
   // The advice endpoint is client_admin only — a viewer must not be offered a
   // button that spends the tenant's AI budget and then returns 403.
   const canAskAi = readSession()?.role === 'client_admin';
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+    setLoading(true);
     try {
       const [r, m] = await Promise.all([
         api.get<EmployeeRisk[]>(`/tenants/${tenantId}/employees/risk`),

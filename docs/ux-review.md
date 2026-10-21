@@ -42,7 +42,7 @@ Severity is about user impact. Effort is rough: S ≤ half a day, M ≤ 3 days, 
 | # | Finding | Evidence | Sev | Effort |
 |---|---|---|---|---|
 | A1 | No `error.tsx` / `not-found.tsx` / `global-error.tsx`: failures and bad URLs show an unbranded Next page | all three files absent | High | S |
-| A2 | No route-level loading: 16 pages have no skeleton and render an empty frame first | pages listed in the count above | High | M |
+| A2 | 9 client list pages had no loading state, so their empty row ("No certificates issued yet") painted before the request finished — a slow connection looked like an empty account | `certificates`, `reported`, `risk` fixed; `domains`, `license`, `reporting-setup`, `routing`, `sending-domains`, `templates` and six staff pages still bare | High | M |
 | A3 | `Guard` paints a full-screen "Loading…" text on every navigation while it reads localStorage | `components/guard.tsx` session gate | Medium | S |
 | A4 | No toast or inline-at-top feedback: notices render where the form is, so a save at the bottom of a long page is announced off-screen | 61 `Notice` uses, no toast system | Medium | M |
 | A5 | `EmptyState` exists and six pages use it, but **20 empty rows bypassed it** for a bare `colSpan` line with ad-hoc padding | 20 `colSpan` sites across 13 files | Medium | S |
@@ -53,7 +53,7 @@ Severity is about user impact. Effort is rough: S ≤ half a day, M ≤ 3 days, 
 | # | Finding | Evidence | Sev | Effort |
 |---|---|---|---|---|
 | B1 | 28 hints are 11–12px in `text-slate-400` on white — about 2.8:1, below the 4.5:1 minimum | 63 `text-slate-400`, 28 at small sizes | High | S |
-| B2 | Thin labelling overall: 35 `aria-*`, 4 `role=`, 13 labelled controls across ~23 routes | counts above | High | M |
+| B2 | Placeholder-only inputs had no accessible name (search boxes, quiz fields) and the preview's mock sign-in was exposed to assistive tech as a set of unusable controls | 10 such inputs found; all labelled or hidden | High | M |
 | B3 | Tables have no `scope="col"` and scroll horizontally with no affordance | `components/ui.tsx` Table | Medium | S |
 | B4 | The landing-preview modal has no `role="dialog"`, `aria-modal`, Escape handler or focus return | `app/client/page.tsx` preview modal | Medium | S |
 | B5 | Mobile navigation is a flat 13-link horizontal scroller: no grouping, no cue that it scrolls (it does have `aria-current` and a label, which is good) | `components/guard.tsx` MobileNav | Medium | M |
@@ -176,6 +176,22 @@ Second tranche, same branch:
   the product built from raw elements.
 - **The landing preview is a real dialog**: `role="dialog"`, `aria-modal`, labelled,
   Escape closes it, focus moves in and returns to the opener.
+
+Fifth tranche — honesty about loading, and accessible names:
+
+- **Three list pages stop claiming to be empty while they load.** `certificates`,
+  `reported` and `risk` render `SkeletonRows` until their data arrives; previously the
+  empty row ("No certificates issued yet") was the first thing painted, so a slow
+  request looked like an empty account.
+- **Ten placeholder-only inputs** now have an accessible name — the staff pickers, the
+  roster search, the quiz's prompt/option/explanation fields.
+- **The two mock sign-in forms** (campaign preview and landing design) are
+  `aria-hidden`: they are pictures of a form, and announcing them as unusable controls
+  is worse than silence.
+
+Still bare: six client pages (`domains`, `license`, `reporting-setup`, `routing`,
+`sending-domains`, `templates`) and six staff pages. The pattern is now established and
+mechanical; it is the obvious next increment.
 
 Fourth tranche — the public surfaces:
 

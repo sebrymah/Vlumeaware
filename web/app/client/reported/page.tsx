@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Card, EmptyRow, Notice, Table } from '@/components/ui';
+import { Badge, Card, EmptyRow, Notice, Table, SkeletonRows } from '@/components/ui';
 
 interface PhishReport {
   id: string;
@@ -27,14 +27,19 @@ function Reported() {
   const tenantId = useActingTenant();
   const [rows, setRows] = useState<PhishReport[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Otherwise "no reports yet" paints before the request finishes.
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+    setLoading(true);
     try {
       setRows(await api.get<PhishReport[]>(`/tenants/${tenantId}/phish-reports`));
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId]);
 

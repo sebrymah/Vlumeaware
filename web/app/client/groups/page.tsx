@@ -224,6 +224,7 @@ function Groups() {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <input
+              aria-label="Search staff by name, email or department"
                 className={`${inputClass} flex-1`}
                 type="search"
                 placeholder="Search staff by name, email or department…"

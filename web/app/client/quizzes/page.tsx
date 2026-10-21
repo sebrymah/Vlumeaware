@@ -516,7 +516,7 @@ function Quizzes() {
                 </div>
                 <input
                   className={`${inputClass} mt-2`}
-                  placeholder="Question prompt"
+                  placeholder="Question prompt" aria-label="Question prompt"
                   value={q.prompt}
                   onChange={(e) => setQ(qi, { prompt: e.target.value })}
                   required
@@ -533,7 +533,7 @@ function Quizzes() {
                       />
                       <input
                         className={inputClass}
-                        placeholder={`Option ${oi + 1}`}
+                        placeholder={`Option ${oi + 1}`} aria-label={`Option ${oi + 1}`}
                         value={o}
                         onChange={(e) => setOption(qi, oi, e.target.value)}
                       />
@@ -566,7 +566,7 @@ function Quizzes() {
                 </div>
                 <input
                   className={`${inputClass} mt-2`}
-                  placeholder="Explanation shown after answering (optional)"
+                  placeholder="Explanation shown after answering (optional)" aria-label="Explanation shown after answering (optional)"
                   value={q.explanation}
                   onChange={(e) => setQ(qi, { explanation: e.target.value })}
                 />
