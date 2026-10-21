@@ -196,6 +196,12 @@ The "Now" tranche is complete, and the direction-independent half of "Next". Wha
 remains: the public pages onto the kit, toasts, skeleton coverage, and the product
 decision below.
 
+**A duplication worth fixing properly.** The training page carries its own copy of the
+quiz markup rather than sharing `app/t/[token]/quiz.tsx`, so the pass had to be applied
+twice and the two will drift. Extracting one learner-facing quiz component is a small
+refactor with a real payoff; it is on the "Later" list rather than done here, because it
+touches scoring-adjacent UI.
+
 ### The decision the employee pass needs
 
 The simulation landing currently imitates a plausible corporate sign-in, and the

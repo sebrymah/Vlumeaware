@@ -60,7 +60,7 @@ export function Quiz({ token, accent }: { token: string; accent: string }) {
 
   return (
     <div className="mt-6 border-t border-slate-200 pt-5">
-      <h2 className="text-sm font-semibold text-slate-900">Quick knowledge check</h2>
+      <h2 className="text-lg font-semibold text-slate-900">Quick knowledge check</h2>
       <p className="mt-1 text-xs text-slate-500">
         {result
           ? `You scored ${result.score}/${result.total}. Pass mark ${result.passingScorePct}%.`

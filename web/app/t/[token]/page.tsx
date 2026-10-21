@@ -42,7 +42,7 @@ export default async function TeachableMomentPage({
     return (
       <Shell accent="#475569" org="Vlumeaware">
         <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">This link is no longer valid</h1>
-        <p className="mt-3 text-sm text-slate-600">
+        <p className="mt-3 text-base text-slate-600">
           If you received an email asking you to open this link, treat it as suspicious and report
           it to your IT team.
         </p>
@@ -103,7 +103,7 @@ export default async function TeachableMomentPage({
       {moment.assignedModule && (
         <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
           <h2 className="text-lg font-semibold text-slate-900">Your training module</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-base text-slate-600">
             You have been assigned <strong>{moment.assignedModule.title}</strong>, which covers this
             specific kind of attack. Watch it below.
           </p>
@@ -124,7 +124,7 @@ export default async function TeachableMomentPage({
 
       <div className="mt-6 border-t border-slate-200 pt-5">
         <h2 className="text-lg font-semibold text-slate-900">Next time you see something like this</h2>
-        <p className="mt-1 text-sm text-slate-600">
+        <p className="mt-1 text-base text-slate-600">
           Report it without clicking. If the message asks you to change payment details, confirm by
           calling a number you already have — never one supplied in the email.
         </p>
@@ -163,10 +163,10 @@ function RedFlags({
 
       {flags.length > 0 && (
         <>
-          <h2 className="mt-5 text-sm font-semibold text-slate-900">What gave it away</h2>
+          <h2 className="mt-6 text-lg font-semibold text-slate-900">What gave it away</h2>
           <ul className="mt-2 space-y-2">
             {flags.map((flag) => (
-              <li key={flag} className="flex gap-2 text-sm text-slate-600">
+              <li key={flag} className="flex gap-2 text-base leading-relaxed text-slate-600">
                 <span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
                 {flag}
               </li>
