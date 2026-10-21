@@ -285,9 +285,9 @@ export function CampaignReport({
         <Stat label="Click rate" value={pct(m.clickRate)} hint={`${m.clicked} clicked`} />
         <Stat label="Report rate" value={pct(m.reportRate)} hint={`${m.reported} reported first`} />
         <Stat
-          label="Credentials entered"
-          value={String(m.credentialsSubmitted)}
-          hint="count only — no submitted values are stored"
+          label="Credential rate"
+          value={pct(m.totalSent ? m.credentialsSubmitted / m.totalSent : 0)}
+          hint={`${m.credentialsSubmitted} entered — count only, no values stored`}
         />
       </div>
 
