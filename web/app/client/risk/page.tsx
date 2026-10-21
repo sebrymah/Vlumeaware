@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass, pct } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass, pct } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { readSession } from '@/lib/session';
 
@@ -365,11 +365,7 @@ function Risk() {
             </Fragment>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={8} className="px-2 py-6 text-center text-slate-500">
-                No employees yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={8} title="No employees yet." />
           )}
         </Table>
       </Card>

@@ -45,7 +45,7 @@ Severity is about user impact. Effort is rough: S ≤ half a day, M ≤ 3 days, 
 | A2 | No route-level loading: 16 pages have no skeleton and render an empty frame first | pages listed in the count above | High | M |
 | A3 | `Guard` paints a full-screen "Loading…" text on every navigation while it reads localStorage | `components/guard.tsx` session gate | Medium | S |
 | A4 | No toast or inline-at-top feedback: notices render where the form is, so a save at the bottom of a long page is announced off-screen | 61 `Notice` uses, no toast system | Medium | M |
-| A5 | Empty states are inconsistent: some explain the next action, some render an empty table | `report.tsx` has good copy; several list pages do not | Medium | S |
+| A5 | `EmptyState` exists and six pages use it, but **20 empty rows bypassed it** for a bare `colSpan` line with ad-hoc padding | 20 `colSpan` sites across 13 files | Medium | S |
 | A6 | No global focus style and no `prefers-reduced-motion`; 17 elements carry their own `focus-visible` classes | `globals.css` has print only | Medium | S |
 
 ### B. Accessibility
@@ -113,12 +113,13 @@ a styling change.
    action each. (A route-level `loading.tsx` is deliberately not part of this: the pages
    fetch in an effect after mount, so a route-level loader would paint and vanish. The
    real fix is skeleton coverage, item 10.)
-2. A shared `EmptyState` component and apply it to the list pages that render an empty
-   table body.
+2. ~~Apply `EmptyState` to the pages rendering an empty table body~~ — done: a table-aware
+   `EmptyRow` wraps it, 20 sites converted, and the filtered-search case gained a
+   "Clear search" action.
 3. Contrast pass: move the 28 small `text-slate-400` hints to `text-slate-500`.
 4. Global `:focus-visible` ring and `prefers-reduced-motion` in `globals.css`.
-5. Table `scope="col"`; make the invite page use `Field`/`Button`/`Card`.
-6. `role="dialog"`/Escape/focus return on the preview modal.
+5. ~~Table `scope="col"`; invite page onto the kit~~ — done.
+6. ~~`role="dialog"`/Escape/focus return on the preview modal~~ — done.
 
 **Next — the experience (about a week)**
 
@@ -160,5 +161,17 @@ business logic and are visible on every page:
 - **Contrast fixed on small text.** 28 hints at 11–12px were `text-slate-400` on white
   (about 2.8:1). They are now `text-slate-500` (about 4.8:1), across 20 files.
 
-Still open from "Now": shared `EmptyState`, table `scope`, the invite page onto the kit,
-and dialog semantics on the preview modal.
+Second tranche, same branch:
+
+- **One empty state, applied.** `EmptyRow` joins `EmptyState` in the kit; 20 bare
+  `colSpan` rows became it, and the eight most consequential ones gained a sentence of
+  guidance ("Add employees and a scenario first…"). The filtered roster search now offers
+  a **Clear search** action instead of a dead end.
+- **`scope="col"`** on every table header, so a screen reader announces the column.
+- **The invite page** now uses `Card`/`Field`/`Button`/`Notice` — it was the only page in
+  the product built from raw elements.
+- **The landing preview is a real dialog**: `role="dialog"`, `aria-modal`, labelled,
+  Escape closes it, focus moves in and returns to the opener.
+
+The "Now" tranche is complete. What remains is "Next": the employee-experience pass,
+public pages onto the kit, toasts, and skeleton coverage.

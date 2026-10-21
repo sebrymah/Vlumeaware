@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { Button, Card, ConfirmButton, EmptyRow, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 
 interface Employee {
   id: string;
@@ -364,11 +364,7 @@ function Employees() {
               </tr>
             ))}
             {!list.length && (
-              <tr>
-                <td colSpan={4} className="px-2 py-6 text-center text-slate-500">
-                  No employees uploaded yet.
-                </td>
-              </tr>
+              <EmptyRow colSpan={4} title="No employees uploaded yet." hint="Upload a CSV or add one person. Their address must be on a verified domain." />
             )}
             {list.length > 0 &&
               rosterSearch.trim() &&
@@ -376,11 +372,16 @@ function Employees() {
                 const q = rosterSearch.trim().toLowerCase();
                 return [e.name, e.email, e.department ?? ''].some((v) => v.toLowerCase().includes(q));
               }) && (
-                <tr>
-                  <td colSpan={4} className="px-2 py-6 text-center text-slate-500">
-                    No staff match “{rosterSearch}”.
-                  </td>
-                </tr>
+                <EmptyRow
+                  colSpan={4}
+                  title={`No staff match “${rosterSearch.trim()}”.`}
+                  hint="Check the spelling, or clear the search to see everyone."
+                  action={
+                    <Button variant="ghost" onClick={() => setRosterSearch('')}>
+                      Clear search
+                    </Button>
+                  }
+                />
               )}
             </Table>
           ) : (

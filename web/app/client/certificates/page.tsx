@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, Notice, Table } from '@/components/ui';
+import { Button, Card, EmptyRow, Notice, Table } from '@/components/ui';
 
 interface Certificate {
   id: string;
@@ -84,11 +84,7 @@ function Certificates() {
             </tr>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                No certificates issued yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={6} title="No certificates issued yet." hint="They are issued automatically when someone passes a quiz." />
           )}
         </Table>
       </Card>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Notice, Table, inputClass } from '@/components/ui';
 
 interface Scenario {
   id: string;
@@ -182,11 +182,7 @@ function Routing() {
             );
           })}
           {!scenarios.length && (
-            <tr>
-              <td colSpan={4} className="px-2 py-6 text-center text-slate-500">
-                No scenarios yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={4} title="No scenarios yet." />
           )}
         </Table>
         {scenarios.some((s) => !ruleFor(s.id)) && (
@@ -221,11 +217,7 @@ function Routing() {
               </tr>
             ))}
             {!assignments.length && (
-              <tr>
-                <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                  No training assigned yet — nobody has clicked a simulation.
-                </td>
-              </tr>
+              <EmptyRow colSpan={6} title="No training assigned yet — nobody has clicked a simulation." />
             )}
           </Table>
         </div>

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Card, Notice, Table } from '@/components/ui';
+import { Badge, Card, EmptyRow, Notice, Table } from '@/components/ui';
 
 interface PhishReport {
   id: string;
@@ -68,11 +68,7 @@ function Reported() {
             </tr>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
-                No reports yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={5} title="No reports yet." hint="Reports arrive when staff forward a suspicious email to your report address." />
           )}
         </Table>
       </Card>

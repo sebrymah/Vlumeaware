@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass } from '@/components/ui';
 
 interface Tenant {
   id: string;
@@ -741,11 +741,7 @@ function TenantDetail() {
             </tr>
           ))}
           {!users.length && (
-            <tr>
-              <td colSpan={3} className="px-2 py-4 text-center text-slate-500">
-                No client accounts yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={3} title="No client accounts yet." />
           )}
         </Table>
 
@@ -804,11 +800,7 @@ function TenantDetail() {
             </tr>
           ))}
           {!campaigns.length && (
-            <tr>
-              <td colSpan={4} className="px-2 py-4 text-center text-slate-500">
-                No campaigns for this client.
-              </td>
-            </tr>
+            <EmptyRow colSpan={4} title="No campaigns for this client." />
           )}
         </Table>
       </Card>

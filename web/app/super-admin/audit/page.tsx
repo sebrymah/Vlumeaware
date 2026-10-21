@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Card, Notice, Table, inputClass } from '@/components/ui';
+import { Card, EmptyRow, Notice, Table, inputClass } from '@/components/ui';
 
 interface AuditEntry {
   id: string;
@@ -97,11 +97,7 @@ function Audit() {
             </tr>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
-                No audit entries yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={5} title="No audit entries yet." />
           )}
         </Table>
       </Card>

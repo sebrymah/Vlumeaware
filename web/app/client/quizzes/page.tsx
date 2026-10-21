@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, EmptyRow, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 
 interface TrainingModule { id: string; title: string }
 interface Campaign { id: string; name: string }
@@ -353,11 +353,7 @@ function Quizzes() {
             </tr>
           ))}
           {!quizzes.length && (
-            <tr>
-              <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                No quizzes yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={6} title="No quizzes yet." hint="Create one, or copy a quiz from the shared library." />
           )}
           </Table>
         ) : (
@@ -400,11 +396,7 @@ function Quizzes() {
               </tr>
             ))}
             {!results.attempts.length && (
-              <tr>
-                <td colSpan={5} className="px-2 py-4 text-center text-slate-500">
-                  No attempts yet.
-                </td>
-              </tr>
+              <EmptyRow colSpan={5} title="No attempts yet." />
             )}
           </Table>
           <div className="mt-4 border-t border-slate-200 pt-3">

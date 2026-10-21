@@ -199,6 +199,32 @@ export function EmptyState({
   );
 }
 
+/**
+ * An empty list inside a table. `EmptyState` gives the copy the same weight and
+ * spacing everywhere; this wrapper keeps callers from hand-rolling a <tr><td>
+ * with ad-hoc padding, which is how the console ended up with twenty different
+ * versions of "nothing here yet".
+ */
+export function EmptyRow({
+  colSpan,
+  title,
+  hint,
+  action,
+}: {
+  colSpan: number;
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-2 py-2">
+        <EmptyState title={title} hint={hint} action={action} />
+      </td>
+    </tr>
+  );
+}
+
 export const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 
 /**

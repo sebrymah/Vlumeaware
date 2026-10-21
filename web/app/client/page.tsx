@@ -1,11 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { ReadinessChecklist } from '@/components/readiness';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass } from '@/components/ui';
 import { LandingDesign } from '@/components/landing-design';
 import { LANDING_LIBRARY } from '@/components/landing-library';
 
@@ -331,11 +331,7 @@ function Campaigns() {
             </tr>
           ))}
           {!campaigns.length && (
-            <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
-                No campaigns yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={5} title="No campaigns yet." hint="Add employees and a scenario first, then launch a simulation. The setup guide walks through both." />
           )}
         </Table>
       </Card>
@@ -732,6 +728,24 @@ function LandingPreview({
   design?: string | null;
   onClose: () => void;
 }) {
+  // A modal that cannot be dismissed from the keyboard traps anyone not using a
+  // mouse, and focus must return to the button that opened it rather than to the
+  // top of the page.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<Element | null>(null);
+  useEffect(() => {
+    openerRef.current = document.activeElement;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (openerRef.current instanceof HTMLElement) openerRef.current.focus();
+    };
+  }, [onClose]);
+
   const marker = '{{LOGIN_FORM}}';
   const safe = html ?? '';
   const idx = safe.indexOf(marker);
@@ -754,11 +768,16 @@ function LandingPreview({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="preview-title"
+        tabIndex={-1}
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
-          <span className="text-xs font-semibold text-slate-600">
+          <span id="preview-title" className="text-xs font-semibold text-slate-600">
             Preview · what the target sees (form is inert here)
           </span>
           <Button variant="ghost" onClick={onClose}>

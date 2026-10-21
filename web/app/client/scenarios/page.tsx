@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, EmptyRow, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 import { RichEditor } from '@/components/rich-editor';
 
 interface Scenario {
@@ -352,11 +352,7 @@ function Scenarios() {
             </tr>
           ))}
           {!list.length && (
-            <tr>
-              <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                Nothing saved yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={6} title="Nothing saved yet." hint="Clone one from the template library above, or write your own." />
           )}
           </Table>
         ) : (

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { CampaignReport } from '@/components/report';
-import { Badge, Card, Notice, Table, pct } from '@/components/ui';
+import { Badge, Card, EmptyRow, Notice, Table, pct } from '@/components/ui';
 
 interface TrendRow {
   campaignId: string;
@@ -81,11 +81,7 @@ function Dashboard() {
             </tr>
           ))}
           {!trend.length && (
-            <tr>
-              <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                No campaigns have run yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={6} title="No campaigns have run yet." />
           )}
         </Table>
       </Card>
