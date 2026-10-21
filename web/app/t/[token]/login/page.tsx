@@ -44,7 +44,7 @@ export default async function SimulatedLoginPage({
       <div className="flex min-h-screen items-center justify-center bg-slate-100 px-6">
         <div className="max-w-sm text-center">
           <h1 className="text-lg font-semibold text-slate-900">This link is no longer valid</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-base text-slate-600">
             If an email asked you to open it, treat it as suspicious and report it to IT.
           </p>
         </div>
@@ -80,7 +80,7 @@ export default async function SimulatedLoginPage({
         <div className="w-full max-w-[440px] bg-white px-11 py-11 shadow-[0_2px_6px_rgba(0,0,0,0.2)]">
           <MicrosoftMark />
           <h1 className="mt-4 text-[24px] font-semibold text-[#1b1b1b]">Sign in</h1>
-          <p className="mt-1 text-sm text-[#1b1b1b]">to continue to {name}</p>
+          <p className="mt-1 text-[15px] text-[#1b1b1b]">to continue to {name}</p>
           <LoginForm token={token} accent="#0067b8" emailLabel="Email, phone, or Skype" />
           <p className="mt-6 text-xs text-[#666]">Use your work or school account.</p>
         </div>

@@ -79,6 +79,9 @@ Severity is about user impact. Effort is rough: S ≤ half a day, M ≤ 3 days, 
 
 ### E. The employee experience — the highest-stakes surface
 
+*(Pass started: the direction-independent half is done — see "Delivered" below. What
+remains is the product decision at the end of this section.)*
+
 The simulation landing, teachable moment, training module, quiz and certificate are the
 pages every target sees. They carry the product's reputation and they are read on a
 phone, in a hurry, possibly mid-meeting. Today they use 20px headings, 14px body, and
@@ -173,5 +176,31 @@ Second tranche, same branch:
 - **The landing preview is a real dialog**: `role="dialog"`, `aria-modal`, labelled,
   Escape closes it, focus moves in and returns to the opener.
 
-The "Now" tranche is complete. What remains is "Next": the employee-experience pass,
-public pages onto the kit, toasts, and skeleton coverage.
+Third tranche — the employee-facing pass, without changing what those pages say:
+
+- **Type and space.** The simulation landing, teachable moment, training and
+  certificate pages move from a 14px/20px admin scale to 16px body with a
+  `text-2xl sm:text-3xl` title — they are read once, on a phone, by someone who did not
+  choose to open them.
+- **A real landmark.** The employee shell was a `<div>`; it is now `<main>`, with room
+  to breathe at both widths and a single legible footer line instead of two 11px ones.
+- **The quiz is usable with a thumb.** Options had `px-2 py-1` at 14px — roughly 28px
+  tall. They are now a 44px target with a visible focus ring, the selected answer takes
+  the tenant's accent colour, and the result is announced (`role="status"`,
+  `aria-live`) rather than only coloured.
+- **The report button no longer lies.** It reported "thank you — noted" in a `finally`
+  block, so a dropped connection told the employee their report had been counted when
+  nothing was recorded. It now distinguishes success from failure and offers Try again.
+
+The "Now" tranche is complete, and the direction-independent half of "Next". What
+remains: the public pages onto the kit, toasts, skeleton coverage, and the product
+decision below.
+
+### The decision the employee pass needs
+
+The simulation landing currently imitates a plausible corporate sign-in, and the
+post-click page explains the exercise in Vlumeware's own voice. That split is the right
+default — a simulation that announces itself is not a simulation — but it is a product
+decision, not a styling one, and it changes the whole visual pass. Options: keep it
+(realistic lure, explicit debrief), brand the *frame* while keeping the lure neutral, or
+theme the debrief in the client's own colours (the accent is already available).

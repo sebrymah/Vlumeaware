@@ -140,11 +140,11 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
         </span>
       </div>
 
-      <h1 className="text-xl font-semibold text-slate-900">Hi {data.employeeName},</h1>
+      <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">Hi {data.employeeName},</h1>
       <p className="mt-1 text-sm text-slate-500">You've been assigned this short awareness module. Watch it, then take the quick check.</p>
 
       {data.module && (
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
           <h2 className="text-base font-semibold text-slate-900">{data.module.title}</h2>
           {data.module.description && <p className="mt-1 text-sm text-slate-500">{data.module.description}</p>}
           <div className="mt-3 overflow-hidden rounded-lg bg-black">
@@ -156,7 +156,7 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
       )}
 
       {submitError && (
-        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base text-red-700">
           {submitError}
         </div>
       )}
@@ -166,8 +166,8 @@ export default function LearnPage({ params }: { params: Promise<{ token: string 
           ✓ Training complete — taking you to your certificate…
         </div>
       ) : data.quiz ? (
-        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900">Knowledge check</h2>
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <h2 className="text-lg font-semibold text-slate-900">Knowledge check</h2>
           <p className="mt-1 text-xs text-slate-500">
             {result
               ? `You scored ${result.score}/${result.total}. Pass mark ${result.passingScorePct}%.`

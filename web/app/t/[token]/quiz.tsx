@@ -72,10 +72,10 @@ export function Quiz({ token, accent }: { token: string; accent: string }) {
           const r = byId(q.id);
           return (
             <div key={q.id}>
-              <p className="text-sm font-medium text-slate-800">
+              <p className="text-base font-medium text-slate-800">
                 {qi + 1}. {q.prompt}
               </p>
-              <div className="mt-1 space-y-1">
+              <div className="mt-2 space-y-2">
                 {q.options.map((opt, oi) => {
                   const chosen = answers[q.id] === oi;
                   const isCorrect = r && r.correctIndex === oi;
@@ -83,7 +83,7 @@ export function Quiz({ token, accent }: { token: string; accent: string }) {
                   return (
                     <label
                       key={oi}
-                      className={`flex cursor-pointer items-center gap-2 rounded border px-2 py-1 text-sm ${
+                      className={`flex min-h-[44px] cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 text-base transition focus-within:ring-2 focus-within:ring-slate-300 ${
                         isCorrect
                           ? 'border-emerald-400 bg-emerald-50 text-emerald-900'
                           : wrongPick
@@ -98,15 +98,17 @@ export function Quiz({ token, accent }: { token: string; accent: string }) {
                         name={q.id}
                         disabled={!!result}
                         checked={chosen}
+                        style={{ accentColor: accent }}
+                        className="h-4 w-4 shrink-0"
                         onChange={() => setAnswers({ ...answers, [q.id]: oi })}
                       />
                       {opt}
-                      {isCorrect && <span className="ml-auto text-[11px] font-semibold">correct</span>}
+                      {isCorrect && <span className="ml-auto text-xs font-semibold">correct</span>}
                     </label>
                   );
                 })}
               </div>
-              {r?.explanation && <p className="mt-1 text-[11px] text-slate-500">{r.explanation}</p>}
+              {r?.explanation && <p className="mt-1.5 text-sm leading-relaxed text-slate-500">{r.explanation}</p>}
             </div>
           );
         })}
@@ -116,14 +118,16 @@ export function Quiz({ token, accent }: { token: string; accent: string }) {
         <button
           onClick={submit}
           disabled={busy || !allAnswered}
-          className="mt-4 rounded px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+          className="mt-5 w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition disabled:opacity-50 sm:w-auto"
           style={{ background: accent }}
         >
           {busy ? 'Checking…' : 'Submit answers'}
         </button>
       ) : (
         <div
-          className={`mt-4 rounded px-3 py-2 text-sm ${
+          role="status"
+          aria-live="polite"
+          className={`mt-5 rounded-lg px-4 py-3 text-base ${
             result.passed ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-900'
           }`}
         >

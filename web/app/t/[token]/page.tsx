@@ -41,7 +41,7 @@ export default async function TeachableMomentPage({
   if (!moment) {
     return (
       <Shell accent="#475569" org="Vlumeaware">
-        <h1 className="text-xl font-semibold text-slate-900">This link is no longer valid</h1>
+        <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">This link is no longer valid</h1>
         <p className="mt-3 text-sm text-slate-600">
           If you received an email asking you to open this link, treat it as suspicious and report
           it to your IT team.
@@ -61,10 +61,10 @@ export default async function TeachableMomentPage({
         <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>
           Well spotted
         </p>
-        <h1 className="mt-2 text-xl font-semibold text-slate-900">
+        <h1 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">
           You reported this one before clicking, {first}
         </h1>
-        <p className="mt-3 text-sm leading-relaxed text-slate-600">
+        <p className="mt-3 text-base leading-relaxed text-slate-600">
           This was an authorized security awareness simulation run for {moment.tenant.name}. You
           reported it correctly, which is exactly the behaviour we are trying to build. No training
           has been assigned.
@@ -79,16 +79,16 @@ export default async function TeachableMomentPage({
       <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: accent }}>
         Security awareness simulation
       </p>
-      <h1 className="mt-2 text-xl font-semibold text-slate-900">
+      <h1 className="mt-2 text-2xl font-semibold text-slate-900 sm:text-3xl">
         {first}, this was a simulated phishing email
       </h1>
-      <p className="mt-3 text-sm leading-relaxed text-slate-600">
+      <p className="mt-3 text-base leading-relaxed text-slate-600">
         The message you just clicked was not real. It was sent as part of an authorized security
         awareness exercise run for {moment.tenant.name}. Nothing has been installed, no account has
         been compromised, and nothing you did has been reported to your manager as a disciplinary
         matter.
       </p>
-      <p className="mt-3 text-sm leading-relaxed text-slate-600">
+      <p className="mt-3 text-base leading-relaxed text-slate-600">
         Had this been a genuine attack, clicking the link is the point at which an attacker would
         have started collecting your credentials or your company&rsquo;s payment details.
       </p>
@@ -102,7 +102,7 @@ export default async function TeachableMomentPage({
 
       {moment.assignedModule && (
         <div className="mt-6 rounded-lg border border-slate-200 bg-slate-50 p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Your training module</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Your training module</h2>
           <p className="mt-1 text-sm text-slate-600">
             You have been assigned <strong>{moment.assignedModule.title}</strong>, which covers this
             specific kind of attack. Watch it below.
@@ -123,7 +123,7 @@ export default async function TeachableMomentPage({
       <Quiz token={token} accent={accent} />
 
       <div className="mt-6 border-t border-slate-200 pt-5">
-        <h2 className="text-sm font-semibold text-slate-900">Next time you see something like this</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Next time you see something like this</h2>
         <p className="mt-1 text-sm text-slate-600">
           Report it without clicking. If the message asks you to change payment details, confirm by
           calling a number you already have — never one supplied in the email.
@@ -149,8 +149,8 @@ function RedFlags({
 }) {
   return (
     <div className="mt-6">
-      <h2 className="text-sm font-semibold text-slate-900">The email you received</h2>
-      <dl className="mt-2 rounded-lg border border-slate-200 bg-white p-3 text-sm">
+      <h2 className="text-lg font-semibold text-slate-900">The email you received</h2>
+      <dl className="mt-3 rounded-lg border border-slate-200 bg-white p-4 text-base">
         <div className="flex gap-2">
           <dt className="w-16 shrink-0 text-slate-500">From</dt>
           <dd className="text-slate-800">{sender}</dd>
@@ -190,10 +190,10 @@ function Shell({
   logo?: string | null;
 }) {
   return (
-    <div className="min-h-screen bg-slate-100 py-10">
-      <div className="mx-auto max-w-2xl px-6">
+    <main className="min-h-screen bg-slate-100 py-8 sm:py-12">
+      <div className="mx-auto max-w-2xl px-4 sm:px-6">
         <div className="overflow-hidden rounded-xl bg-white shadow-sm">
-          <div className="flex items-center gap-3 px-6 py-4" style={{ background: accent }}>
+          <div className="flex items-center gap-3 px-5 py-4 sm:px-8" style={{ background: accent }}>
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logo} alt={org} className="h-7 w-auto" />
@@ -201,17 +201,15 @@ function Shell({
               <span className="text-sm font-semibold text-white">{org}</span>
             )}
           </div>
-          <div className="px-6 py-7">{children}</div>
+          <div className="px-5 py-7 sm:px-8 sm:py-9">{children}</div>
         </div>
-        <p className="mt-4 text-center text-[11px] text-slate-500">
-          Authorized security awareness exercise delivered by Vlumetech LTD on behalf of {org}.
-        </p>
-        <p className="mt-1 text-center text-[11px] text-slate-500">
-          <Link href="/" className="hover:underline">
+        <p className="mt-5 text-center text-xs leading-relaxed text-slate-500">
+          Authorized security awareness exercise delivered by Vlumetech LTD on behalf of {org}.{' '}
+          <Link href="/" className="underline hover:text-slate-700">
             Vlumeaware
           </Link>
         </p>
       </div>
-    </div>
+    </main>
   );
 }
