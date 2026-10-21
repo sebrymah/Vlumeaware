@@ -35,7 +35,9 @@ class AgreementDto {
 
 class CreateTenantUserDto {
   @IsEmail() email!: string;
-  @IsString() @MinLength(12) password!: string;
+  // No password: the new account gets a one-time emailed link and chooses its
+  // own. An admin-chosen password would have to be sent over some channel, and
+  // that is the thing we are avoiding.
   @IsIn(['client_admin', 'client_viewer']) role!: 'client_admin' | 'client_viewer';
 }
 
@@ -276,9 +278,81 @@ export class TenantsController {
     return this.tenants.seatUsage(tenantId);
   }
 
+  /**
+   * A client admin adds their own colleagues. This is what makes the "add a
+   * second admin" that the setup guide asks for possible without waiting on
+   * Vlumetech; the class-level @Roles(superadmin) previously made it staff-only.
+   *
+   * The DTO restricts the role to client_admin/client_viewer, so this cannot
+   * mint staff, and the tenant comes from the path — the scope interceptor
+   * rejects a client addressing any tenant but their own.
+   */
   @Post(':tenantId/users')
-  createUser(@Param('tenantId', ParseUUIDPipe) tenantId: string, @Body() dto: CreateTenantUserDto) {
-    return this.tenants.createTenantUser(tenantId, dto);
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @Throttle({ limit: 10, windowMs: 60_000 })
+  createUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: CreateTenantUserDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.createTenantUser(tenantId, dto, user.email);
+  }
+
+  /**
+   * Sends a fresh one-time link. One route serves both "resend invitation" (the
+   * account was never opened) and "reset password" (it was) because they are the
+   * same operation; re-issuing invalidates any earlier link.
+   */
+  @Post(':tenantId/users/:userId/invite')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @Throttle({ limit: 10, windowMs: 60_000 })
+  resendInvite(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.sendConsoleInvite(tenantId, userId, user.email);
+  }
+
+  /**
+   * Erasure, as opposed to the ordinary offboarding path: a client admin
+   * deactivates, and only Vlumetech destroys the row (for a data-deletion
+   * request, say). Keeping the row is what lets the audit trail resolve it.
+   */
+  @Post(':tenantId/users/:userId/deactivate')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  deactivateUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.deactivateTenantUser(tenantId, userId, {
+      userId: user.sub,
+      email: user.email,
+    });
+  }
+
+  @Post(':tenantId/users/:userId/reactivate')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  reactivateUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.tenants.reactivateTenantUser(tenantId, userId);
+  }
+
+  @Delete(':tenantId/users/:userId')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin)
+  removeUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.deleteTenantUser(tenantId, userId, { userId: user.sub, email: user.email });
   }
 
   @Get(':tenantId/users')

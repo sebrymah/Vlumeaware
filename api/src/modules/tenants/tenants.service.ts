@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { notificationFromAddress } from '../../providers/mailer/from-addresses';
@@ -11,8 +11,10 @@ import { allowlistGuidance } from '../../common/config/allowlist';
 import { AGREEMENT_VERSION } from '../../common/config/agreement';
 import { AuthService } from '../../common/auth/auth.service';
 import { AuditService } from '../../common/audit/audit.service';
+import { ConsoleInviteService } from '../console-invite/console-invite.service';
 import { TrialService } from '../../common/trial/trial.service';
 import { StorageService } from '../../providers/storage/storage.service';
+import { Prisma } from '@prisma/client';
 import type { TenantRole } from '@prisma/client';
 
 /** A signed NDPA agreement: a PDF, or a photograph/scan of the signed page. */
@@ -27,6 +29,7 @@ export class TenantsService {
     private readonly storage: StorageService,
     private readonly audit: AuditService,
     private readonly trial: TrialService,
+    private readonly invites: ConsoleInviteService,
     @Inject(MAILER) private readonly mailer: Mailer,
   ) {}
 
@@ -95,7 +98,16 @@ export class TenantsService {
     const tenant = await this.getSecurityPolicy(tenantId);
     const users = await this.prisma.db.tenantUser.findMany({
       where: { tenantId },
-      select: { id: true, email: true, role: true, mfaEnabledAt: true, lockedUntil: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        mfaEnabledAt: true,
+        lockedUntil: true,
+        createdAt: true,
+        inviteExpiresAt: true,
+        deactivatedAt: true,
+      },
       orderBy: { createdAt: 'asc' },
     });
     return {
@@ -108,6 +120,10 @@ export class TenantsService {
         role: u.role,
         mfaEnabled: Boolean(u.mfaEnabledAt),
         locked: Boolean(u.lockedUntil && u.lockedUntil > new Date()),
+        // A link is outstanding: invited, but has not chosen a password yet.
+        invitePending: Boolean(u.inviteExpiresAt && u.inviteExpiresAt > new Date()),
+        // Access withdrawn; the record is kept so it can be restored.
+        deactivated: Boolean(u.deactivatedAt),
         createdAt: u.createdAt,
       })),
     };
@@ -297,27 +313,173 @@ export class TenantsService {
     });
   }
 
-  /** Creates a client-side admin or viewer account within one tenant. */
-  async createTenantUser(tenantId: string, input: { email: string; password: string; role: TenantRole }) {
+  /**
+   * Creates a client-side admin or viewer account within one tenant, and emails
+   * the new person a one-time link to choose their own password.
+   *
+   * Called by a client admin as well as by staff, so the checks below matter:
+   * the address is normalised, a clash comes back as a conflict rather than a
+   * 500, adding an administrator is audited, and the account starts with a
+   * random unknowable hash so it cannot be signed into until the link is used.
+   */
+  async createTenantUser(
+    tenantId: string,
+    input: { email: string; role: TenantRole },
+    actorEmail?: string,
+  ) {
     await this.findOne(tenantId);
-    const passwordHash = await AuthService.hash(input.password);
+    const email = input.email.trim().toLowerCase();
+    if (!email) throw new BadRequestException('An email address is required.');
+
     // Client MFA is the tenant's own opt-in policy, so a new account inherits
     // it: a client that requires MFA gets users who must enrol before they can
     // use the API, and a client that does not is unaffected. Existing accounts
     // are grandfathered, so switching this on never locks a team out.
     const { requireMfa } = await this.getSecurityPolicy(tenantId);
-    return runInTenant(tenantId, () =>
-      this.prisma.db.tenantUser.create({
-        data: {
-          tenantId,
-          email: input.email,
-          passwordHash,
-          role: input.role,
-          mfaRequired: requireMfa,
-        },
-        select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
+    const passwordHash = await AuthService.hash(randomBytes(32).toString('hex'));
+
+    let user;
+    try {
+      user = await runInTenant(tenantId, () =>
+        this.prisma.db.tenantUser.create({
+          data: { tenantId, email, passwordHash, role: input.role, mfaRequired: requireMfa },
+          select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
+        }),
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException('An account with that email address already exists.');
+      }
+      throw err;
+    }
+
+    const { emailSent, expiresAt } = await this.invites.issue({
+      tenantId,
+      userId: user.id,
+      email: user.email,
+      kind: 'invite',
+      actorEmail,
+    });
+    // Adding someone who can administer the account is worth a durable record.
+    await this.audit.record('tenant.user.create', `${input.role} ${email}`, tenantId);
+    return { ...user, invitePending: true, inviteExpiresAt: expiresAt, emailSent };
+  }
+
+  /**
+   * Sends a fresh link: the same call serves "resend invitation" for an account
+   * that never arrived at a password and "reset password" for one that has.
+   * Re-issuing overwrites the stored hash, so any earlier link stops working.
+   */
+  async sendConsoleInvite(tenantId: string, userId: string, actorEmail?: string) {
+    const user = await this.findConsoleUser(tenantId, userId);
+    if (user.deactivatedAt) {
+      throw new BadRequestException('Restore this account before sending it a sign-in link.');
+    }
+    const { emailSent, expiresAt } = await this.invites.issue({
+      tenantId,
+      userId: user.id,
+      email: user.email,
+      kind: 'reset',
+      actorEmail,
+    });
+    return { email: user.email, emailSent, inviteExpiresAt: expiresAt };
+  }
+
+  /**
+   * Removes a console user. Two situations would leave the tenant unable to
+   * administer itself, so both are refused: removing yourself, and removing the
+   * last remaining administrator.
+   */
+  async deleteTenantUser(
+    tenantId: string,
+    userId: string,
+    actor: { userId: string; email?: string },
+  ) {
+    const user = await this.findConsoleUser(tenantId, userId);
+    if (user.id === actor.userId) {
+      throw new BadRequestException(
+        'You cannot remove your own account. Ask another administrator to do it.',
+      );
+    }
+    await this.assertNotLastActiveAdmin(tenantId, user);
+    await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.delete({ where: { id: user.id } }),
+    );
+    await this.audit.record('tenant.user.delete', `${user.role} ${user.email}`, tenantId);
+    return { removed: user.email };
+  }
+
+  /**
+   * Withdraws access without destroying the record.
+   *
+   * Preferred over deletion for offboarding: the audit trail still resolves who
+   * this person was, a mistake is reversible, and because the session check
+   * re-reads this row, access stops on the next request rather than whenever the
+   * token happens to expire.
+   */
+  async deactivateTenantUser(
+    tenantId: string,
+    userId: string,
+    actor: { userId: string; email?: string },
+  ) {
+    const user = await this.findConsoleUser(tenantId, userId);
+    if (user.deactivatedAt) return { deactivated: user.email, alreadyInactive: true };
+    if (user.id === actor.userId) {
+      throw new BadRequestException(
+        'You cannot deactivate your own account. Ask another administrator to do it.',
+      );
+    }
+    await this.assertNotLastActiveAdmin(tenantId, user);
+    await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.update({
+        where: { id: user.id },
+        data: { deactivatedAt: new Date(), inviteTokenHash: null, inviteExpiresAt: null },
       }),
     );
+    await this.audit.record('tenant.user.deactivate', `${user.role} ${user.email}`, tenantId);
+    return { deactivated: user.email };
+  }
+
+  async reactivateTenantUser(tenantId: string, userId: string) {
+    const user = await this.findConsoleUser(tenantId, userId);
+    await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.update({
+        where: { id: user.id },
+        data: { deactivatedAt: null, failedLoginCount: 0, lockedUntil: null },
+      }),
+    );
+    await this.audit.record('tenant.user.reactivate', `${user.role} ${user.email}`, tenantId);
+    // They still need a password if they never set one, so the admin is told to
+    // send a link rather than being sent one automatically.
+    return { reactivated: user.email, needsPassword: Boolean(user.deactivatedAt) };
+  }
+
+  private async assertNotLastActiveAdmin(
+    tenantId: string,
+    user: { role: string; email: string },
+  ) {
+    if (user.role !== 'client_admin') return;
+    const admins = await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.count({
+        where: { role: 'client_admin', deactivatedAt: null },
+      }),
+    );
+    if (admins <= 1) {
+      throw new BadRequestException(
+        'This is the only active administrator. Add another administrator first, or the account will be locked out.',
+      );
+    }
+  }
+
+  private async findConsoleUser(tenantId: string, userId: string) {
+    const user = await runInTenant(tenantId, () =>
+      this.prisma.db.tenantUser.findFirst({
+        where: { id: userId },
+        select: { id: true, email: true, role: true, deactivatedAt: true },
+      }),
+    );
+    if (!user) throw new NotFoundException('Console user not found');
+    return user;
   }
 
   listTenantUsers(tenantId: string) {

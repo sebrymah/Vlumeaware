@@ -93,7 +93,8 @@ function TenantDetail() {
   const [licenseTier, setLicenseTier] = useState('');
   const [seatLimit, setSeatLimit] = useState('');
   const [seatsUsed, setSeatsUsed] = useState<number | null>(null);
-  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'client_admin' });
+  // No password: the new user gets a one-time emailed link and chooses their own.
+  const [newUser, setNewUser] = useState({ email: '', role: 'client_admin' });
 
   const load = useCallback(async () => {
     try {
@@ -154,7 +155,7 @@ function TenantDetail() {
     setError(null);
     try {
       await api.post(`/tenants/${tenantId}/users`, newUser);
-      setNewUser({ email: '', password: '', role: 'client_admin' });
+      setNewUser({ email: '', role: 'client_admin' });
       setOk('Account created.');
       await load();
     } catch (err) {
@@ -761,16 +762,10 @@ function TenantDetail() {
             </Field>
           </div>
           <div className="w-56">
-            <Field label="Initial password" hint="Minimum 12 characters">
-              <input
-                className={inputClass}
-                type="password"
-                minLength={12}
-                value={newUser.password}
-                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                required
-              />
-            </Field>
+            <p className="text-[11px] leading-relaxed text-slate-400">
+              No password to set: they receive a one-time link, choose their own, and the tenant's
+              password policy applies to it.
+            </p>
           </div>
           <div className="w-40">
             <Field label="Role">

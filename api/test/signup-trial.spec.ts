@@ -20,7 +20,7 @@ const signup = new SignupService(prisma, audit);
 /** The service now emails setup instructions on approval; nothing under test
  *  asserts on that, so the mailer is a no-op here. */
 const noopMailer = { send: async () => ({ messageId: 'test' }) } as never;
-const tenants = new TenantsService(prisma, new StorageService(), audit, trial, noopMailer);
+const tenants = new TenantsService(prisma, new StorageService(), audit, trial, { issue: async () => ({ emailSent: true, expiresAt: new Date() }) } as never, noopMailer);
 const employees = new EmployeesService(prisma, new DomainsService(prisma));
 
 const uniq = () => `co-${Date.now()}-${Math.round(Math.random() * 1e6)}`;

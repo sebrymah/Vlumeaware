@@ -25,7 +25,7 @@ const tenants = new TenantsService(
   new StorageService(),
   new AuditService(prisma),
   new TrialService(prisma),
-  noopMailer,
+  { issue: async () => ({ emailSent: true, expiresAt: new Date() }) } as never, noopMailer,
 );
 
 const tenantIds: string[] = [];

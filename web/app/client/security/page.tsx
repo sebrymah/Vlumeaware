@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  ConfirmButton,
+  Field,
+  Notice,
+  SkeletonRows,
+  Table,
+  inputClass,
+} from '@/components/ui';
 import { readSession } from '@/lib/session';
 
 interface SecurityUser {
@@ -12,6 +22,10 @@ interface SecurityUser {
   role: string;
   mfaEnabled: boolean;
   locked: boolean;
+  /** Invited, but has not followed the link and chosen a password yet. */
+  invitePending: boolean;
+  /** Access withdrawn; the record is kept so it can be restored or audited. */
+  deactivated: boolean;
 }
 
 interface Security {
@@ -49,6 +63,10 @@ function Security() {
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // New console user (a colleague this admin is adding). No password: they get
+  // an emailed link and choose their own, so this admin never knows it.
+  const [newUser, setNewUser] = useState({ email: '', role: 'client_admin' });
 
   // MFA enrolment for the signed-in admin.
   const [enrolment, setEnrolment] = useState<{ secret: string; otpauthUrl: string } | null>(null);
@@ -136,6 +154,38 @@ function Security() {
     run(async () => {
       await api.post(`/tenants/${tenantId}/users/${user.id}/unlock`);
       return `${user.email} can sign in again.`;
+    });
+
+  const addUser = () =>
+    run(async () => {
+      const created = await api.post<{ email: string; emailSent: boolean }>(
+        `/tenants/${tenantId}/users`,
+        newUser,
+      );
+      setNewUser({ email: '', role: 'client_admin' });
+      return created.emailSent
+        ? `Invitation sent to ${created.email}. They choose their own password from the link.`
+        : `${created.email} was added, but the invitation could not be emailed. Use "Send link" to try again.`;
+    });
+
+  const sendLink = (user: SecurityUser) =>
+    run(async () => {
+      const res = await api.post<{ emailSent: boolean }>(
+        `/tenants/${tenantId}/users/${user.id}/invite`,
+      );
+      return res.emailSent
+        ? `A fresh sign-in link is on its way to ${user.email}.`
+        : `Could not email ${user.email}. Check the mail provider, then try again.`;
+    });
+
+  const setActive = (user: SecurityUser, active: boolean) =>
+    run(async () => {
+      await api.post(
+        `/tenants/${tenantId}/users/${user.id}/${active ? 'reactivate' : 'deactivate'}`,
+      );
+      return active
+        ? `${user.email} can sign in again. Send them a link if they have no password.`
+        : `${user.email} can no longer sign in.`;
     });
 
   /**
@@ -311,27 +361,93 @@ function Security() {
                 <Badge>{u.mfaEnabled ? 'on' : 'off'}</Badge>
               </td>
               <td className="px-2 py-2">
-                {u.locked ? (
+                {u.deactivated ? (
+                  <span className="text-xs font-medium text-slate-400">deactivated</span>
+                ) : u.locked ? (
                   <span className="text-xs font-medium text-red-600">locked</span>
+                ) : u.invitePending ? (
+                  <span className="text-xs font-medium text-amber-700">invited</span>
                 ) : (
                   <span className="text-xs text-slate-500">active</span>
                 )}
               </td>
               <td className="px-2 py-2">
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-1">
                   {u.locked && (
                     <Button variant="ghost" onClick={() => unlock(u)} disabled={busy}>
                       Unlock
                     </Button>
                   )}
+                  {u.email !== me &&
+                    (u.deactivated ? (
+                      <Button variant="ghost" onClick={() => setActive(u, true)} disabled={busy}>
+                        Restore
+                      </Button>
+                    ) : (
+                      <>
+                        <Button variant="ghost" onClick={() => sendLink(u)} disabled={busy}>
+                          {u.invitePending ? 'Resend link' : 'Reset password'}
+                        </Button>
+                        <ConfirmButton
+                          label="Deactivate"
+                          confirmLabel="Deactivate"
+                          question={`Deactivate ${u.email}? They lose access immediately. The account can be restored later.`}
+                          onConfirm={() => setActive(u, false)}
+                          disabled={busy}
+                        />
+                      </>
+                    ))}
                 </div>
               </td>
             </tr>
           ))}
         </Table>
         <p className="mt-3 text-[11px] text-slate-400">
-          An account locks itself for a short period after repeated failed sign-ins. Unlock releases
-          it early. Adding and removing users is on the Employees page.
+          <b>Invited</b> means the emailed link has not been used yet, so no password has been chosen.
+          <b> Reset password</b> emails a fresh link and invalidates any earlier one. <b>Deactivate</b>
+          withdraws access immediately but keeps the record, so it can be restored; you cannot
+          deactivate yourself, and the last active administrator cannot be deactivated. An account
+          locks itself after repeated failed sign-ins; Unlock releases it early.
+        </p>
+      </Card>
+
+      <Card title="Add a console user">
+        <p className="text-xs leading-relaxed text-slate-500">
+          Console users sign in to this dashboard. <b>Administrators</b> can change settings, people,
+          campaigns and other console users; <b>viewers</b> can read everything but change nothing.
+          This is separate from <b>Employees</b>, which is the list of people receiving simulations.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <Field label="Email address" hint="They are emailed a link">
+            <input
+              className={inputClass}
+              type="email"
+              autoComplete="off"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+            />
+          </Field>
+          <Field label="Role">
+            <select
+              className={inputClass}
+              value={newUser.role}
+              onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+            >
+              <option value="client_admin">Administrator</option>
+              <option value="client_viewer">Viewer</option>
+            </select>
+          </Field>
+          <div className="flex items-end">
+            <Button onClick={addUser} disabled={busy || !newUser.email.trim()}>
+              Send invitation
+            </Button>
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+          You do not set their password. They receive a one-time link, choose one themselves, and it
+          must be at least {security.passwordMinLength} characters to match your policy.
+          {security.requireMfa &&
+            ' Because this account requires multi-factor authentication, they will also set that up before first use.'}
         </p>
       </Card>
 
