@@ -77,9 +77,15 @@ export class ReportsService {
 
     // Submission analytics from the metadata-only capture. No secret is stored;
     // these are the non-reversible signals a board report can use.
+    // One row per person, not per event: a staffer who re-submitted on the fake
+    // page creates several credential_submission rows, but the funnel counts
+    // people. De-duplicate to each person's first submission so this matches the
+    // credential count on the summary tiles (28 people, not 30 events).
     const submissions = await this.prisma.db.credentialSubmission.findMany({
       where: { send: { campaignId } },
-      select: { passwordLength: true, usernameLooksLikeEmail: true, timeToSubmitMs: true },
+      select: { sendId: true, passwordLength: true, usernameLooksLikeEmail: true, timeToSubmitMs: true },
+      distinct: ['sendId'],
+      orderBy: { submittedAt: 'asc' },
     });
     const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
     const median = (xs: number[]) => {
