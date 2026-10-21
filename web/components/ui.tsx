@@ -303,6 +303,29 @@ export function ConfirmButton({
   );
 }
 
+/**
+ * A whole page in a loading state: a title bar and a card outline, so a page that
+ * is still fetching looks like it is loading rather than like it has no data.
+ * Used by pages whose first paint would otherwise be an empty table.
+ */
+export function PageSkeleton() {
+  return (
+    <div role="status" aria-live="polite" aria-label="Loading" className="animate-pulse space-y-5">
+      <div className="h-6 w-44 rounded bg-slate-200" />
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+        <div className="h-4 w-32 rounded bg-slate-100" />
+        <div className="mt-4 space-y-3">
+          <div className="h-7 rounded-lg bg-slate-100" />
+          <div className="h-7 rounded-lg bg-slate-100" />
+          <div className="h-7 rounded-lg bg-slate-100" />
+          <div className="h-7 rounded-lg bg-slate-100" />
+        </div>
+      </div>
+      <span className="sr-only">Loading</span>
+    </div>
+  );
+}
+
 /** Grey placeholder rows shown while a list loads, instead of bare "Loading…". */
 export function SkeletonRows({ rows = 4 }: { rows?: number }) {
   return (

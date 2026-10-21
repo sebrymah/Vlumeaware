@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, PageSkeleton, Table, inputClass } from '@/components/ui';
 
 interface Tenant {
   id: string;
@@ -70,6 +70,9 @@ function TenantDetail() {
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Four requests feed this page; without a loading state the tables paint their
+  // empty rows first and the page looks like an empty client.
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmName, setConfirmName] = useState('');
@@ -97,6 +100,7 @@ function TenantDetail() {
   const [newUser, setNewUser] = useState({ email: '', role: 'client_admin' });
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [t, u, c, k] = await Promise.all([
         api.get<Tenant>(`/tenants/${tenantId}`),
@@ -121,6 +125,8 @@ function TenantDetail() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId]);
 
@@ -330,6 +336,7 @@ function TenantDetail() {
 
   const signed = tenant.ndpaAgreementSignedAt !== null;
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">

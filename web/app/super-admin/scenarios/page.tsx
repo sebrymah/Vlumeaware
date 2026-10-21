@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, EmptyState, Field, Notice, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Field, Notice, PageSkeleton, inputClass } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
 type Tier = 'low' | 'medium' | 'high';
@@ -47,6 +47,8 @@ function renderBody(html: string) {
 function Scenarios() {
   const [list, setList] = useState<Template[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Otherwise the empty state paints before the first request settles.
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState(blank());
@@ -54,11 +56,14 @@ function Scenarios() {
   const [preview, setPreview] = useState<Template | null>(null);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       setList(await api.get<Template[]>('/phishing-templates'));
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -150,6 +155,7 @@ function Scenarios() {
     return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [list]);
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-4 rounded-xl border border-brand-100 bg-gradient-to-r from-brand-50 to-white p-5">
