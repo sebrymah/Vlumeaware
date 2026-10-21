@@ -69,6 +69,16 @@ describe('isAuthenticatedSender', () => {
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 
+  it('counts a malformed-but-ours duplicate so it cannot slip past the single-header guard', () => {
+    const headers = [
+      ar(`${AUTHSERV}; dmarc=pass header.from=acme.test (unbalanced`), // malformed, our id
+      ar(`${AUTHSERV}; dmarc=pass header.from=acme.test`), // well-formed pass
+    ];
+    // Two headers bear our authserv-id ⟹ injection ⟹ reject, even though one
+    // of them does not parse.
+    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
+  });
+
   it('fails closed when no trusted authserv-id is configured', () => {
     const saved = process.env.POSTMARK_AUTHSERV_ID;
     delete process.env.POSTMARK_AUTHSERV_ID;

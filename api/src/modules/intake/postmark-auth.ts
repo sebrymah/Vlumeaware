@@ -104,6 +104,17 @@ function unquote(v: string): string {
   return t;
 }
 
+/**
+ * Lenient authserv-id: the first token, taken from the RAW value before any
+ * comment stripping, so a header that bears our id but is otherwise malformed
+ * still counts toward the duplicate check rather than silently vanishing. A
+ * value that begins with a comment yields '' (it is not our MTA's header).
+ */
+function rawAuthservId(value: string): string {
+  const m = value.trimStart().match(/^[^;\s(]+/);
+  return m ? m[0].toLowerCase() : '';
+}
+
 /** Parse an Authentication-Results value; null authserv marks it unusable. */
 function parse(value: string): { authserv: string | null; results: Resinfo[] } {
   const cleaned = stripComments(value);
@@ -158,12 +169,19 @@ export function isAuthenticatedSender(headers: MailHeader[] | undefined, fromEma
   const fromDomain = fromEmail.split('@').pop()?.trim().toLowerCase();
   if (!fromDomain) return false;
 
-  const ours = (headers ?? []).filter(
-    (h) => h.Name?.toLowerCase() === 'authentication-results' && parse(h.Value ?? '').authserv === trusted,
+  // Count candidates by their RAW authserv-id so a malformed-but-ours header is
+  // not silently dropped (which would let an attacker sneak a second header
+  // past the "exactly one" guard). Only then parse the sole candidate strictly;
+  // if it is malformed, parse() yields a null authserv and we fail closed.
+  const candidates = (headers ?? []).filter(
+    (h) => h.Name?.toLowerCase() === 'authentication-results' && rawAuthservId(h.Value ?? '') === trusted,
   );
-  if (ours.length !== 1) return false;
+  if (candidates.length !== 1) return false;
 
-  return parse(ours[0].Value ?? '').results.some(
+  const parsed = parse(candidates[0].Value ?? '');
+  if (parsed.authserv !== trusted) return false;
+
+  return parsed.results.some(
     (r) => r.method === 'dmarc' && r.result === 'pass' && r.props['header.from'] === fromDomain,
   );
 }
