@@ -1,4 +1,4 @@
-import { ConflictException, BadRequestException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { tenantGuardExtension } from '../src/common/prisma/tenant-guard.extension';
 import { runAsSystem, runInTenant } from '../src/common/prisma/tenant-context';
@@ -8,6 +8,7 @@ import { AuditService } from '../src/common/audit/audit.service';
 import { TrialService } from '../src/common/trial/trial.service';
 import { TenantsService } from '../src/modules/tenants/tenants.service';
 import { TenantsController } from '../src/modules/tenants/tenants.controller';
+import { ConsoleInviteService } from '../src/modules/console-invite/console-invite.service';
 import { ROLES_KEY } from '../src/common/auth/roles.decorator';
 import { ROLES } from '../src/common/auth/roles';
 
@@ -16,27 +17,29 @@ import { ROLES } from '../src/common/auth/roles';
  *
  * Vlumetech used to be the only party who could create a client's console
  * accounts, which made the setup guide's "add a second admin" advice impossible
- * to follow without a support request. Opening the route to client admins means
- * the checks around it stop being staff-only conveniences and start being the
- * account's real policy — so they are pinned here:
- *
- *  - the tenant's own password minimum, not just the DTO's 12-character floor;
- *  - the address normalised, so case cannot sneak a duplicate past the unique
- *    index;
- *  - a duplicate reported as a conflict rather than a 500;
- *  - a durable audit row, since the new account can administer the tenant;
- *  - the role set, which is what stops this minting staff or escalating a viewer.
+ * to follow without a support request. This pins the lifecycle that opened up:
+ * creating with an emailed link (never an admin-chosen password), resetting, and
+ * removing with the two refusals that stop a tenant locking itself out.
  */
 const base = new PrismaClient();
 const db = base.$extends(tenantGuardExtension);
 const prisma = { db } as unknown as PrismaService;
-const noopMailer = { send: async () => ({ messageId: 'test' }) } as never;
+
+const sent: Array<{ to: string; subject: string; html: string }> = [];
+const mailer = {
+  send: async (e: { to: string; subject: string; html: string }) => {
+    sent.push(e);
+    return { messageId: 'test' };
+  },
+};
+const invites = new ConsoleInviteService(prisma, mailer as never, new AuditService(prisma));
 const tenants = new TenantsService(
   prisma,
   new StorageService(),
   new AuditService(prisma),
   new TrialService(prisma),
-  noopMailer,
+  invites,
+  mailer as never,
 );
 
 const tenantIds: string[] = [];
@@ -60,52 +63,48 @@ async function freshTenant(policy: { passwordMinLength?: number; requireMfa?: bo
   return t;
 }
 
-describe('a client admin creating console users', () => {
-  it('creates an admin and normalises the address', async () => {
+describe('creating a console user', () => {
+  it('emails a one-time link instead of taking a password', async () => {
     const t = await freshTenant();
+    sent.length = 0;
+
     const created = await tenants.createTenantUser(t.id, {
       email: '  Second.Admin@Example.TEST ',
-      password: 'correct horse battery',
       role: 'client_admin',
     });
+
     expect(created.email).toBe('second.admin@example.test');
     expect(created.role).toBe('client_admin');
-
-    const listed = await tenants.listTenantUsers(t.id);
-    expect(listed.map((u) => u.email)).toContain('second.admin@example.test');
+    expect(created.invitePending).toBe(true);
+    expect(created.emailSent).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].to).toBe('second.admin@example.test');
+    // The link is the only way in; no password is ever put in the mail.
+    expect(sent[0].html).toContain('/invite/');
   });
 
-  it('enforces the tenant password minimum, not just the DTO floor', async () => {
-    const t = await freshTenant({ passwordMinLength: 16 });
-    await expect(
-      tenants.createTenantUser(t.id, {
-        email: 'short@example.test',
-        password: 'fifteen-chars-x', // 15 characters: fine for the DTO, short for this tenant
-        role: 'client_admin',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-
+  it('cannot be signed into until the link is used', async () => {
+    const t = await freshTenant();
     const created = await tenants.createTenantUser(t.id, {
-      email: 'long-enough@example.test',
-      password: 'sixteen-chars-xx',
+      email: 'pending@example.test',
       role: 'client_admin',
     });
-    expect(created.email).toBe('long-enough@example.test');
+    const row = await runInTenant(t.id, () =>
+      db.tenantUser.findUnique({
+        where: { id: created.id },
+        select: { passwordHash: true, inviteTokenHash: true },
+      }),
+    );
+    // A real bcrypt hash — of random bytes nobody was told.
+    expect(row?.passwordHash).toMatch(/^\$2[aby]\$/);
+    expect(row?.inviteTokenHash).toHaveLength(64);
   });
 
   it('treats a differently-capitalised address as a duplicate, and says so', async () => {
     const t = await freshTenant();
-    await tenants.createTenantUser(t.id, {
-      email: 'admin@example.test',
-      password: 'correct horse battery',
-      role: 'client_admin',
-    });
+    await tenants.createTenantUser(t.id, { email: 'admin@example.test', role: 'client_admin' });
     await expect(
-      tenants.createTenantUser(t.id, {
-        email: 'ADMIN@Example.Test',
-        password: 'correct horse battery',
-        role: 'client_viewer',
-      }),
+      tenants.createTenantUser(t.id, { email: 'ADMIN@Example.Test', role: 'client_viewer' }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
@@ -113,7 +112,6 @@ describe('a client admin creating console users', () => {
     const t = await freshTenant({ requireMfa: true });
     const created = await tenants.createTenantUser(t.id, {
       email: 'mfa@example.test',
-      password: 'correct horse battery',
       role: 'client_admin',
     });
     const row = await runInTenant(t.id, () =>
@@ -122,25 +120,20 @@ describe('a client admin creating console users', () => {
     expect(row?.mfaRequired).toBe(true);
   });
 
-  it('leaves a durable audit record naming what was created', async () => {
+  it('audits the creation, naming role and address', async () => {
     const t = await freshTenant();
-    await tenants.createTenantUser(t.id, {
-      email: 'audited@example.test',
-      password: 'correct horse battery',
-      role: 'client_viewer',
-    });
+    await tenants.createTenantUser(t.id, { email: 'audited@example.test', role: 'client_viewer' });
     const entry = await runInTenant(t.id, () =>
       db.auditLog.findFirst({
         where: { tenantId: t.id, action: 'tenant.user.create' },
         orderBy: { createdAt: 'desc' },
       }),
     );
-    expect(entry).not.toBeNull();
     expect(entry?.detail).toContain('audited@example.test');
     expect(entry?.detail).toContain('client_viewer');
   });
 
-  it('is open to client admins and to staff, but not to viewers', () => {
+  it('is open to client admins and staff, but not to viewers', () => {
     // The class-level @Roles(superadmin) is what made this staff-only; the
     // method-level decorator replaced it, and must not have widened it to
     // viewers, who would otherwise be able to grant themselves an admin login.
@@ -148,5 +141,83 @@ describe('a client admin creating console users', () => {
     expect(roles).toContain(ROLES.superadmin);
     expect(roles).toContain(ROLES.clientAdmin);
     expect(roles).not.toContain(ROLES.clientViewer);
+  });
+});
+
+describe('removing a console user', () => {
+  it('removes the account and records it', async () => {
+    const t = await freshTenant();
+    const leaver = await tenants.createTenantUser(t.id, {
+      email: 'leaver@example.test',
+      role: 'client_viewer',
+    });
+    const removed = await tenants.deleteTenantUser(t.id, leaver.id, { userId: 'someone-else' });
+    expect(removed.removed).toBe('leaver@example.test');
+
+    const listed = await tenants.listTenantUsers(t.id);
+    expect(listed.map((u) => u.email)).not.toContain('leaver@example.test');
+
+    const entry = await runInTenant(t.id, () =>
+      db.auditLog.findFirst({
+        where: { tenantId: t.id, action: 'tenant.user.delete' },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+    expect(entry?.detail).toContain('leaver@example.test');
+  });
+
+  it('refuses to remove yourself', async () => {
+    const t = await freshTenant();
+    const me = await tenants.createTenantUser(t.id, {
+      email: 'me@example.test',
+      role: 'client_admin',
+    });
+    await expect(tenants.deleteTenantUser(t.id, me.id, { userId: me.id })).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    const listed = await tenants.listTenantUsers(t.id);
+    expect(listed.map((u) => u.email)).toContain('me@example.test');
+  });
+
+  it('refuses to remove the last administrator', async () => {
+    const t = await freshTenant();
+    const onlyAdmin = await tenants.createTenantUser(t.id, {
+      email: 'only-admin@example.test',
+      role: 'client_admin',
+    });
+    await expect(
+      tenants.deleteTenantUser(t.id, onlyAdmin.id, { userId: 'another-admin' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('allows removing an administrator when another remains', async () => {
+    const t = await freshTenant();
+    await tenants.createTenantUser(t.id, { email: 'first@example.test', role: 'client_admin' });
+    const second = await tenants.createTenantUser(t.id, {
+      email: 'second@example.test',
+      role: 'client_admin',
+    });
+    const removed = await tenants.deleteTenantUser(t.id, second.id, { userId: 'first-actor' });
+    expect(removed.removed).toBe('second@example.test');
+  });
+});
+
+describe('resetting a console user password', () => {
+  it('emails a fresh link and marks the account pending again', async () => {
+    const t = await freshTenant();
+    const user = await tenants.createTenantUser(t.id, {
+      email: 'reset-me@example.test',
+      role: 'client_viewer',
+    });
+    sent.length = 0;
+
+    const result = await tenants.sendConsoleInvite(t.id, user.id, 'admin@example.test');
+    expect(result.emailSent).toBe(true);
+    expect(sent).toHaveLength(1);
+    expect(sent[0].html).toContain('/invite/');
+
+    // getSecurity relies on the request scope the interceptor opens in production.
+    const security = await runInTenant(t.id, () => tenants.getSecurity(t.id));
+    expect(security.users.find((u) => u.email === 'reset-me@example.test')?.invitePending).toBe(true);
   });
 });

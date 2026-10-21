@@ -12,7 +12,7 @@ const db = base.$extends(tenantGuardExtension);
 const prisma = { db } as unknown as PrismaService;
 const trial = new TrialService(prisma);
 const noopMailer = { send: async () => ({ messageId: 'test' }) } as never;
-const tenants = new TenantsService(prisma, new StorageService(), new AuditService(prisma), trial, noopMailer);
+const tenants = new TenantsService(prisma, new StorageService(), new AuditService(prisma), trial, { issue: async () => ({ emailSent: true, expiresAt: new Date() }) } as never, noopMailer);
 
 const uniq = () => `term-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const sys = <T>(fn: () => Promise<T>) => runAsSystem('test', fn);

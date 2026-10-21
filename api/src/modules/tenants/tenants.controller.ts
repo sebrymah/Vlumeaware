@@ -35,7 +35,9 @@ class AgreementDto {
 
 class CreateTenantUserDto {
   @IsEmail() email!: string;
-  @IsString() @MinLength(12) password!: string;
+  // No password: the new account gets a one-time emailed link and chooses its
+  // own. An admin-chosen password would have to be sent over some channel, and
+  // that is the thing we are avoiding.
   @IsIn(['client_admin', 'client_viewer']) role!: 'client_admin' | 'client_viewer';
 }
 
@@ -288,8 +290,40 @@ export class TenantsController {
   @Post(':tenantId/users')
   @Roles(ROLES.superadmin, ROLES.clientAdmin)
   @Throttle({ limit: 10, windowMs: 60_000 })
-  createUser(@Param('tenantId', ParseUUIDPipe) tenantId: string, @Body() dto: CreateTenantUserDto) {
-    return this.tenants.createTenantUser(tenantId, dto);
+  createUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Body() dto: CreateTenantUserDto,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.createTenantUser(tenantId, dto, user.email);
+  }
+
+  /**
+   * Sends a fresh one-time link. One route serves both "resend invitation" (the
+   * account was never opened) and "reset password" (it was) because they are the
+   * same operation; re-issuing invalidates any earlier link.
+   */
+  @Post(':tenantId/users/:userId/invite')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @Throttle({ limit: 10, windowMs: 60_000 })
+  resendInvite(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.sendConsoleInvite(tenantId, userId, user.email);
+  }
+
+  @Delete(':tenantId/users/:userId')
+  @HttpCode(200)
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  removeUser(
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @CurrentUser() user: JwtPayload,
+  ) {
+    return this.tenants.deleteTenantUser(tenantId, userId, { userId: user.sub, email: user.email });
   }
 
   @Get(':tenantId/users')

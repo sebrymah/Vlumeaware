@@ -14,7 +14,7 @@ const storage = new StorageService();
 /** The service now emails setup instructions on approval; nothing under test
  *  asserts on that, so the mailer is a no-op here. */
 const noopMailer = { send: async () => ({ messageId: 'test' }) } as never;
-const tenants = new TenantsService(prisma, storage, new AuditService(prisma), new TrialService(prisma), noopMailer);
+const tenants = new TenantsService(prisma, storage, new AuditService(prisma), new TrialService(prisma), { issue: async () => ({ emailSent: true, expiresAt: new Date() }) } as never, noopMailer);
 
 const uniq = () => `del-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const sys = <T>(fn: () => Promise<T>) => runAsSystem('test', fn);

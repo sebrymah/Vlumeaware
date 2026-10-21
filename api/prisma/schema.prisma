@@ -190,6 +190,14 @@ model TenantUser {
   /// Brute-force protection, which client logins previously had none of.
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")
+  /// A one-time link for setting the password: issued when the account is
+  /// created (invitation) and reissued when an admin resets it. Only the SHA-256
+  /// is stored, so a database leak cannot be redeemed — the same reasoning as
+  /// LicenseToken.tokenHash. Null means no link is outstanding. The plaintext
+  /// password is never emailed and never known to the admin.
+  inviteTokenHash String?   @unique @map("invite_token_hash")
+  inviteExpiresAt DateTime? @map("invite_expires_at")
+  inviteSentAt    DateTime? @map("invite_sent_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
