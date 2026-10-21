@@ -183,8 +183,11 @@ Fifth tranche — honesty about loading, and accessible names:
   `reported` and `risk` render `SkeletonRows` until their data arrives; previously the
   empty row ("No certificates issued yet") was the first thing painted, so a slow
   request looked like an empty account.
-- **Ten placeholder-only inputs** now have an accessible name — the staff pickers, the
-  roster search, the quiz's prompt/option/explanation fields.
+- **Three placeholder-only inputs gained an accessible name** — the quiz's
+  prompt/option/explanation fields. The staff pickers and roster search already had one:
+  my first count said otherwise because the scan's regex stopped at the `>` inside
+  `onChange={(e) => …}` and never saw the attribute after it. Worth recording as a
+  reminder that a naive scan of JSX over-reports.
 - **The two mock sign-in forms** (campaign preview and landing design) are
   `aria-hidden`: they are pictures of a form, and announcing them as unusable controls
   is worse than silence.
