@@ -761,7 +761,7 @@ function TenantDetail() {
             </Field>
           </div>
           <div className="w-56">
-            <Field label="Initial password" hint="Minimum 12 characters">
+            <Field label="Initial password" hint="The tenant's policy applies — 12 characters by default">
               <input
                 className={inputClass}
                 type="password"

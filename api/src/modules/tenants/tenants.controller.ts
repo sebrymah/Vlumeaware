@@ -276,7 +276,18 @@ export class TenantsController {
     return this.tenants.seatUsage(tenantId);
   }
 
+  /**
+   * A client admin adds their own colleagues. This is what makes the "add a
+   * second admin" that the setup guide asks for possible without waiting on
+   * Vlumetech; the class-level @Roles(superadmin) previously made it staff-only.
+   *
+   * The DTO restricts the role to client_admin/client_viewer, so this cannot
+   * mint staff, and the tenant comes from the path — the scope interceptor
+   * rejects a client addressing any tenant but their own.
+   */
   @Post(':tenantId/users')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin)
+  @Throttle({ limit: 10, windowMs: 60_000 })
   createUser(@Param('tenantId', ParseUUIDPipe) tenantId: string, @Body() dto: CreateTenantUserDto) {
     return this.tenants.createTenantUser(tenantId, dto);
   }

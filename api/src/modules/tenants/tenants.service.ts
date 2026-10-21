@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { MAILER } from '../../providers/mailer/mailer.interface';
 import type { Mailer } from '../../providers/mailer/mailer.interface';
 import { notificationFromAddress } from '../../providers/mailer/from-addresses';
@@ -13,6 +13,7 @@ import { AuthService } from '../../common/auth/auth.service';
 import { AuditService } from '../../common/audit/audit.service';
 import { TrialService } from '../../common/trial/trial.service';
 import { StorageService } from '../../providers/storage/storage.service';
+import { Prisma } from '@prisma/client';
 import type { TenantRole } from '@prisma/client';
 
 /** A signed NDPA agreement: a PDF, or a photograph/scan of the signed page. */
@@ -297,27 +298,56 @@ export class TenantsService {
     });
   }
 
-  /** Creates a client-side admin or viewer account within one tenant. */
+  /**
+   * Creates a client-side admin or viewer account within one tenant.
+   *
+   * Called by a client admin as well as by staff, so the checks below matter:
+   * the tenant's own password policy is enforced (not just the DTO's 12-char
+   * floor, or a client with a stricter policy would get weaker accounts than
+   * they configured), the address is normalised so the unique index cannot be
+   * sidestepped with a different capitalisation, and a clash comes back as a
+   * conflict rather than a 500.
+   */
   async createTenantUser(tenantId: string, input: { email: string; password: string; role: TenantRole }) {
     await this.findOne(tenantId);
-    const passwordHash = await AuthService.hash(input.password);
+    const email = input.email.trim().toLowerCase();
+    if (!email) throw new BadRequestException('An email address is required.');
+
     // Client MFA is the tenant's own opt-in policy, so a new account inherits
     // it: a client that requires MFA gets users who must enrol before they can
     // use the API, and a client that does not is unaffected. Existing accounts
     // are grandfathered, so switching this on never locks a team out.
-    const { requireMfa } = await this.getSecurityPolicy(tenantId);
-    return runInTenant(tenantId, () =>
-      this.prisma.db.tenantUser.create({
-        data: {
-          tenantId,
-          email: input.email,
-          passwordHash,
-          role: input.role,
-          mfaRequired: requireMfa,
-        },
-        select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
-      }),
-    );
+    const { requireMfa, passwordMinLength } = await this.getSecurityPolicy(tenantId);
+    if (input.password.length < passwordMinLength) {
+      throw new BadRequestException(
+        `This account requires a password of at least ${passwordMinLength} characters.`,
+      );
+    }
+
+    const passwordHash = await AuthService.hash(input.password);
+    let user;
+    try {
+      user = await runInTenant(tenantId, () =>
+        this.prisma.db.tenantUser.create({
+          data: {
+            tenantId,
+            email,
+            passwordHash,
+            role: input.role,
+            mfaRequired: requireMfa,
+          },
+          select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
+        }),
+      );
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        throw new ConflictException('An account with that email address already exists.');
+      }
+      throw err;
+    }
+    // Adding someone who can administer the account is worth a durable record.
+    await this.audit.record('tenant.user.create', `${input.role} ${email}`, tenantId);
+    return user;
   }
 
   listTenantUsers(tenantId: string) {

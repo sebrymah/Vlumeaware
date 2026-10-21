@@ -50,6 +50,9 @@ function Security() {
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // New console user (a colleague this admin is adding).
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'client_admin' });
+
   // MFA enrolment for the signed-in admin.
   const [enrolment, setEnrolment] = useState<{ secret: string; otpauthUrl: string } | null>(null);
   const [code, setCode] = useState('');
@@ -136,6 +139,14 @@ function Security() {
     run(async () => {
       await api.post(`/tenants/${tenantId}/users/${user.id}/unlock`);
       return `${user.email} can sign in again.`;
+    });
+
+  const addUser = () =>
+    run(async () => {
+      await api.post(`/tenants/${tenantId}/users`, newUser);
+      const added = newUser.email.trim();
+      setNewUser({ email: '', password: '', role: 'client_admin' });
+      return `${added} can now sign in. Share the initial password with them securely — they can change it here.`;
     });
 
   /**
@@ -331,7 +342,62 @@ function Security() {
         </Table>
         <p className="mt-3 text-[11px] text-slate-400">
           An account locks itself for a short period after repeated failed sign-ins. Unlock releases
-          it early. Adding and removing users is on the Employees page.
+          it early.
+        </p>
+      </Card>
+
+      <Card title="Add a console user">
+        <p className="text-xs leading-relaxed text-slate-500">
+          Console users sign in to this dashboard. <b>Administrators</b> can change settings, people,
+          campaigns and other console users; <b>viewers</b> can read everything but change nothing.
+          This is separate from <b>Employees</b>, which is the list of people receiving simulations.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Email address">
+            <input
+              className={inputClass}
+              type="email"
+              autoComplete="off"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+            />
+          </Field>
+          <Field
+            label="Initial password"
+            hint={`At least ${security.passwordMinLength} characters`}
+          >
+            <input
+              className={inputClass}
+              type="password"
+              autoComplete="new-password"
+              value={newUser.password}
+              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+            />
+          </Field>
+          <Field label="Role">
+            <select
+              className={inputClass}
+              value={newUser.role}
+              onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+            >
+              <option value="client_admin">Administrator</option>
+              <option value="client_viewer">Viewer</option>
+            </select>
+          </Field>
+          <div className="flex items-end">
+            <Button
+              onClick={addUser}
+              disabled={busy || !newUser.email.trim() || !newUser.password}
+            >
+              Add user
+            </Button>
+          </div>
+        </div>
+        <p className="mt-3 text-[11px] leading-relaxed text-slate-400">
+          The password you set is the one they sign in with first; ask them to change it here
+          afterwards.
+          {security.requireMfa &&
+            ' This account requires multi-factor authentication, so they will be asked to set it up at their first sign-in.'}
         </p>
       </Card>
 
