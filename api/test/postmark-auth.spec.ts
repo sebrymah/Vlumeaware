@@ -24,18 +24,18 @@ describe('isAuthenticatedSender', () => {
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(true);
   });
 
-  it('accepts a DKIM pass whose d= is aligned to the From domain', () => {
+  it('does NOT trust a DKIM pass on its own — only an aligned DMARC pass', () => {
     const headers = [ar(`${AUTHSERV}; dkim=pass header.d=acme.test`)];
-    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(true);
+    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
+  });
+
+  it('rejects a DMARC pass whose header.from is a different domain', () => {
+    const headers = [ar(`${AUTHSERV}; dmarc=pass header.from=attacker.test`)];
+    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 
   it('rejects a sender-injected result bearing a different authserv-id', () => {
     const headers = [ar('evil.example; dmarc=pass header.from=acme.test')];
-    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
-  });
-
-  it('rejects a DKIM pass for an unrelated (attacker) domain', () => {
-    const headers = [ar(`${AUTHSERV}; dkim=pass header.d=attacker.test`)];
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 
@@ -57,8 +57,15 @@ describe('isAuthenticatedSender', () => {
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 
-  it('rejects a From that is a sibling, not a subdomain, of the signing domain', () => {
-    const headers = [ar(`${AUTHSERV}; dkim=pass header.d=notacme.test`)];
+  it('does not let an escaped paren in a comment leak the verdict', () => {
+    // The "\)" is escaped, so the comment runs to the real ")" and the hidden
+    // dmarc=pass is dropped, leaving only dmarc=fail.
+    const headers = [ar(`${AUTHSERV}; dmarc=fail (c\\)dmarc=pass header.from=acme.test) header.from=acme.test`)];
+    expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
+  });
+
+  it('fails closed on a malformed header (unbalanced parentheses)', () => {
+    const headers = [ar(`${AUTHSERV}; dmarc=pass header.from=acme.test (oops`)];
     expect(isAuthenticatedSender(headers, 'staff@acme.test')).toBe(false);
   });
 

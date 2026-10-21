@@ -11,11 +11,13 @@ interface Resinfo {
 }
 
 /**
- * Remove RFC 5322 CFWS comments — `(...)`, nestable — while respecting quoted
- * strings (a `(` inside `"..."` is literal). Done with a real scan rather than a
- * regex so a verdict hidden in a comment can never survive into the parse.
+ * Remove RFC 5322 CFWS comments — `(...)`, nestable — returning `null` if the
+ * header is malformed (unbalanced parens or quotes) so the caller fails closed.
+ * Inside a comment `\` escapes the next character and `"` is a literal (not a
+ * quote); outside, `"` opens a quoted string. A real scan, not a regex, so a
+ * verdict hidden in a comment or behind an escaped paren cannot leak through.
  */
-function stripComments(input: string): string {
+function stripComments(input: string): string | null {
   let out = '';
   let depth = 0;
   let inQuote = false;
@@ -23,30 +25,42 @@ function stripComments(input: string): string {
     const c = input[i];
     if (inQuote) {
       if (c === '\\') {
-        if (depth === 0) out += c + (input[i + 1] ?? '');
+        out += c + (input[i + 1] ?? '');
         i += 1;
         continue;
       }
       if (c === '"') inQuote = false;
-      if (depth === 0) out += c;
+      out += c;
+      continue;
+    }
+    if (depth > 0) {
+      // Inside a comment: drop content; '\' escapes the next char; '"' is literal.
+      if (c === '\\') {
+        i += 1;
+        continue;
+      }
+      if (c === '(') depth += 1;
+      else if (c === ')') depth -= 1;
+      continue;
+    }
+    if (c === '\\') {
+      out += c + (input[i + 1] ?? '');
+      i += 1;
       continue;
     }
     if (c === '"') {
       inQuote = true;
-      if (depth === 0) out += c;
+      out += c;
       continue;
     }
     if (c === '(') {
       depth += 1;
       continue;
     }
-    if (c === ')') {
-      if (depth > 0) depth -= 1;
-      continue;
-    }
-    if (depth === 0) out += c;
+    if (c === ')') return null; // unbalanced close
+    out += c;
   }
-  return out;
+  return depth === 0 && !inQuote ? out : null;
 }
 
 /** Split on a single-char separator that is outside any quoted string. */
@@ -90,12 +104,14 @@ function unquote(v: string): string {
   return t;
 }
 
-/** Parse an Authentication-Results value into its authserv-id and resinfos. */
-function parse(value: string): { authserv: string; results: Resinfo[] } {
-  const parts = splitOutsideQuotes(stripComments(value), ';')
+/** Parse an Authentication-Results value; null authserv marks it unusable. */
+function parse(value: string): { authserv: string | null; results: Resinfo[] } {
+  const cleaned = stripComments(value);
+  if (cleaned === null) return { authserv: null, results: [] };
+  const parts = splitOutsideQuotes(cleaned, ';')
     .map((p) => p.trim())
     .filter(Boolean);
-  const authserv = parts.length ? parts[0].split(/\s+/)[0].toLowerCase() : '';
+  const authserv = parts.length ? parts[0].split(/\s+/)[0].toLowerCase() : null;
   const results: Resinfo[] = [];
   for (const part of parts.slice(1)) {
     const tokens = splitOutsideQuotes(part, ' ')
@@ -122,20 +138,18 @@ function parse(value: string): { authserv: string; results: Resinfo[] } {
  * decided only from the Authentication-Results header our own trusted MTA
  * stamped (`POSTMARK_AUTHSERV_ID`). Hardened per the security review:
  *
- *  - The value is tokenised (comments stripped, quoted strings respected, split
- *    into resinfo entries); verdicts and property values are compared EXACTLY,
- *    never by a substring regex over the whole header. So a pass hidden in a
- *    comment, in a quoted string, or in an unrelated property cannot match.
- *  - Only headers whose authserv-id equals ours are considered, and there must
- *    be exactly ONE — an MTA strips pre-existing results bearing its own id
- *    (RFC 8601 §5), so a second one means a sender tried to inject theirs, and
- *    we fail closed.
- *  - A pass must be aligned to the From domain: DMARC `header.from` equal to it,
- *    or DKIM `header.d` equal to it (or a parent domain it is a subdomain of).
+ *  - The value is tokenised (comments stripped with a real scanner, quoted
+ *    strings respected), and the header is rejected outright if malformed.
+ *    Verdicts and property values are compared EXACTLY, never by substring.
+ *  - Only headers whose authserv-id equals ours count, and there must be exactly
+ *    ONE — an MTA strips pre-existing results bearing its own id (RFC 8601 §5),
+ *    so a second one is a sender-injected forgery and we fail closed.
+ *  - We trust ONLY a DMARC pass whose `header.from` exactly equals the From
+ *    domain. DMARC pass already means the From was authenticated AND aligned, so
+ *    there is no separate (over-permissive) DKIM-alignment path to abuse.
  *
- * Fails closed: no configured authserv-id, not exactly one trusted header, or no
- * aligned pass ⟹ unauthenticated. This is defence-in-depth; crediting a report
- * independently requires the reporter to be the send's real recipient.
+ * Fails closed in every uncertain case. Defence-in-depth only: crediting a
+ * report independently requires the reporter to be the send's real recipient.
  */
 export function isAuthenticatedSender(headers: MailHeader[] | undefined, fromEmail: string): boolean {
   const trusted = process.env.POSTMARK_AUTHSERV_ID?.trim().toLowerCase();
@@ -149,15 +163,7 @@ export function isAuthenticatedSender(headers: MailHeader[] | undefined, fromEma
   );
   if (ours.length !== 1) return false;
 
-  const alignsToFrom = (value: string | undefined): boolean => {
-    if (!value) return false;
-    const d = value.replace(/^@/, '');
-    return d === fromDomain || fromDomain.endsWith(`.${d}`);
-  };
-
   return parse(ours[0].Value ?? '').results.some(
-    (r) =>
-      (r.method === 'dmarc' && r.result === 'pass' && r.props['header.from'] === fromDomain) ||
-      (r.method === 'dkim' && r.result === 'pass' && alignsToFrom(r.props['header.d'])),
+    (r) => r.method === 'dmarc' && r.result === 'pass' && r.props['header.from'] === fromDomain,
   );
 }
