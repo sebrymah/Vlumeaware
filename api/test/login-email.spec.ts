@@ -6,6 +6,7 @@ import { runAsSystem, runInTenant } from '../src/common/prisma/tenant-context';
 import { PrismaService } from '../src/common/prisma/prisma.service';
 import { AuditService } from '../src/common/audit/audit.service';
 import { AuthService } from '../src/common/auth/auth.service';
+import { PlatformPolicyService } from '../src/modules/platform/platform-policy.service';
 
 /**
  * Signing in must not depend on how the address was typed.
@@ -24,7 +25,12 @@ const prisma = { db } as unknown as PrismaService;
 
 process.env.JWT_SECRET ??= 'test-secret-that-is-at-least-32-characters-long';
 const jwt = new JwtService({ secret: process.env.JWT_SECRET });
-const auth = new AuthService(prisma, jwt, new AuditService(prisma));
+const auth = new AuthService(
+  prisma,
+  jwt,
+  new AuditService(prisma),
+  new PlatformPolicyService(prisma),
+);
 
 const tenantIds: string[] = [];
 const staffIds: string[] = [];

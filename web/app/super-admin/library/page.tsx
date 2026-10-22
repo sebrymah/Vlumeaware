@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, uploadWithProgress } from '@/lib/api';
 import { formatDuration, readVideoDuration } from '@/lib/video-duration';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Field, Notice, PageSkeleton, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
 import { Icon } from '@/components/icons';
 
@@ -42,6 +42,8 @@ export default function LibraryPage() {
 function Library() {
   const [list, setList] = useState<SharedModule[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Otherwise the empty state paints before the first request settles.
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploadPct, setUploadPct] = useState<number | null>(null);
@@ -64,11 +66,14 @@ function Library() {
   ).sort();
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       setList(await api.get<SharedModule[]>('/shared-training-modules'));
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -192,6 +197,7 @@ function Library() {
     }
   }
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div>

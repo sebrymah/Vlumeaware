@@ -232,7 +232,7 @@ export default async function PortalDashboard({ params }: { params: Promise<{ to
           )}
         </section>
 
-        <p className="pb-6 text-center text-[11px] text-slate-400">This dashboard is private to you. Powered by Vlumeaware.</p>
+        <p className="pb-6 text-center text-[11px] text-slate-500">This dashboard is private to you. Powered by Vlumeaware.</p>
       </div>
     </div>
   );

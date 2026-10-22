@@ -328,7 +328,7 @@ export default function DocsPage() {
 
   const Nav = (
     <nav className="space-y-4">
-      <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+      <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
         On this page
       </p>
       {SECTIONS.map((section) => (

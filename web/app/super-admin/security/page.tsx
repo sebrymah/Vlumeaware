@@ -159,9 +159,9 @@ function Security() {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Can’t scan? Enter this key</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Can’t scan? Enter this key</div>
                   <div className="mt-1 select-all break-all font-mono text-[13px] text-slate-900">{setup.secret}</div>
-                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Or open the setup link</div>
+                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Or open the setup link</div>
                   <a className="mt-1 block break-all font-mono text-[12px] text-brand-700 underline" href={setup.otpauthUrl}>{setup.otpauthUrl}</a>
                 </div>
               </div>

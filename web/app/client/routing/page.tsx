@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Notice, PageSkeleton, Table, inputClass } from '@/components/ui';
 
 interface Scenario {
   id: string;
@@ -49,11 +49,15 @@ function Routing() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
+  // Otherwise the empty state paints before the first request settles, which
+  // reads as "nothing here" rather than "still loading".
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+      setLoading(true);
     try {
       const [s, r, a, m] = await Promise.all([
         api.get<Scenario[]>(`/tenants/${tenantId}/scenarios`),
@@ -68,6 +72,8 @@ function Routing() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId]);
 
@@ -123,6 +129,7 @@ function Routing() {
   const ruleFor = (scenarioId: string) => rules.find((r) => r.scenarioId === scenarioId);
   const outstanding = assignments.filter((a) => !a.completedAt).length;
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div>
@@ -182,11 +189,7 @@ function Routing() {
             );
           })}
           {!scenarios.length && (
-            <tr>
-              <td colSpan={4} className="px-2 py-6 text-center text-slate-500">
-                No scenarios yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={4} title="No scenarios yet." />
           )}
         </Table>
         {scenarios.some((s) => !ruleFor(s.id)) && (
@@ -221,11 +224,7 @@ function Routing() {
               </tr>
             ))}
             {!assignments.length && (
-              <tr>
-                <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                  No training assigned yet — nobody has clicked a simulation.
-                </td>
-              </tr>
+              <EmptyRow colSpan={6} title="No training assigned yet — nobody has clicked a simulation." />
             )}
           </Table>
         </div>

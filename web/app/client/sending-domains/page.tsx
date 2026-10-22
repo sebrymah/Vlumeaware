@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, ConfirmButton, EmptyState, Field, Notice, TermHelp, inputClass } from '@/components/ui';
+import { Button, Card, ConfirmButton, EmptyState, Field, Notice, PageSkeleton, TermHelp, inputClass } from '@/components/ui';
 
 interface DnsRecord {
   record?: string;
@@ -124,7 +124,7 @@ function SenderTitle({
           {busy ? 'Saving…' : 'Save name'}
         </Button>
       </div>
-      <p className="mt-1 text-[11px] text-slate-400">
+      <p className="mt-1 text-[11px] text-slate-500">
         Shown as the sender&rsquo;s name. The domain and address the mail comes from do not change.
         Leave blank to use each scenario&rsquo;s own sender name.
       </p>
@@ -138,11 +138,15 @@ function SendingDomains() {
   const [shared, setShared] = useState<SharedOption[]>([]);
   const [domain, setDomain] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Otherwise the empty state paints before the first request settles, which
+  // reads as "nothing here" rather than "still loading".
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+      setLoading(true);
     try {
       // The list endpoint refreshes pending domains from the provider, so
       // opening the page reflects DNS that has propagated since last time.
@@ -155,6 +159,8 @@ function SendingDomains() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId]);
 
@@ -223,6 +229,7 @@ function SendingDomains() {
   const ownDomains = list.filter((d) => !d.managed);
   const verifiedCount = ownDomains.filter((d) => d.status === 'verified').length;
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div>
@@ -262,7 +269,7 @@ function SendingDomains() {
                       not enabled
                     </span>
                   )}
-                  <span className="text-[11px] text-slate-400">Verified by Vlumeaware · no DNS to publish</span>
+                  <span className="text-[11px] text-slate-500">Verified by Vlumeaware · no DNS to publish</span>
                   <div className="ml-auto flex gap-2">
                     {s.enabled && s.id ? (
                       <ConfirmButton
@@ -331,7 +338,7 @@ function SendingDomains() {
                   <span className="font-mono text-sm font-medium text-slate-900">{d.domain}</span>
                   <StatusPill status={d.status} />
                   {d.verifiedAt && (
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-slate-500">
                       verified {new Date(d.verifiedAt).toLocaleDateString()}
                     </span>
                   )}

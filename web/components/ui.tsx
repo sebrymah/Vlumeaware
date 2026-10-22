@@ -65,24 +65,37 @@ export function Button({
   variant = 'primary',
   disabled,
   type = 'button',
+  size = 'sm',
+  className = '',
 }: {
   children: ReactNode;
   onClick?: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
   disabled?: boolean;
   type?: 'button' | 'submit';
+  /**
+   * 'sm' is the console's dense default. Public and employee-facing forms use
+   * 'md': a 28px target is fine beside a table row and too small on a login
+   * form, especially on a phone.
+   */
+  size?: 'sm' | 'md';
+  className?: string;
 }) {
   const styles = {
     primary: 'bg-brand-600 hover:bg-brand-700 text-white shadow-sm',
     ghost: 'border border-slate-300 bg-white hover:bg-slate-50 text-slate-700',
     danger: 'bg-red-600 hover:bg-red-700 text-white shadow-sm',
   }[variant];
+  const sizes = {
+    sm: 'px-3 py-1.5 text-xs',
+    md: 'px-4 py-2.5 text-sm',
+  }[size];
   return (
     <button
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${styles}`}
+      className={`inline-flex items-center justify-center gap-1.5 rounded-lg font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${sizes} ${styles} ${className}`}
     >
       {children}
     </button>
@@ -92,7 +105,7 @@ export function Button({
 export function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-card">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">{label}</div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</div>
       {hint && <div className="mt-0.5 text-xs text-slate-500">{hint}</div>}
     </div>
@@ -160,7 +173,7 @@ export function Field({
     <label className="block">
       <span className="text-xs font-semibold text-slate-600">{label}</span>
       <div className="mt-1">{children}</div>
-      {hint && <span className="mt-1 block text-[11px] text-slate-400">{hint}</span>}
+      {hint && <span className="mt-1 block text-[11px] text-slate-500">{hint}</span>}
     </label>
   );
 }
@@ -193,9 +206,35 @@ export function EmptyState({
     <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
       {icon && <div className="mb-3 text-slate-300">{icon}</div>}
       <p className="text-sm font-semibold text-slate-700">{title}</p>
-      {hint && <p className="mt-1 max-w-sm text-xs text-slate-400">{hint}</p>}
+      {hint && <p className="mt-1 max-w-sm text-xs text-slate-500">{hint}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
+  );
+}
+
+/**
+ * An empty list inside a table. `EmptyState` gives the copy the same weight and
+ * spacing everywhere; this wrapper keeps callers from hand-rolling a <tr><td>
+ * with ad-hoc padding, which is how the console ended up with twenty different
+ * versions of "nothing here yet".
+ */
+export function EmptyRow({
+  colSpan,
+  title,
+  hint,
+  action,
+}: {
+  colSpan: number;
+  title: string;
+  hint?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-2 py-2">
+        <EmptyState title={title} hint={hint} action={action} />
+      </td>
+    </tr>
   );
 }
 
@@ -261,6 +300,29 @@ export function ConfirmButton({
         Cancel
       </button>
     </span>
+  );
+}
+
+/**
+ * A whole page in a loading state: a title bar and a card outline, so a page that
+ * is still fetching looks like it is loading rather than like it has no data.
+ * Used by pages whose first paint would otherwise be an empty table.
+ */
+export function PageSkeleton() {
+  return (
+    <div role="status" aria-live="polite" aria-label="Loading" className="animate-pulse space-y-5">
+      <div className="h-6 w-44 rounded bg-slate-200" />
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-card">
+        <div className="h-4 w-32 rounded bg-slate-100" />
+        <div className="mt-4 space-y-3">
+          <div className="h-7 rounded-lg bg-slate-100" />
+          <div className="h-7 rounded-lg bg-slate-100" />
+          <div className="h-7 rounded-lg bg-slate-100" />
+          <div className="h-7 rounded-lg bg-slate-100" />
+        </div>
+      </div>
+      <span className="sr-only">Loading</span>
+    </div>
   );
 }
 

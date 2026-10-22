@@ -1,11 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
 import { ReadinessChecklist } from '@/components/readiness';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass } from '@/components/ui';
+import { useToast } from '@/components/toast';
 import { LandingDesign } from '@/components/landing-design';
 import { LANDING_LIBRARY } from '@/components/landing-library';
 
@@ -45,6 +46,13 @@ export default function AdminCampaignsPage() {
 }
 
 function Campaigns() {
+  const { show } = useToast();
+  // Launching, scheduling and killing a campaign are the consequential actions on
+  // this page; confirm them where the eye is, not only at the top of the screen.
+  const flash = (message: string) => {
+    flash(message);
+    show(message);
+  };
   const tenantId = useActingTenant();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -149,7 +157,7 @@ function Campaigns() {
       const res = await api.post<Record<string, unknown>>(
         `/tenants/${tenantId}/campaigns/${campaignId}/${action}`,
       );
-      setOk(
+      flash(
         action === 'launch' || action === 'resume'
           ? `Campaign ${action}ed — ${res.queued} sends queued.`
           : action === 'kill'
@@ -245,7 +253,7 @@ function Campaigns() {
       setLandingTemplate('generic');
       setLandingHtml('');
       setLandingPageName('');
-      setOk(
+      flash(
         scheduledSendAt
           ? 'Campaign scheduled. It will auto-launch at the set time.'
           : 'Campaign created as a draft. Launch it when you are ready to send.',
@@ -331,11 +339,7 @@ function Campaigns() {
             </tr>
           ))}
           {!campaigns.length && (
-            <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
-                No campaigns yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={5} title="No campaigns yet." hint="Add employees and a scenario first, then launch a simulation. The setup guide walks through both." />
           )}
         </Table>
       </Card>
@@ -486,7 +490,7 @@ function Campaigns() {
                     ))}
                   </select>
                 )}
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-slate-500">
                   {recipientMode === 'all'
                     ? 'The simulation goes to everyone on your roster (verified domains only).'
                     : recipientMode === 'group'
@@ -550,7 +554,7 @@ function Campaigns() {
                     placeholder="e.g. IT Service Desk"
                     aria-label="Sender display name"
                   />
-                  <p className="mt-1 text-[11px] text-slate-400">
+                  <p className="mt-1 text-[11px] text-slate-500">
                     The name staff see in their inbox. Set a convincing title so the sending address
                     is not the first thing they notice. Leave blank to use each scenario&rsquo;s own
                     sender name.
@@ -732,6 +736,43 @@ function LandingPreview({
   design?: string | null;
   onClose: () => void;
 }) {
+  // A modal that cannot be dismissed from the keyboard traps anyone not using a
+  // mouse, and focus must return to the button that opened it rather than to the
+  // top of the page.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<Element | null>(null);
+  useEffect(() => {
+    openerRef.current = document.activeElement;
+    panelRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      // Keep Tab inside the dialog: without this, focus walks into the page behind
+      // an overlay the user cannot see.
+      if (e.key !== 'Tab' || !panelRef.current) return;
+      const focusable = panelRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      } else if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (openerRef.current instanceof HTMLElement) openerRef.current.focus();
+    };
+  }, [onClose]);
+
   const marker = '{{LOGIN_FORM}}';
   const safe = html ?? '';
   const idx = safe.indexOf(marker);
@@ -754,11 +795,16 @@ function LandingPreview({
       onClick={onClose}
     >
       <div
-        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl"
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="preview-title"
+        tabIndex={-1}
+        className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl bg-white shadow-xl outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2">
-          <span className="text-xs font-semibold text-slate-600">
+          <span id="preview-title" className="text-xs font-semibold text-slate-600">
             Preview · what the target sees (form is inert here)
           </span>
           <Button variant="ghost" onClick={onClose}>

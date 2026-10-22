@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { Button, Card, ConfirmButton, EmptyRow, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { useToast } from '@/components/toast';
 
 interface Employee {
   id: string;
@@ -32,6 +33,13 @@ export default function EmployeesPage() {
 }
 
 function Employees() {
+  const { show } = useToast();
+  // Records the message inline and shows it where the eye already is; a save at
+  // the bottom of a long page would otherwise be announced below the fold.
+  const flash = (message: string) => {
+    flash(message);
+    show(message);
+  };
   const tenantId = useActingTenant();
   const [list, setList] = useState<Employee[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -91,7 +99,7 @@ function Employees() {
         `/tenants/${tenantId}/training/assign`,
         body,
       );
-      setOk(
+      flash(
         `Training assigned: ${res.assigned} new, ${res.skipped} already had it` +
           (notify ? `, ${res.notified} emailed.` : '.'),
       );
@@ -140,7 +148,7 @@ function Employees() {
       if (res.skipped.length > 0) {
         setError(`Not added: ${res.skipped[0].reason}`);
       } else {
-        setOk(res.created ? `${oneName} added to the roster.` : `${oneName} updated.`);
+        flash(res.created ? `${oneName} added to the roster.` : `${oneName} updated.`);
         setOneName('');
         setOneEmail('');
         setOneDept('');
@@ -364,11 +372,7 @@ function Employees() {
               </tr>
             ))}
             {!list.length && (
-              <tr>
-                <td colSpan={4} className="px-2 py-6 text-center text-slate-500">
-                  No employees uploaded yet.
-                </td>
-              </tr>
+              <EmptyRow colSpan={4} title="No employees uploaded yet." hint="Upload a CSV or add one person. Their address must be on a verified domain." />
             )}
             {list.length > 0 &&
               rosterSearch.trim() &&
@@ -376,11 +380,16 @@ function Employees() {
                 const q = rosterSearch.trim().toLowerCase();
                 return [e.name, e.email, e.department ?? ''].some((v) => v.toLowerCase().includes(q));
               }) && (
-                <tr>
-                  <td colSpan={4} className="px-2 py-6 text-center text-slate-500">
-                    No staff match “{rosterSearch}”.
-                  </td>
-                </tr>
+                <EmptyRow
+                  colSpan={4}
+                  title={`No staff match “${rosterSearch.trim()}”.`}
+                  hint="Check the spelling, or clear the search to see everyone."
+                  action={
+                    <Button variant="ghost" onClick={() => setRosterSearch('')}>
+                      Clear search
+                    </Button>
+                  }
+                />
               )}
             </Table>
           ) : (

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, EmptyState, Field, Notice, TermHelp, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Field, Notice, PageSkeleton, TermHelp, inputClass } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
 interface DnsRecord {
@@ -72,6 +72,9 @@ function Domains() {
   const [list, setList] = useState<Domain[]>([]);
   const [domain, setDomain] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Otherwise the empty state paints before the first request settles, which
+  // reads as "nothing here" rather than "still loading".
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [allowlist, setAllowlist] = useState<Allowlist | null>(null);
@@ -79,6 +82,7 @@ function Domains() {
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+      setLoading(true);
     try {
       const [domains, guidance] = await Promise.all([
         api.get<Domain[]>(`/tenants/${tenantId}/domains`),
@@ -89,6 +93,8 @@ function Domains() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId]);
 
@@ -169,6 +175,7 @@ function Domains() {
 
   const verifiedCount = list.filter((d) => d.status === 'verified').length;
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div>

@@ -167,8 +167,41 @@ model User {
   /// Sign-in lockout after repeated failures (review R8).
   failedLoginCount Int       @default(0) @map("failed_login_count")
   lockedUntil      DateTime? @map("locked_until")
+  /// One-time link for setting a password: issued when an administrator creates the
+  /// account and reissued for a reset. Only the SHA-256 is stored, exactly like the
+  /// console-user link, so a database leak cannot be redeemed.
+  inviteTokenHash String?   @unique @map("invite_token_hash")
+  inviteExpiresAt DateTime? @map("invite_expires_at")
+  inviteSentAt    DateTime? @map("invite_sent_at")
+  /// When this person last chose a password, so the console can distinguish an
+  /// invitation nobody completed from an account in use.
+  passwordSetAt DateTime? @map("password_set_at")
+  /// Access withdrawn (ISO 27001 A.9.2 offboarding). Sign-in and every request
+  /// refuse a deactivated account; the row is kept so the audit trail still
+  /// resolves who did what.
+  deactivatedAt DateTime? @map("deactivated_at")
+  /// Last successful sign-in, for the access review the auditor asks for.
+  lastLoginAt DateTime? @map("last_login_at")
 
   @@map("users")
+}
+
+/// Platform-wide security posture for Vlumetech staff accounts.
+///
+/// One row. It exists so that the staff MFA requirement, password minimum and
+/// session length are a stated policy an auditor can read — rather than a constant
+/// buried in the code — and so an administrator can raise them without a deploy.
+model PlatformSecurityPolicy {
+  id                    String   @id @default("default")
+  /// Whether staff must enrol a second factor. Default true: the control is not
+  /// optional for Vlumetech, but the policy is explicit so it can be evidenced.
+  requireMfa            Boolean  @default(true) @map("require_mfa")
+  passwordMinLength     Int      @default(12) @map("password_min_length")
+  sessionTimeoutMinutes Int      @default(480) @map("session_timeout_minutes")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+  updatedBy             String?  @map("updated_by")
+
+  @@map("platform_security_policy")
 }
 
 model TenantUser {

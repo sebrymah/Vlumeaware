@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, uploadWithProgress } from '@/lib/api';
 import { formatDuration, readVideoDuration } from '@/lib/video-duration';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, EmptyState, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, EmptyRow, EmptyState, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 import { VideoPreviewButton } from '@/components/video-preview';
 import { Icon } from '@/components/icons';
 
@@ -312,11 +312,7 @@ function Content() {
             );
           })}
           {!libraryItems.length && (
-            <tr>
-              <td colSpan={4} className="px-2 py-4 text-center text-slate-500">
-                No shared modules published yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={4} title="No shared modules published yet." />
           )}
         </Table>
       </Card>
@@ -352,7 +348,7 @@ function Content() {
                       ))}
                     </select>
                   ) : (
-                    <span className="text-[11px] text-slate-400">No quizzes yet</span>
+                    <span className="text-[11px] text-slate-500">No quizzes yet</span>
                   )}
                 </td>
                 <td className="px-2 py-2">{new Date(m.createdAt).toLocaleDateString()}</td>
@@ -371,11 +367,7 @@ function Content() {
             );
           })}
           {!list.length && (
-            <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
-                No modules yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={5} title="No modules yet." hint="Add awareness content from the library, or author your own." />
           )}
           </Table>
         ) : (

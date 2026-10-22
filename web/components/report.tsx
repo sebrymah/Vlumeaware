@@ -377,7 +377,7 @@ export function CampaignReport({
             );
           })}
         </div>
-        <p className="mb-2 text-[11px] text-slate-400">
+        <p className="mb-2 text-[11px] text-slate-500">
           Counts are cumulative — someone who clicked is also counted under Opened, so Opened ≥ Clicked ≥ Submitted.
         </p>
         <div className="max-h-[28rem] overflow-y-auto">
@@ -418,7 +418,7 @@ export function CampaignReport({
                         )}
                       </div>
                     ) : (
-                      <span className="text-[11px] text-slate-400">Add a module first</span>
+                      <span className="text-[11px] text-slate-500">Add a module first</span>
                     )}
                   </td>
                 )}

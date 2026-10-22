@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Stat, Table, inputClass, pct } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, Stat, Table, inputClass, pct } from '@/components/ui';
 
 interface OverviewRow {
   tenantId: string;
@@ -178,11 +178,7 @@ function Console() {
             </tr>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={7} className="px-2 py-6 text-center text-slate-500">
-                No clients onboarded yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={7} title="No clients onboarded yet." hint="Create one directly, or approve a signup from the list." />
           )}
         </Table>
       </Card>

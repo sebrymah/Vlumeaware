@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, EmptyRow, Field, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
 
 interface TrainingModule { id: string; title: string }
 interface Campaign { id: string; name: string }
@@ -353,11 +353,7 @@ function Quizzes() {
             </tr>
           ))}
           {!quizzes.length && (
-            <tr>
-              <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                No quizzes yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={6} title="No quizzes yet." hint="Create one, or copy a quiz from the shared library." />
           )}
           </Table>
         ) : (
@@ -400,11 +396,7 @@ function Quizzes() {
               </tr>
             ))}
             {!results.attempts.length && (
-              <tr>
-                <td colSpan={5} className="px-2 py-4 text-center text-slate-500">
-                  No attempts yet.
-                </td>
-              </tr>
+              <EmptyRow colSpan={5} title="No attempts yet." />
             )}
           </Table>
           <div className="mt-4 border-t border-slate-200 pt-3">
@@ -452,7 +444,7 @@ function Quizzes() {
             </Button>
           </form>
           {modules.length === 0 && (
-            <p className="mt-2 text-[11px] text-slate-400">
+            <p className="mt-2 text-[11px] text-slate-500">
               Add a training video first (Awareness content) — a quiz must attach to one.
             </p>
           )}
@@ -524,7 +516,7 @@ function Quizzes() {
                 </div>
                 <input
                   className={`${inputClass} mt-2`}
-                  placeholder="Question prompt"
+                  placeholder="Question prompt" aria-label="Question prompt"
                   value={q.prompt}
                   onChange={(e) => setQ(qi, { prompt: e.target.value })}
                   required
@@ -541,7 +533,7 @@ function Quizzes() {
                       />
                       <input
                         className={inputClass}
-                        placeholder={`Option ${oi + 1}`}
+                        placeholder={`Option ${oi + 1}`} aria-label={`Option ${oi + 1}`}
                         value={o}
                         onChange={(e) => setOption(qi, oi, e.target.value)}
                       />
@@ -574,7 +566,7 @@ function Quizzes() {
                 </div>
                 <input
                   className={`${inputClass} mt-2`}
-                  placeholder="Explanation shown after answering (optional)"
+                  placeholder="Explanation shown after answering (optional)" aria-label="Explanation shown after answering (optional)"
                   value={q.explanation}
                   onChange={(e) => setQ(qi, { explanation: e.target.value })}
                 />

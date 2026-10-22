@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { runAsSystem } from '../prisma/tenant-context';
 import { AuditService } from '../audit/audit.service';
+import { PlatformPolicyService } from '../../modules/platform/platform-policy.service';
 import { ROLES } from './roles';
 import type { JwtPayload, Role } from './roles';
 import { generateSecret, otpauthUrl, verifyTotp } from './totp';
@@ -28,7 +29,13 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly audit: AuditService,
+    private readonly policy: PlatformPolicyService,
   ) {}
+
+  /** Last successful sign-in, for the staff access review an auditor asks for. */
+  private markStaffSignedIn(id: string) {
+    return this.prisma.db.user.update({ where: { id }, data: { lastLoginAt: new Date() } });
+  }
 
   /**
    * Records an authentication event. Login runs before any request scope, so
@@ -62,6 +69,15 @@ export class AuthService {
       }
       await this.resetStaffFailures(staff.id);
 
+      // Checked after the password, so a withdrawn account cannot be used to probe
+      // whether an address exists.
+      if (staff.deactivatedAt) {
+        this.authEvent('auth.login_refused_deactivated', staff.id, ROLES.superadmin);
+        throw new UnauthorizedException(
+          'This account has been deactivated. Ask another administrator to restore it.',
+        );
+      }
+
       // MFA active → hand back a short-lived challenge instead of an access token.
       if (staff.mfaEnabledAt) {
         this.authEvent('auth.mfa_challenged', staff.id, ROLES.superadmin);
@@ -71,10 +87,15 @@ export class AuthService {
         };
       }
       // No MFA yet: staff may sign in, but the console must force enrolment.
+      await this.markStaffSignedIn(staff.id);
       this.authEvent('auth.login', staff.id, ROLES.superadmin, undefined, 'password, MFA enrolment pending');
+      const policy = await this.policy.get();
       return {
-        ...this.issue({ sub: staff.id, email: staff.email, role: ROLES.superadmin }),
-        mfaEnrollmentRequired: true,
+        ...this.issue(
+          { sub: staff.id, email: staff.email, role: ROLES.superadmin },
+          policy.sessionTimeoutMinutes,
+        ),
+        mfaEnrollmentRequired: staff.mfaRequired,
       };
     }
 
@@ -183,8 +204,13 @@ export class AuthService {
         throw new UnauthorizedException('Invalid authentication code');
       }
       await this.resetStaffFailures(staff.id);
+      await this.markStaffSignedIn(staff.id);
       this.authEvent('auth.login', staff.id, ROLES.superadmin, undefined, 'password + MFA');
-      return this.issue({ sub: staff.id, email: staff.email, role: ROLES.superadmin });
+      const policy = await this.policy.get();
+      return this.issue(
+        { sub: staff.id, email: staff.email, role: ROLES.superadmin },
+        policy.sessionTimeoutMinutes,
+      );
     }
 
     const tenantUser = await runAsSystem('mfa: resolve tenant user', () =>
@@ -299,7 +325,9 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ): Promise<{ changed: true }> {
-    const minimum = tenantId ? (await this.tenantPolicy(tenantId)).passwordMinLength : 12;
+    const minimum = tenantId
+      ? (await this.tenantPolicy(tenantId)).passwordMinLength
+      : (await this.policy.get()).passwordMinLength;
     if (newPassword.length < minimum) {
       throw new BadRequestException(`Password must be at least ${minimum} characters.`);
     }

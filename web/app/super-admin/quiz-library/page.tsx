@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, EmptyState, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, Field, Notice, PageSkeleton, Table, inputClass } from '@/components/ui';
 import { Icon } from '@/components/icons';
 
 interface Question {
@@ -43,6 +43,8 @@ const SAMPLE = `[
 function QuizLibrary() {
   const [list, setList] = useState<SharedQuiz[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Otherwise the empty state paints before the first request settles.
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<SharedQuiz | null>(null);
@@ -53,11 +55,14 @@ function QuizLibrary() {
   const [questionsJson, setQuestionsJson] = useState('');
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       setList(await api.get<SharedQuiz[]>('/shared-quizzes'));
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -117,6 +122,7 @@ function QuizLibrary() {
     }
   }
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div className="flex items-start gap-4 rounded-xl border border-brand-100 bg-gradient-to-r from-brand-50 to-white p-5">
@@ -177,7 +183,7 @@ function QuizLibrary() {
               <tr key={z.id} className="border-b border-slate-100">
                 <td className="px-2 py-2">
                   {z.title}
-                  {z.source && <div className="text-[11px] text-slate-400">{z.source}</div>}
+                  {z.source && <div className="text-[11px] text-slate-500">{z.source}</div>}
                 </td>
                 <td className="px-2 py-2 text-slate-500">{z.category ?? '—'}</td>
                 <td className="px-2 py-2">{z.questions?.length ?? 0}</td>

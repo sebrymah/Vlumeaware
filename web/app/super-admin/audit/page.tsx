@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Card, Notice, Table, inputClass } from '@/components/ui';
+import { Card, EmptyRow, Notice, PageSkeleton, Table, inputClass } from '@/components/ui';
 
 interface AuditEntry {
   id: string;
@@ -30,8 +30,11 @@ function Audit() {
   const [tenantId, setTenantId] = useState('');
   const [action, setAction] = useState('');
   const [error, setError] = useState<string | null>(null);
+  // Otherwise the empty state paints before the first request settles.
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const qs = new URLSearchParams();
       if (tenantId) qs.set('tenantId', tenantId);
@@ -45,6 +48,8 @@ function Audit() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId, action]);
 
@@ -54,6 +59,7 @@ function Audit() {
 
   const tenantName = (id: string | null) => (id ? tenants.find((t) => t.id === id)?.name ?? id.slice(0, 8) : '—');
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div>
@@ -97,11 +103,7 @@ function Audit() {
             </tr>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={5} className="px-2 py-6 text-center text-slate-500">
-                No audit entries yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={5} title="No audit entries yet." />
           )}
         </Table>
       </Card>

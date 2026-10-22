@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Button, Card, Notice, Table } from '@/components/ui';
+import { Button, Card, EmptyRow, Notice, SkeletonRows, Table } from '@/components/ui';
 
 interface Certificate {
   id: string;
@@ -29,14 +29,20 @@ function Certificates() {
   const tenantId = useActingTenant();
   const [rows, setRows] = useState<Certificate[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Without this the table renders its "nothing yet" state for the duration of
+  // the request, so a slow connection looks like an empty account.
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+    setLoading(true);
     try {
       setRows(await api.get<Certificate[]>(`/tenants/${tenantId}/certificates`));
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId]);
 
@@ -84,11 +90,7 @@ function Certificates() {
             </tr>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={6} className="px-2 py-6 text-center text-slate-500">
-                No certificates issued yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={6} title="No certificates issued yet." hint="They are issued automatically when someone passes a quiz." />
           )}
         </Table>
       </Card>

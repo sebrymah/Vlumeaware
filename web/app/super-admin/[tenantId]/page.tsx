@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, PageSkeleton, Table, inputClass } from '@/components/ui';
 
 interface Tenant {
   id: string;
@@ -70,6 +70,9 @@ function TenantDetail() {
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Four requests feed this page; without a loading state the tables paint their
+  // empty rows first and the page looks like an empty client.
+  const [loading, setLoading] = useState(true);
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmName, setConfirmName] = useState('');
@@ -97,6 +100,7 @@ function TenantDetail() {
   const [newUser, setNewUser] = useState({ email: '', role: 'client_admin' });
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const [t, u, c, k] = await Promise.all([
         api.get<Tenant>(`/tenants/${tenantId}`),
@@ -121,6 +125,8 @@ function TenantDetail() {
       setError(null);
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }, [tenantId]);
 
@@ -330,6 +336,7 @@ function TenantDetail() {
 
   const signed = tenant.ndpaAgreementSignedAt !== null;
 
+  if (loading) return <PageSkeleton />;
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
@@ -649,7 +656,7 @@ function TenantDetail() {
                           {status}
                         </span>
                         {k.redeemedBy && (
-                          <span className="block text-[11px] text-slate-400">{k.redeemedBy}</span>
+                          <span className="block text-[11px] text-slate-500">{k.redeemedBy}</span>
                         )}
                       </td>
                       <td className="px-2 py-2 text-right">
@@ -741,11 +748,7 @@ function TenantDetail() {
             </tr>
           ))}
           {!users.length && (
-            <tr>
-              <td colSpan={3} className="px-2 py-4 text-center text-slate-500">
-                No client accounts yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={3} title="No client accounts yet." />
           )}
         </Table>
 
@@ -762,7 +765,7 @@ function TenantDetail() {
             </Field>
           </div>
           <div className="w-56">
-            <p className="text-[11px] leading-relaxed text-slate-400">
+            <p className="text-[11px] leading-relaxed text-slate-500">
               No password to set: they receive a one-time link, choose their own, and the tenant's
               password policy applies to it.
             </p>
@@ -804,11 +807,7 @@ function TenantDetail() {
             </tr>
           ))}
           {!campaigns.length && (
-            <tr>
-              <td colSpan={4} className="px-2 py-4 text-center text-slate-500">
-                No campaigns for this client.
-              </td>
-            </tr>
+            <EmptyRow colSpan={4} title="No campaigns for this client." />
           )}
         </Table>
       </Card>

@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, Field, Notice, Table, inputClass, pct } from '@/components/ui';
+import { Badge, Button, Card, EmptyRow, Field, Notice, Table, inputClass, pct, SkeletonRows } from '@/components/ui';
 import { Icon } from '@/components/icons';
 import { readSession } from '@/lib/session';
 
@@ -64,12 +64,16 @@ function Risk() {
   const [advice, setAdvice] = useState<RiskAdvice | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [advising, setAdvising] = useState(false);
+  // The table used to show "No employees yet" while the risk query was still in
+  // flight, which reads as an empty roster rather than a loading one.
+  const [loading, setLoading] = useState(true);
   // The advice endpoint is client_admin only — a viewer must not be offered a
   // button that spends the tenant's AI budget and then returns 403.
   const canAskAi = readSession()?.role === 'client_admin';
 
   const load = useCallback(async () => {
     if (!tenantId) return;
+    setLoading(true);
     try {
       const [r, m] = await Promise.all([
         api.get<EmployeeRisk[]>(`/tenants/${tenantId}/employees/risk`),
@@ -252,14 +256,14 @@ function Risk() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-[11px] text-slate-400">
+                  <p className="mt-2 text-[11px] text-slate-500">
                     These are suggestions. Assign them from the Training page, or use the remediation
                     enrolment below.
                   </p>
                 </div>
               )}
 
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-slate-500">
                 Generated {new Date(advice.generatedAt).toLocaleString()} from the table below.
                 Judgement stays yours.
               </p>
@@ -365,11 +369,7 @@ function Risk() {
             </Fragment>
           ))}
           {!rows.length && (
-            <tr>
-              <td colSpan={8} className="px-2 py-6 text-center text-slate-500">
-                No employees yet.
-              </td>
-            </tr>
+            <EmptyRow colSpan={8} title="No employees yet." />
           )}
         </Table>
       </Card>

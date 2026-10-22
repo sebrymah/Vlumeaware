@@ -47,17 +47,17 @@ export default function VerifyPage({ params }: { params: Promise<{ serial: strin
           <LogoMark size={18} className="mr-1.5 inline-block align-[-3px]" />
           Vlume<span className="text-brand-600">aware</span>
         </span>
-        <span className="text-[11px] uppercase tracking-widest text-slate-400">
+        <span className="text-[11px] uppercase tracking-widest text-slate-500">
           Certificate verification
         </span>
       </div>
 
-      {state.status === 'loading' && <p className="text-sm text-slate-500">Checking…</p>}
+      {state.status === 'loading' && <p className="text-base text-slate-500">Checking…</p>}
 
       {state.status === 'unknown' && (
         <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-lg font-semibold text-slate-900">No certificate with this serial</h1>
-          <p className="mt-2 text-sm text-slate-600">
+          <p className="mt-2 text-base text-slate-600">
             Nothing on record matches{' '}
             <span className="font-mono text-slate-900">{serial}</span>. Check the serial against the
             certificate, which is case-sensitive, or ask the issuing organisation to confirm it.
@@ -82,7 +82,7 @@ export default function VerifyPage({ params }: { params: Promise<{ serial: strin
             </div>
           </div>
 
-          <dl className="divide-y divide-slate-100 px-6 py-2 text-sm">
+          <dl className="divide-y divide-slate-100 px-6 py-3 text-base">
             <Row label="Awarded to" value={state.cert.employee?.name ?? '—'} />
             <Row label="Module" value={state.cert.moduleTitle} />
             {state.cert.quizTitle && <Row label="Assessment" value={state.cert.quizTitle} />}

@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Guard, useActingTenant } from '@/components/guard';
-import { Badge, Button, Card, ConfirmButton, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { Badge, Button, Card, ConfirmButton, EmptyRow, Notice, SkeletonRows, Table, inputClass } from '@/components/ui';
+import { useToast } from '@/components/toast';
 
 interface Employee {
   id: string;
@@ -32,6 +33,13 @@ export default function GroupsPage() {
 }
 
 function Groups() {
+  const { show } = useToast();
+  // Records the message inline and shows it where the eye already is; a save at
+  // the bottom of a long page would otherwise be announced below the fold.
+  const flash = (message: string) => {
+    flash(message);
+    show(message);
+  };
   const tenantId = useActingTenant();
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -73,7 +81,7 @@ function Groups() {
     setOk(null);
     try {
       await api.post(`/tenants/${tenantId}/groups`, { name: newName });
-      setOk(`Group “${newName.trim()}” created.`);
+      flash(`Group “${newName.trim()}” created.`);
       setNewName('');
       await load();
     } catch (err) {
@@ -134,7 +142,7 @@ function Groups() {
     setOk(null);
     try {
       await api.put(`/tenants/${tenantId}/groups/${editing.id}/members`, { employeeIds: memberIds });
-      setOk(`Saved ${memberIds.length} member${memberIds.length === 1 ? '' : 's'} to “${editing.name}”.`);
+      flash(`Saved ${memberIds.length} member${memberIds.length === 1 ? '' : 's'} to “${editing.name}”.`);
       setEditing(null);
       await load();
     } catch (err) {
@@ -206,11 +214,7 @@ function Groups() {
               </tr>
             ))}
             {!groups.length && (
-              <tr>
-                <td colSpan={3} className="px-2 py-6 text-center text-slate-500">
-                  No groups yet — create one above.
-                </td>
-              </tr>
+              <EmptyRow colSpan={3} title="No groups yet — create one above." />
             )}
           </Table>
         )}
@@ -228,6 +232,7 @@ function Groups() {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <input
+              aria-label="Search staff by name, email or department"
                 className={`${inputClass} flex-1`}
                 type="search"
                 placeholder="Search staff by name, email or department…"

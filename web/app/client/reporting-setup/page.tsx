@@ -107,7 +107,7 @@ function ReportingSetup() {
               <li>If it was one of our simulations, that person is credited for reporting it.</li>
               <li>If it looks like a real threat, it appears under Reporting → Phish reports for your team to triage.</li>
             </ol>
-            <p className="mt-3 text-[11px] text-slate-400">
+            <p className="mt-3 text-[11px] text-slate-500">
               A one-click “Report phishing” button inside the mail client is on the roadmap. Forwarding
               works everywhere today, including on phones.
             </p>

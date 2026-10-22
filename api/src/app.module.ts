@@ -17,6 +17,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { ScenariosModule } from './modules/scenarios/scenarios.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { ConsoleInviteModule } from './modules/console-invite/console-invite.module';
+import { PlatformModule } from './modules/platform/platform.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { TrainingModule } from './modules/training/training.module';
 import { TrainingModulesModule } from './modules/training-modules/training-modules.module';
@@ -44,6 +45,7 @@ import { HealthController } from './health.controller';
     AuthModule,
     TenantsModule,
     ConsoleInviteModule,
+    PlatformModule,
     EmployeesModule,
     GroupsModule,
     ScenariosModule,
