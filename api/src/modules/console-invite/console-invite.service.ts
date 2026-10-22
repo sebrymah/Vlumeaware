@@ -47,7 +47,9 @@ export class ConsoleInviteService {
    * which would leave the admin unable to retry.
    */
   async issue(input: {
-    tenantId: string;
+    /** 'console' is a tenant user; 'staff' is a Vlumetech account. */
+    scope?: 'console' | 'staff';
+    tenantId?: string;
     userId: string;
     email: string;
     kind: 'invite' | 'reset';
@@ -57,27 +59,32 @@ export class ConsoleInviteService {
     const expiresAt = new Date(Date.now() + ConsoleInviteService.TTL_MS);
 
     // Re-issuing overwrites the hash, which invalidates any earlier link.
-    await runInTenant(input.tenantId, () =>
-      this.prisma.db.tenantUser.update({
-        where: { id: input.userId },
-        data: {
-          inviteTokenHash: ConsoleInviteService.hashToken(raw),
-          inviteExpiresAt: expiresAt,
-          inviteSentAt: new Date(),
-        },
-      }),
-    );
+    const tokenFields = {
+      inviteTokenHash: ConsoleInviteService.hashToken(raw),
+      inviteExpiresAt: expiresAt,
+      inviteSentAt: new Date(),
+    };
+    if (input.scope === 'staff') {
+      // Staff are not tenant-scoped, so no async-local context is needed.
+      await this.prisma.db.user.update({ where: { id: input.userId }, data: tokenFields });
+    } else {
+      await runInTenant(input.tenantId!, () =>
+        this.prisma.db.tenantUser.update({ where: { id: input.userId }, data: tokenFields }),
+      );
+    }
 
-    const [tenant, inviter] = await Promise.all([
-      runAsSystem('console invite: tenant name', () =>
-        this.prisma.db.tenant.findUnique({ where: { id: input.tenantId }, select: { name: true } }),
-      ),
-      input.actorEmail
-        ? Promise.resolve(input.actorEmail)
-        : Promise.resolve(undefined),
-    ]);
+    const tenant =
+      input.scope === 'staff'
+        ? { name: 'Vlumetech' }
+        : await runAsSystem('console invite: tenant name', () =>
+            this.prisma.db.tenant.findUnique({
+              where: { id: input.tenantId! },
+              select: { name: true },
+            }),
+          );
+    const inviter = input.actorEmail;
 
-    const where = esc(tenant?.name ?? 'Vlumeaware');
+    const where = esc(tenant?.name ?? 'Vlumetech');
     const link = `${publicBaseUrl()}/invite/${raw}`;
     const opening =
       input.kind === 'invite'
@@ -125,9 +132,19 @@ export class ConsoleInviteService {
   /** What the recipient's page needs to show before they type a password. */
   async peek(rawToken: string) {
     const user = await this.findByToken(rawToken);
+
+    if (user.scope === 'staff') {
+      return {
+        email: user.email,
+        tenantName: 'Vlumetech',
+        passwordMinLength: await this.staffPasswordMinimum(),
+        expiresAt: user.inviteExpiresAt,
+      };
+    }
+
     const tenant = await runAsSystem('console invite: tenant details', () =>
       this.prisma.db.tenant.findUnique({
-        where: { id: user.tenantId },
+        where: { id: user.tenantId! },
         select: { name: true, passwordMinLength: true },
       }),
     );
@@ -142,6 +159,19 @@ export class ConsoleInviteService {
   }
 
   /**
+   * Read straight from the table rather than through the policy service: the policy
+   * module depends on this one to issue invitations, and a reverse import would be a
+   * cycle for the sake of one integer.
+   */
+  private async staffPasswordMinimum(): Promise<number> {
+    const policy = await this.prisma.db.platformSecurityPolicy.findUnique({
+      where: { id: 'default' },
+      select: { passwordMinLength: true },
+    });
+    return policy?.passwordMinLength ?? 12;
+  }
+
+  /**
    * Redeems the link. The caller is anonymous, so nothing here trusts anything
    * but the token: it must exist (by hash), be unexpired, and the account's
    * tenant policy governs the password.
@@ -149,13 +179,17 @@ export class ConsoleInviteService {
   async accept(rawToken: string, password: string) {
     const user = await this.findByToken(rawToken);
 
-    const tenant = await runAsSystem('console invite: policy', () =>
-      this.prisma.db.tenant.findUnique({
-        where: { id: user.tenantId },
-        select: { passwordMinLength: true },
-      }),
-    );
-    const minimum = tenant?.passwordMinLength ?? 12;
+    const minimum =
+      user.scope === 'staff'
+        ? await this.staffPasswordMinimum()
+        : ((
+            await runAsSystem('console invite: policy', () =>
+              this.prisma.db.tenant.findUnique({
+                where: { id: user.tenantId! },
+                select: { passwordMinLength: true },
+              }),
+            )
+          )?.passwordMinLength ?? 12);
     if (password.length < minimum) {
       throw new BadRequestException(
         `Choose a password of at least ${minimum} characters.`,
@@ -163,37 +197,47 @@ export class ConsoleInviteService {
     }
 
     const passwordHash = await AuthService.hash(password);
-    return runInTenant(user.tenantId, async () => {
-      await this.prisma.db.tenantUser.update({
-        where: { id: user.id },
-        data: {
-          passwordHash,
-          // The account now has a password somebody knows, which the console
-          // needs to distinguish from an invitation nobody ever completed.
-          passwordSetAt: new Date(),
-          // Clearing the hash is what makes the link single-use.
-          inviteTokenHash: null,
-          inviteExpiresAt: null,
-          inviteSentAt: null,
-          // A fresh password should not inherit an earlier lockout.
-          failedLoginCount: 0,
-          lockedUntil: null,
-        },
-      });
-      await this.audit.record('tenant.user.password_set', user.email, user.tenantId);
+    const data = {
+      passwordHash,
+      // The account now has a password somebody knows, which the console needs to
+      // distinguish from an invitation nobody ever completed.
+      passwordSetAt: new Date(),
+      // Clearing the hash is what makes the link single-use.
+      inviteTokenHash: null,
+      inviteExpiresAt: null,
+      inviteSentAt: null,
+      // A fresh password should not inherit an earlier lockout.
+      failedLoginCount: 0,
+      lockedUntil: null,
+    };
+
+    if (user.scope === 'staff') {
+      await this.prisma.db.user.update({ where: { id: user.id }, data });
+      await this.audit.record('platform.staff.password_set', user.email);
+      return { email: user.email };
+    }
+
+    return runInTenant(user.tenantId!, async () => {
+      await this.prisma.db.tenantUser.update({ where: { id: user.id }, data });
+      await this.audit.record('tenant.user.password_set', user.email, user.tenantId!);
       return { email: user.email };
     });
   }
 
+  /**
+   * One public endpoint serves both kinds of account, so the token is looked up in
+   * both tables. The console user is checked first so behaviour is deterministic.
+   */
   private async findByToken(rawToken: string) {
     const token = (rawToken ?? '').trim();
     if (!token) throw new NotFoundException('This link is not valid.');
+    const hash = ConsoleInviteService.hashToken(token);
 
     // System scope: the caller is anonymous and the tenant is only discoverable
     // from the token itself.
-    const user = await runAsSystem('console invite: look up token', () =>
+    const consoleUser = await runAsSystem('console invite: look up token', () =>
       this.prisma.db.tenantUser.findUnique({
-        where: { inviteTokenHash: ConsoleInviteService.hashToken(token) },
+        where: { inviteTokenHash: hash },
         select: {
           id: true,
           tenantId: true,
@@ -204,6 +248,10 @@ export class ConsoleInviteService {
       }),
     );
 
+    const user = consoleUser
+      ? { ...consoleUser, scope: 'console' as const }
+      : await this.findStaffByToken(hash);
+
     if (!user) throw new NotFoundException('This link is not valid.');
     // An account withdrawn after the link was sent must not be able to use it.
     if (user.deactivatedAt) throw new NotFoundException('This link is not valid.');
@@ -211,5 +259,13 @@ export class ConsoleInviteService {
       throw new NotFoundException('This link has expired. Ask an administrator for a new one.');
     }
     return user;
+  }
+
+  private async findStaffByToken(hash: string) {
+    const staff = await this.prisma.db.user.findUnique({
+      where: { inviteTokenHash: hash },
+      select: { id: true, email: true, inviteExpiresAt: true, deactivatedAt: true },
+    });
+    return staff ? { ...staff, tenantId: undefined, scope: 'staff' as const } : null;
   }
 }

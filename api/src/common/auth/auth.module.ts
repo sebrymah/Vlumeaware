@@ -4,10 +4,12 @@ import type { JwtSignOptions } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { PlatformModule } from '../../modules/platform/platform.module';
 import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
+    PlatformModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
