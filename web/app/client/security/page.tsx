@@ -361,6 +361,7 @@ function Security() {
         </div>
       </Card>
 
+      <div id="console-users" className="scroll-mt-24" />
       <Card title={`Console users (${security.users.length})`}>
         <Table head={['Email', 'Role', 'MFA', 'Status', 'Last sign-in', '']}>
           {security.users.map((u) => (
