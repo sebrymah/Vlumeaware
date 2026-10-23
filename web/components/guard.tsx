@@ -4,7 +4,16 @@ import { useRouter, usePathname } from 'next/navigation';
 import { LogoMark } from '@/components/logo';
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { clearSession, homeFor, loginPathFor, loginPathForAllowed, readSession, type Role, type Session } from '@/lib/session';
+import {
+  clearSession,
+  homeFor,
+  loginPathFor,
+  loginPathForAllowed,
+  readSession,
+  sessionRemainingMs,
+  type Role,
+  type Session,
+} from '@/lib/session';
 import { TrialBanner } from '@/components/trial-banner';
 import { Icon } from '@/components/icons';
 
@@ -212,9 +221,14 @@ export function Guard({ allow, children }: { allow: Role[]; children: ReactNode 
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {
+    const signOut = () => {
+      clearSession();
+      router.replace(loginPathForAllowed(allow));
+    };
+
     const s = readSession();
     if (!s) {
-      router.replace(loginPathForAllowed(allow));
+      signOut();
       return;
     }
     if (!allow.includes(s.role)) {
@@ -222,6 +236,23 @@ export function Guard({ allow, children }: { allow: Role[]; children: ReactNode 
       return;
     }
     setSession(s);
+
+    // Log out when the token expires even if the tab is idle. Timers are throttled
+    // in background tabs, so also re-check when the tab is looked at again —
+    // otherwise a session outlives its own expiry until a request happens to fail.
+    const remaining = sessionRemainingMs(s.accessToken);
+    const timer =
+      remaining !== null && remaining > 0 ? window.setTimeout(signOut, remaining) : undefined;
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !readSession()) signOut();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [allow, router]);
 
   if (session === undefined) {

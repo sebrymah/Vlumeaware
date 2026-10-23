@@ -1,8 +1,30 @@
 'use client';
 
-import { clearSession, readSession } from './session';
+import { clearSession, loginPathFor, readSession } from './session';
+import type { Role } from './session';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+
+/** Console paths; a 401 on one of these means the session is over. */
+const CONSOLE_PREFIXES = ['/client', '/super-admin', '/dashboard'];
+
+let loggingOut = false;
+
+/**
+ * End the session completely: drop the token and reload at the sign-in page for
+ * the role. A hard navigation rather than a client-side push, because the page
+ * currently on screen was rendered for a session that no longer exists — leaving
+ * it mounted is exactly the half-logged-in state this avoids.
+ */
+function endSession(role?: Role) {
+  if (typeof window === 'undefined' || loggingOut) return;
+  const onConsole = CONSOLE_PREFIXES.some((p) => window.location.pathname.startsWith(p));
+  const destination = role ? loginPathFor(role) : '/login';
+  if (!onConsole) return;
+  loggingOut = true;
+  clearSession();
+  window.location.replace(destination);
+}
 
 export class ApiError extends Error {
   constructor(
