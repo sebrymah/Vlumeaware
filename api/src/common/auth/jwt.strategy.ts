@@ -39,9 +39,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (payload.role === ROLES.superadmin) {
       const staff = await runAsSystem('auth: staff session check', () =>
-        this.prisma.db.user.findUnique({ where: { id: payload.sub }, select: { id: true } }),
+        this.prisma.db.user.findUnique({
+          where: { id: payload.sub },
+          select: { id: true, role: true, deactivatedAt: true },
+        }),
       );
-      if (!staff) throw new UnauthorizedException('This account is no longer active');
+      if (!staff || staff.deactivatedAt) {
+        throw new UnauthorizedException('This account is no longer active');
+      }
+      // The row is the source of truth for staff too: a role change (or a
+      // deactivation) must not be survivable by a token issued before it.
+      if (staff.role !== payload.role) {
+        throw new UnauthorizedException('Your access has changed. Sign in again.');
+      }
       return payload;
     }
 

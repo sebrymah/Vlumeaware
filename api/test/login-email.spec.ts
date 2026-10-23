@@ -118,6 +118,25 @@ describe('signing in with a console account', () => {
       /deactivated/i,
     );
   });
+
+  it('does not reveal a correct password for a locked account (no oracle)', async () => {
+    const t = await freshTenant();
+    const user = await consoleUser(t.id, 'locked@example.test', 'correct horse battery');
+    await runInTenant(t.id, () =>
+      db.tenantUser.update({
+        where: { id: user.id },
+        data: { lockedUntil: new Date(Date.now() + 60_000) },
+      }),
+    );
+    // A locked account must fail identically for a right and a wrong password —
+    // neither the message nor the outcome may hint the password was correct.
+    const right = await auth.login('locked@example.test', 'correct horse battery').catch((e) => e);
+    const wrong = await auth.login('locked@example.test', 'not the password').catch((e) => e);
+    expect(right).toBeInstanceOf(UnauthorizedException);
+    expect(wrong).toBeInstanceOf(UnauthorizedException);
+    expect(right.message).toBe(wrong.message);
+    expect(right.message).not.toMatch(/lock/i);
+  });
 });
 
 describe('signing in with a staff account', () => {

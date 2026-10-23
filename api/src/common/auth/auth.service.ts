@@ -113,17 +113,25 @@ export class AuthService {
       }),
     );
 
+    // Remove locked accounts BEFORE the password compare: otherwise a locked
+    // account returns the "account locked" message only when the password is
+    // correct, which turns the lockout into a password oracle. Filtered out, a
+    // locked account is indistinguishable from a wrong password.
+    const now = new Date();
+    const usable = candidates.filter((c) => !(c.lockedUntil && c.lockedUntil > now));
+
     let tenantUser: (typeof candidates)[number] | undefined;
-    for (const candidate of candidates) {
+    for (const candidate of usable) {
       if (await bcrypt.compare(password, candidate.passwordHash)) {
         tenantUser = candidate;
         break;
       }
     }
     if (!tenantUser && candidates.length) {
-      // Record the failure against each matching account, which is what would
-      // happen if the attempt had been aimed at them one at a time.
-      for (const candidate of candidates) {
+      // Record the failure against each unlocked matching account (a locked one
+      // is already locked). The error is identical whether the password was
+      // wrong or the account is locked.
+      for (const candidate of usable) {
         await this.recordTenantUserFailure(
           candidate.id,
           candidate.failedLoginCount,
