@@ -270,6 +270,9 @@ export function CampaignReport({
               disabled={busy}
             />
           )}
+          <Button variant="ghost" onClick={() => setCreatingGroup(true)}>
+            Create a group
+          </Button>
           <Button variant="ghost" onClick={exportCsv}>
             Export CSV
           </Button>
