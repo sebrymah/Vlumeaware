@@ -17,7 +17,17 @@ interface GroupRow {
   name: string;
   createdAt: string;
   _count: { members: number };
+  sourceCampaignName?: string | null;
+  sourceCriteria?: string | null;
 }
+
+const CRITERIA_LABEL: Record<string, string> = {
+  clicked: 'Clicked',
+  submitted: 'Submitted credentials',
+  reported: 'Caught it',
+  opened: 'Opened',
+  any: 'Any interaction',
+};
 interface GroupDetail {
   id: string;
   name: string;

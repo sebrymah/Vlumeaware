@@ -12,11 +12,38 @@ import { currentTenantId } from '../../common/prisma/tenant-context';
 export class GroupsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
-    return this.prisma.db.employeeGroup.findMany({
+  async list() {
+    const groups = await this.prisma.db.employeeGroup.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, createdAt: true, _count: { select: { members: true } } },
+      select: {
+        id: true,
+        name: true,
+        createdAt: true,
+        sourceCampaignId: true,
+        sourceCriteria: true,
+        _count: { select: { members: true } },
+      },
     });
+    const sourceIds = groups.map((g) => g.sourceCampaignId).filter((id): id is string => !!id);
+    const campaigns = sourceIds.length
+      ? await this.prisma.db.campaign.findMany({
+          where: { id: { in: sourceIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nameOf = new Map(campaigns.map((c) => [c.id, c.name]));
+    return groups.map((g) => ({
+      id: g.id,
+      name: g.name,
+      createdAt: g.createdAt,
+      // Keep the original shape for the campaign builder's selector, which reads
+      // `_count.members`; memberCount is the same value under a clearer name.
+      _count: { members: g._count.members },
+      memberCount: g._count.members,
+      sourceCampaignId: g.sourceCampaignId,
+      sourceCampaignName: g.sourceCampaignId ? nameOf.get(g.sourceCampaignId) ?? null : null,
+      sourceCriteria: g.sourceCriteria,
+    }));
   }
 
   async findOne(id: string) {
@@ -39,10 +66,51 @@ export class GroupsService {
   }
 
   async create(name: string) {
+    return this.createWithMembers(name, [], undefined);
+  }
+
+  /**
+   * Creates a group and its members in one transaction.
+   *
+   * This is the "create from campaign results" path: the caller has already shown
+   * a preview and let the admin trim it, so the members arrive as the final set.
+   * Provenance is recorded so the group can say where it came from. The ids are
+   * narrowed to this tenant exactly as setMembers does — a foreign id can never be
+   * linked in.
+   */
+  async createWithMembers(
+    name: string,
+    employeeIds: string[],
+    source?: { campaignId?: string; criteria?: string },
+  ) {
     const clean = name.trim();
     if (!clean) throw new ConflictException('A group name is required.');
+
+    const tenantId = currentTenantId();
+    const valid = await this.prisma.db.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: { id: true },
+    });
+    const ids = valid.map((e) => e.id);
+
     try {
-      return await this.prisma.db.employeeGroup.create({ data: { name: clean, tenantId: currentTenantId() } });
+      return await this.prisma.db.$transaction(async (tx) => {
+        const group = await tx.employeeGroup.create({
+          data: {
+            name: clean,
+            tenantId,
+            sourceCampaignId: source?.campaignId ?? null,
+            sourceCriteria: source?.criteria ?? null,
+          },
+        });
+        if (ids.length) {
+          await tx.employeeGroupMember.createMany({
+            data: ids.map((employeeId) => ({ groupId: group.id, employeeId, tenantId })),
+            skipDuplicates: true,
+          });
+        }
+        return { id: group.id, name: group.name, memberCount: ids.length };
+      });
     } catch (err) {
       throw GroupsService.friendly(err);
     }

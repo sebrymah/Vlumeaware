@@ -238,6 +238,56 @@ export class CampaignsService {
   }
 
   /**
+   * Per-employee outcome for the "create a group from results" flow.
+   *
+   * One row per employee, OR-ing the flags across that employee's sends in this
+   * campaign (a multi-scenario campaign sends to one person several times), and
+   * counting only delivered sends so drafts and still-queued rows match nothing.
+   */
+  async impact(campaignId: string) {
+    await this.findOne(campaignId);
+    const delivered = { campaignId, sentAt: { not: null } } as const;
+
+    // Two aggregate passes: the date flags use max(), and the boolean
+    // credentialsSubmitted flag needs a filtered count (max(boolean) is not valid
+    // in Postgres).
+    const [rows, submitters] = await Promise.all([
+      this.prisma.db.send.groupBy({
+        by: ['employeeId'],
+        where: delivered,
+        _max: { openedAt: true, clickedAt: true, reportedAt: true },
+      }),
+      this.prisma.db.send.groupBy({
+        by: ['employeeId'],
+        where: { ...delivered, credentialsSubmitted: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const byId = new Map(rows.map((r) => [r.employeeId, r]));
+    const submitted = new Set(submitters.map((s) => s.employeeId));
+    const employees = await this.prisma.db.employee.findMany({
+      where: { id: { in: rows.map((r) => r.employeeId) } },
+      select: { id: true, name: true, email: true, department: true },
+    });
+    return employees
+      .map((e) => {
+        const agg = byId.get(e.id)!;
+        return {
+          employeeId: e.id,
+          name: e.name,
+          email: e.email,
+          department: e.department,
+          opened: agg._max.openedAt !== null,
+          clicked: agg._max.clickedAt !== null,
+          reported: agg._max.reportedAt !== null,
+          submitted: submitted.has(e.id),
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
    * Materialises one send row per employee per scenario, then enqueues them.
    * Rows are created before any job runs so the kill switch has something to
    * halt and reporting has a complete denominator.

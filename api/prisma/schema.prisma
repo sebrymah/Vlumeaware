@@ -281,6 +281,11 @@ model EmployeeGroup {
   tenantId  String   @map("tenant_id") @db.Uuid
   name      String
   createdAt DateTime @default(now()) @map("created_at")
+  /// Provenance for a group created from campaign results: which campaign, and
+  /// the criteria that selected the members. Null for hand-built groups. A label,
+  /// not a hard link — the campaign may be gone, the group still exists.
+  sourceCampaignId String? @map("source_campaign_id") @db.Uuid
+  sourceCriteria   String? @map("source_criteria")
 
   tenant  Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   members EmployeeGroupMember[]

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Badge, Button, Card, ConfirmButton, Notice, Stat, Table, pct } from '@/components/ui';
+import { CreateGroupModal } from '@/components/create-group-modal';
 
 export interface Metrics {
   campaignId: string;
@@ -135,6 +136,7 @@ export function CampaignReport({
   const [ok, setOk] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState<Stage | 'all'>('all');
+  const [creatingGroup, setCreatingGroup] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -247,7 +249,8 @@ export function CampaignReport({
     statusFilter === 'all' ? recipients : recipients.filter((r) => reached(r, statusFilter));
 
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-lg font-semibold text-slate-900">{m.campaignName}</h1>
@@ -496,6 +499,16 @@ export function CampaignReport({
           </div>
         )}
       </Card>
-    </div>
+      </div>
+      {creatingGroup && data && (
+        <CreateGroupModal
+          tenantId={tenantId}
+          campaignId={campaignId}
+          campaignName={m.campaignName}
+          onClose={() => setCreatingGroup(false)}
+          onCreated={() => setCreatingGroup(false)}
+        />
+      )}
+    </>
   );
 }

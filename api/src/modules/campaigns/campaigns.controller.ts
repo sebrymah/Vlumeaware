@@ -103,6 +103,13 @@ export class CampaignsController {
     return this.campaigns.recipients(campaignId);
   }
 
+  /** Per-employee outcome, for previewing a "create group from results" action. */
+  @Get('tenants/:tenantId/campaigns/:campaignId/impact')
+  @Roles(ROLES.superadmin, ROLES.clientAdmin, ROLES.clientViewer)
+  impact(@Param('campaignId', ParseUUIDPipe) campaignId: string) {
+    return this.campaigns.impact(campaignId);
+  }
+
   @Post('tenants/:tenantId/campaigns/:campaignId/launch')
   @Roles(ROLES.superadmin, ROLES.clientAdmin)
   @RequiresSignedAgreement()
