@@ -37,7 +37,7 @@ function Employees() {
   // Records the message inline and shows it where the eye already is; a save at
   // the bottom of a long page would otherwise be announced below the fold.
   const flash = (message: string) => {
-    flash(message);
+    setOk(message);
     show(message);
   };
   const tenantId = useActingTenant();

@@ -42,6 +42,10 @@ interface GroupDetail {
   name: string;
   members: Employee[];
 }
+interface TrainingModule {
+  id: string;
+  title: string;
+}
 
 export default function GroupsPage() {
   return (
@@ -56,7 +60,7 @@ function Groups() {
   // Records the message inline and shows it where the eye already is; a save at
   // the bottom of a long page would otherwise be announced below the fold.
   const flash = (message: string) => {
-    flash(message);
+    setOk(message);
     show(message);
   };
   const tenantId = useActingTenant();
@@ -71,6 +75,11 @@ function Groups() {
   const [editing, setEditing] = useState<GroupDetail | null>(null);
   const [memberIds, setMemberIds] = useState<string[]>([]);
   const [search, setSearch] = useState('');
+
+  const [assigning, setAssigning] = useState<GroupRow | null>(null);
+  const [modules, setModules] = useState<TrainingModule[]>([]);
+  const [moduleId, setModuleId] = useState('');
+  const [assignMembers, setAssignMembers] = useState<string[]>([]);
 
   const load = useCallback(async () => {
     if (!tenantId) return;
@@ -171,6 +180,46 @@ function Groups() {
     }
   }
 
+  async function openAssign(g: GroupRow) {
+    setError(null);
+    setOk(null);
+    try {
+      const [mods, detail] = await Promise.all([
+        api.get<TrainingModule[]>(`/tenants/${tenantId}/training-modules`),
+        api.get<GroupDetail>(`/tenants/${tenantId}/groups/${g.id}`),
+      ]);
+      setModules(mods);
+      setAssignMembers(detail.members.map((m) => m.id));
+      setModuleId('');
+      setAssigning(g);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }
+
+  async function confirmAssign() {
+    if (!assigning || !moduleId) return;
+    setBusy(true);
+    setError(null);
+    setOk(null);
+    try {
+      const res = await api.post<{ assigned: number; skipped: number }>(
+        `/tenants/${tenantId}/training/assign`,
+        { trainingModuleId: moduleId, employeeIds: assignMembers, notify: true },
+      );
+      flash(
+        `Assigned to ${res.assigned} member${res.assigned === 1 ? '' : 's'}${
+          res.skipped ? ` (${res.skipped} already had it)` : ''
+        } in “${assigning.name}”.`,
+      );
+      setAssigning(null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const q = search.trim().toLowerCase();
   const shown = q
     ? employees.filter((e) => [e.name, e.email, e.department ?? ''].some((v) => v.toLowerCase().includes(q)))
@@ -218,6 +267,9 @@ function Groups() {
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" onClick={() => openEditor(g)}>
                       Manage members
+                    </Button>
+                    <Button variant="ghost" onClick={() => openAssign(g)} disabled={busy}>
+                      Assign course
                     </Button>
                     <Button variant="ghost" onClick={() => rename(g)} disabled={busy}>
                       Rename
@@ -301,6 +353,50 @@ function Groups() {
                 Save members
               </Button>
             </div>
+          </div>
+        </Card>
+      )}
+
+      {assigning && (
+        <Card
+          title={`Assign a course — ${assigning.name}`}
+          actions={
+            <Button variant="ghost" onClick={() => setAssigning(null)}>
+              Close
+            </Button>
+          }
+        >
+          <p className="text-xs text-slate-500">
+            Every current member of this group will receive the course, with an email link. Members
+            added later are not included — assign again when the group changes.
+          </p>
+          <div className="mt-3 flex flex-wrap items-end gap-3">
+            <div className="min-w-[16rem] flex-1">
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-600">Course</span>
+                <select
+                  className={`${inputClass} mt-1`}
+                  value={moduleId}
+                  onChange={(e) => setModuleId(e.target.value)}
+                >
+                  <option value="">Choose a course…</option>
+                  {modules.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <Button
+              size="md"
+              onClick={confirmAssign}
+              disabled={busy || !moduleId || assignMembers.length === 0}
+            >
+              {busy
+                ? 'Assigning…'
+                : `Assign to ${assignMembers.length} member${assignMembers.length === 1 ? '' : 's'}`}
+            </Button>
           </div>
         </Card>
       )}
