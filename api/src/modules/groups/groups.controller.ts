@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Patch, Post, Put } from '@nestjs/common';
-import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
 import { ROLES } from '../../common/auth/roles';
 import { Roles } from '../../common/auth/roles.decorator';
 import { GroupsService } from './groups.service';
@@ -12,15 +12,14 @@ class MembersDto {
   @IsArray() @ArrayMaxSize(10000) @IsUUID('4', { each: true }) employeeIds!: string[];
 }
 
-/** The five criteria a group can be created from, plus the hand-built default. */
-const SOURCE_CRITERIA = ['clicked', 'submitted', 'reported', 'opened', 'any'] as const;
-
 class CreateGroupDto {
   @IsString() @MinLength(1) @MaxLength(80) name!: string;
   @IsOptional() @IsArray() @ArrayMaxSize(10000) @IsUUID('4', { each: true })
   employeeIds?: string[];
   @IsOptional() @IsUUID('4') sourceCampaignId?: string;
-  @IsOptional() @IsIn(SOURCE_CRITERIA) sourceCriteria?: string;
+  // Comma-joined criteria keys, e.g. "clicked,submitted". The UI controls the
+  // values; this is display-only provenance, so no enum enforcement here.
+  @IsOptional() @IsString() @MaxLength(200) sourceCriteria?: string;
 }
 
 @Controller('tenants/:tenantId/groups')

@@ -16,15 +16,26 @@ interface ImpactRow {
   submitted: boolean;
 }
 
+/**
+ * The criteria are multi-select: selecting "Clicked" and "Caught it" produces the
+ * union of both. Each row in the preview says which of the chosen criteria it
+ * matched, so the admin can tell why someone is in the list.
+ */
 const CRITERIA = [
   { key: 'submitted', label: 'Submitted credentials', hint: 'entered credentials on the lure' },
   { key: 'clicked', label: 'Clicked', hint: 'clicked the link' },
   { key: 'reported', label: 'Caught it', hint: 'reported the email' },
   { key: 'opened', label: 'Opened', hint: 'opened the email' },
-  { key: 'any', label: 'Any interaction', hint: 'clicked or submitted credentials' },
 ] as const;
 
 type CriteriaKey = (typeof CRITERIA)[number]['key'];
+
+const LABEL_OF: Record<CriteriaKey, string> = {
+  submitted: 'Submitted credentials',
+  clicked: 'Clicked',
+  reported: 'Caught it',
+  opened: 'Opened',
+};
 
 function matches(row: ImpactRow, key: CriteriaKey): boolean {
   switch (key) {
@@ -36,9 +47,12 @@ function matches(row: ImpactRow, key: CriteriaKey): boolean {
       return row.reported;
     case 'opened':
       return row.opened;
-    case 'any':
-      return row.clicked || row.submitted;
   }
+}
+
+/** The criteria an employee matched, for the "why is this person here" hint. */
+function matchedKeys(row: ImpactRow, keys: CriteriaKey[]): CriteriaKey[] {
+  return keys.filter((k) => matches(row, k));
 }
 
 /**
@@ -62,7 +76,7 @@ export function CreateGroupModal({
   const { show } = useToast();
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const [criteria, setCriteria] = useState<CriteriaKey>('submitted');
+  const [criteria, setCriteria] = useState<CriteriaKey[]>(['submitted']);
   const [rows, setRows] = useState<ImpactRow[] | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [name, setName] = useState('');
@@ -89,23 +103,28 @@ export function CreateGroupModal({
   }, [tenantId, campaignId]);
 
   const matched = useMemo(
-    () => (rows ?? []).filter((r) => matches(r, criteria)),
+    () => (rows ?? []).filter((r) => criteria.some((k) => matches(r, k))),
     [rows, criteria],
   );
 
-  // When the criteria changes, the whole matched set is selected; the admin then
+  // When the criteria change, the whole matched set is selected; the admin then
   // unticks rather than having to tick everyone in.
   useEffect(() => {
     setSelected(new Set(matched.map((r) => r.employeeId)));
-    // The suggested name follows the criteria unless the admin already typed one.
     if (!nameTouched) {
-      const label = CRITERIA.find((c) => c.key === criteria)!.label;
+      const label = criteria.map((k) => LABEL_OF[k]).join(' + ');
       setName(`${label} — ${campaignName} ${new Date().toLocaleDateString()}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [criteria, rows]);
 
   const allSelected = matched.length > 0 && matched.every((r) => selected.has(r.employeeId));
+
+  function toggleCriteria(key: CriteriaKey) {
+    setCriteria((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  }
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -126,7 +145,9 @@ export function CreateGroupModal({
           name: name.trim(),
           employeeIds: [...selected],
           sourceCampaignId: campaignId,
-          sourceCriteria: criteria,
+          // Provenance is the ordered, comma-joined criteria, so a multi-select
+          // group reads "clicked,submitted" on the groups page.
+          sourceCriteria: [...criteria].sort().join(','),
         },
       );
       show(`Group "${created.name}" created with ${created.memberCount} members.`);
@@ -165,24 +186,35 @@ export function CreateGroupModal({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div className="space-y-4">
             <div>
-              <span className="text-xs font-semibold text-slate-600">Who should be in it?</span>
+              <span className="text-xs font-semibold text-slate-600">
+                Who should be in it? Select one or more.
+              </span>
               <div className="mt-2 flex flex-wrap gap-2">
-                {CRITERIA.map((c) => (
-                  <button
-                    key={c.key}
-                    type="button"
-                    onClick={() => setCriteria(c.key)}
-                    title={c.hint}
-                    className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition ${
-                      criteria === c.key
-                        ? 'bg-brand-50 text-brand-700 ring-brand-500'
-                        : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
+                {CRITERIA.map((c) => {
+                  const on = criteria.includes(c.key);
+                  return (
+                    <button
+                      key={c.key}
+                      type="button"
+                      onClick={() => toggleCriteria(c.key)}
+                      title={c.hint}
+                      aria-pressed={on}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 ring-inset transition ${
+                        on
+                          ? 'bg-brand-50 text-brand-700 ring-brand-500'
+                          : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      {c.label}
+                    </button>
+                  );
+                })}
               </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                {criteria.length
+                  ? `Anyone matching any of the selected: ${criteria.map((k) => LABEL_OF[k]).join(' + ')}.`
+                  : 'Pick at least one criterion.'}
+              </p>
             </div>
 
             <label className="block">
@@ -204,10 +236,11 @@ export function CreateGroupModal({
               <p className="py-6 text-sm text-slate-500">Loading results…</p>
             ) : rows === null ? (
               <p className="py-6 text-sm text-slate-500">Could not load results.</p>
+            ) : criteria.length === 0 ? (
+              <p className="py-6 text-sm text-slate-500">Pick at least one criterion.</p>
             ) : matched.length === 0 ? (
               <p className="py-6 text-sm text-slate-500">
-                No one matched this criteria. This campaign had no{' '}
-                {CRITERIA.find((c) => c.key === criteria)!.label.toLowerCase()}.
+                No one matched the selected criteria.
               </p>
             ) : (
               <div className="rounded-lg border border-slate-200">
@@ -226,31 +259,33 @@ export function CreateGroupModal({
                   </button>
                 </div>
                 <ul className="max-h-64 overflow-y-auto">
-                  {matched.map((r) => (
-                    <li key={r.employeeId} className="border-b border-slate-50 last:border-0">
-                      <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(r.employeeId)}
-                          onChange={() => toggle(r.employeeId)}
-                          className="h-4 w-4"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-slate-800">
-                            {r.name}
+                  {matched.map((r) => {
+                    const why = matchedKeys(r, criteria);
+                    return (
+                      <li key={r.employeeId} className="border-b border-slate-50 last:border-0">
+                        <label className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={selected.has(r.employeeId)}
+                            onChange={() => toggle(r.employeeId)}
+                            className="h-4 w-4"
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-slate-800">
+                              {r.name}
+                            </span>
+                            <span className="block truncate text-xs text-slate-500">
+                              {r.email}
+                              {r.department ? ` · ${r.department}` : ''}
+                            </span>
                           </span>
-                          <span className="block truncate text-xs text-slate-500">
-                            {r.email}
-                            {r.department ? ` · ${r.department}` : ''}
+                          <span className="shrink-0 text-[11px] text-slate-400">
+                            {why.map((k) => LABEL_OF[k]).join(' · ')}
                           </span>
-                        </span>
-                        <span className="shrink-0 text-[11px] text-slate-400">
-                          {r.submitted ? 'submitted · ' : ''}
-                          {r.clicked ? 'clicked' : r.opened ? 'opened' : ''}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
+                        </label>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             )}
@@ -269,7 +304,7 @@ export function CreateGroupModal({
           <Button
             size="md"
             onClick={create}
-            disabled={busy || !name.trim() || selected.size === 0}
+            disabled={busy || !name.trim() || selected.size === 0 || criteria.length === 0}
           >
             {busy ? 'Creating…' : 'Create group'}
           </Button>

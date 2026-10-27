@@ -26,8 +26,17 @@ const CRITERIA_LABEL: Record<string, string> = {
   submitted: 'Submitted credentials',
   reported: 'Caught it',
   opened: 'Opened',
-  any: 'Any interaction',
 };
+
+/** "clicked,submitted" -> "Clicked + Submitted credentials". */
+function criteriaLabel(raw: string | null | undefined): string {
+  if (!raw) return '';
+  return raw
+    .split(',')
+    .map((k) => CRITERIA_LABEL[k.trim()] ?? k.trim())
+    .filter(Boolean)
+    .join(' + ');
+}
 interface GroupDetail {
   id: string;
   name: string;
